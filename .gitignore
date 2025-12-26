@@ -25,3 +25,4 @@ replay_pid*
 
 # Ignore environment variable files
 infra/db/.env
+infra/keycloak/.env
