@@ -6,6 +6,7 @@ This directory contains all infrastructure-related code and configuration for th
 
 - `db/` — Database infrastructure (PostgreSQL, environment variables, Docker Compose, etc.)
 - `keycloak/` — Keycloak identity and access management infrastructure (environment variables, Docker Compose, etc.)
+- `rabbitmq/` — RabbitMQ messaging infrastructure (environment variables, Docker Compose, etc.)
 
 ## General Guidelines
 
@@ -21,3 +22,4 @@ Refer to each subdirectory's README for detailed setup instructions.
 
 For database setup, see [db/README.md](db/README.md).
 For Keycloak setup, see [keycloak/README.md](keycloak/README.md).
+For RabbitMQ setup, see [rabbitmq/README.md](rabbitmq/README.md).
