@@ -27,6 +27,7 @@ replay_pid*
 infra/db/.env
 infra/keycloak/.env
 infra/rabbitmq/.env
+banking/.env
 
 target/
 .mvn/wrapper/maven-wrapper.jar
