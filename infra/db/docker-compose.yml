@@ -1,8 +1,7 @@
-
 services:
-  postgres:
+  finance-db:
     image: postgres:18
-    container_name: pg18
+    container_name: finance-db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -11,13 +10,19 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - pg18-data:/var/lib/postgresql
+      - finance-db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - finance-net
 
 volumes:
-  pg18-data:
+  finance-db-data:
     driver: local
+
+networks:
+  finance-net:
+    external: true

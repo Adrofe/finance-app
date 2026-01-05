@@ -1,0 +1,15 @@
+services:
+  banking:
+    build:
+      context: .
+      dockerfile: banking/Dockerfile
+    env_file:
+      - ./banking/.env
+    ports:
+      - "8081:8081"
+    networks:
+      - finance-net
+
+networks:
+  finance-net:
+    external: true
