@@ -1,40 +1,29 @@
 CREATE TABLE IF NOT EXISTS banking.tags (
   id           BIGSERIAL PRIMARY KEY,
-  name         VARCHAR(64) NOT NULL,
+  name         VARCHAR(64) NOT NULL UNIQUE,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (name)
-);
-
-CREATE TABLE IF NOT EXISTS banking.transaction_tags (
-  transaction_id BIGINT NOT NULL REFERENCES banking.transactions(id) ON DELETE CASCADE,
-  tag_id         BIGINT NOT NULL REFERENCES banking.tags(id) ON DELETE CASCADE,
-  PRIMARY KEY (transaction_id, tag_id)
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS banking.transaction_statuses (
   id           BIGSERIAL PRIMARY KEY,
   code         VARCHAR(32) NOT NULL UNIQUE,
   description  TEXT,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (code)
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS banking.transaction_types (
   id           BIGSERIAL PRIMARY KEY,
-  name         VARCHAR(64) NOT NULL,
+  name         VARCHAR(64) NOT NULL UNIQUE,
   description  TEXT,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (name)
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS banking.merchants (
   id           BIGSERIAL PRIMARY KEY,
-  name         VARCHAR(128) NOT NULL,
+  name         VARCHAR(128) NOT NULL UNIQUE,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (name)
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE TABLE IF NOT EXISTS banking.categories (
   id           BIGSERIAL PRIMARY KEY,
   name         VARCHAR(64) NOT NULL,
@@ -42,32 +31,28 @@ CREATE TABLE IF NOT EXISTS banking.categories (
   parent_id    BIGINT REFERENCES banking.categories(id) ON DELETE SET NULL,
   is_fixed     BOOLEAN DEFAULT FALSE,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
-  updated_at   TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (name)
+  updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS banking.tenants (
   id           BIGSERIAL PRIMARY KEY,
-  name         VARCHAR(128) NOT NULL,
-  email        VARCHAR(128),
+  name         VARCHAR(128) NOT NULL UNIQUE,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
   updated_at   TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS banking.account_types (
   id               BIGSERIAL PRIMARY KEY,
-  name             VARCHAR(64) NOT NULL,
+  name             VARCHAR(64) NOT NULL UNIQUE,
   description      TEXT,
   created_at       TIMESTAMPTZ DEFAULT NOW(),
-  updated_at       TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (name)
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS banking.institutions (
   id               BIGSERIAL PRIMARY KEY,
-  name             VARCHAR(128) NOT NULL,
+  name             VARCHAR(128) NOT NULL UNIQUE,
   country          VARCHAR(2),         -- ISO 3166-1 alpha-2
   website          VARCHAR(256),
   created_at       TIMESTAMPTZ DEFAULT NOW(),
-  updated_at       TIMESTAMPTZ DEFAULT NOW(),
-  PRIMARY KEY (name)
+  updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS banking.accounts (
@@ -104,6 +89,12 @@ CREATE TABLE IF NOT EXISTS banking.transactions (
   status_id            BIGINT REFERENCES banking.transaction_statuses(id) DEFAULT 1,
   transaction_type     BIGINT REFERENCES banking.transaction_types(id),
   created_at           TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS banking.transaction_tags (
+  transaction_id BIGINT NOT NULL REFERENCES banking.transactions(id) ON DELETE CASCADE,
+  tag_id         BIGINT NOT NULL REFERENCES banking.tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (transaction_id, tag_id)
 );
 
 -- Idempotencia en importaciones

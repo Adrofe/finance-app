@@ -152,8 +152,8 @@ INSERT INTO banking.categories (name, parent_id, code) VALUES
 ('Others',(SELECT id FROM banking.categories WHERE code='SAV'),'SAV.OTH')
 ON CONFLICT (code) DO NOTHING;
 
-INSERT INTO banking.tenants (name, email, created_at, updated_at) VALUES
- ('Default Tenant', NULL, NOW(), NOW())
+INSERT INTO banking.tenants (name, created_at, updated_at) VALUES
+ ('Default Tenant', NOW(), NOW())
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO banking.account_types (name, description, created_at, updated_at) VALUES
