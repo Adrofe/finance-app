@@ -1,0 +1,72 @@
+@startuml finance-app context
+' C4 Context
+!include banking/doc/C4_Context.puml
+LAYOUT_WITH_LEGEND()
+
+title C0 — High-Level System Context: finance-app
+
+' Personas
+Person(user, "End User", "Manages personal finances via web/mobile app")
+Person(admin, "Admin/Backoffice", "Configures and supervises the platform")
+
+' Main system boundary
+System_Boundary(finapp, "finance-app (Microservices)") {
+  System(gateway, "API Gateway", "Spring Cloud Gateway", "Routes requests, security, rate limiting")
+  System(identity, "Identity Service", "Keycloak", "Authentication/authorization (OIDC/OAuth2)")
+  System(banking, "Banking Service", "Manages accounts, transactions, categorization")
+  System(budgeting, "Budgeting Service", "Manages budgets and spending limits")
+  System(investments, "Investments Service", "Manages assets, orders, valuations")
+  System(marketdata, "MarketData Service", "Imports prices, FX rates")
+  System(tax, "Tax Service", "Calculates tax events, generates reports")
+  System(reporting, "Reporting Service", "Aggregates and exposes dashboards")
+  System(notifications, "Notification Service", "Sends emails, push, alerts")
+}
+
+' External systems
+System_Ext(csv, "CSV File", "User-provided data imports (bank, broker, market)")
+System_Ext(email, "Email/Push Provider", "SMTP/Push/Webhook delivery")
+System_Ext(pgsql, "PostgreSQL", "Transactional database (per service)")
+System_Ext(mq, "RabbitMQ", "Asynchronous messaging/event bus")
+System_Ext(grafana, "Grafana/Prometheus", "Metrics and dashboards")
+System_Ext(s3, "S3/MinIO", "Backups, file storage")
+
+' User interactions
+Rel(user, gateway, "Uses web/mobile app", "HTTPs + OIDC (JWT)")
+Rel(admin, gateway, "Backoffice/API access", "HTTPs + OIDC (roles)")
+Rel(csv, banking, "Imports transactions (sync)", "Upload HTTPs")
+Rel(user, mq, "Sends transactions (async)", "AMQP")
+
+' Gateway routes to services
+Rel(gateway, identity, "OIDC login, token validation", "HTTPs")
+Rel(gateway, banking, "Routes banking API", "HTTPs + JWT")
+Rel(gateway, budgeting, "Routes budgeting API", "HTTPs + JWT")
+Rel(gateway, investments, "Routes investments API", "HTTPs + JWT")
+Rel(gateway, reporting, "Routes reporting API", "HTTPs + JWT")
+Rel(gateway, tax, "Routes tax API", "HTTPs + JWT")
+
+' Service-to-service interactions
+Rel(banking, mq, "Publishes events (imported, categorized, suspicious)", "AMQP")
+Rel(mq, banking, "Banking consumes transactions (async)", "AMQP")
+Rel(mq, notifications, "Notifications service consumes events", "AMQP")
+Rel(notifications, email, "Sends emails/push", "SMTP/Push")
+Rel(budgeting, mq, "Publishes/consumes budget events", "AMQP")
+Rel(investments, mq, "Publishes/consumes investment events", "AMQP")
+Rel(reporting, pgsql, "Reads aggregates, dashboards", "JDBC/SQL")
+Rel(banking, pgsql, "Reads/writes data", "JDBC/SQL")
+Rel(budgeting, pgsql, "Reads/writes data", "JDBC/SQL")
+Rel(investments, pgsql, "Reads/writes data", "JDBC/SQL")
+Rel(marketdata, pgsql, "Reads/writes data", "JDBC/SQL")
+Rel(tax, pgsql, "Reads/writes data", "JDBC/SQL")
+Rel(notifications, pgsql, "Reads/writes data", "JDBC/SQL")
+Rel(reporting, mq, "Consumes events for dashboards", "AMQP")
+Rel(marketdata, investments, "Provides prices, FX rates", "HTTPs/AMQP")
+Rel(marketdata, banking, "Provides FX rates (if needed)", "HTTPs/AMQP")
+Rel(tax, reporting, "Receives data for annual reports", "HTTPs/AMQP")
+Rel(reporting, grafana, "Exports metrics", "Prometheus")
+Rel(banking, s3, "Backups, CSV exports", "S3 API")
+Rel(budgeting, s3, "Backups", "S3 API")
+Rel(investments, s3, "Backups", "S3 API")
+Rel(tax, s3, "Backups", "S3 API")
+
+SHOW_LEGEND()
+@enduml
