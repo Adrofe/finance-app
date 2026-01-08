@@ -1,0 +1,40 @@
+@startuml banking_context
+' C4 Context
+!include C4_Context.puml
+LAYOUT_WITH_LEGEND()
+
+title C1 — Context: banking module
+
+
+System_Boundary(internal, "Banking (Internal)") {
+	System(system, "banking", "Banking module for personal finance management")
+}
+
+Person(user, "End User", "Manages accounts, transactions, categories, and tags")
+Person(po, "Product Owner", "Backoffice / configuration")
+System_Ext(keycloak, "Keycloak", "Identity & Access Management (OIDC/OAuth2)")
+System_Ext(notify, "Notification Provider", "Email/Push/Webhooks (SMTP/HTTPs)")
+System_Ext(csv, "CSV File", "Bank export provided by the user")
+System_Ext(pgsql, "PostgreSQL", "Transactional database (persistent storage)")
+System_Ext(rabbit, "RabbitMQ", "Asynchronous messaging broker")
+System_Ext(investments, "Investments", "Investments module (microservice)")
+System_Ext(budgeting, "Budgeting", "Budgeting module (microservice)")
+
+Rel(user, system, "Uses web/mobile app", "HTTPs + OIDC (JWT)")
+Rel(po, system, "Configuration and supervision", "HTTPs + OIDC (roles)")
+Rel(csv, system, "Uploads transactions (sync)", "Upload HTTPs")
+Rel(user, rabbit, "Sends transactions (async)", "AMQP")
+Rel(rabbit, system, "Banking consumes transactions (async)", "AMQP")
+Rel(system, rabbit, "Publishes suspicious transaction events", "AMQP")
+Rel(rabbit, notify, "Notification Provider consumes events and sends emails", "AMQP/SMTP/HTTPs")
+Rel(user, keycloak, "Authentication", "OIDC")
+Rel(system, keycloak, "Token verification / authorization", "OIDC introspection")
+
+Rel(system, pgsql, "Reads/writes data", "JDBC/SQL")
+Rel(system, rabbit, "Publishes/consumes events", "AMQP")
+
+Rel(system, investments, "Sends account balances, receives investment transactions", "REST/API/Events")
+Rel(system, budgeting, "Sends categorized transactions, receives budget limits and alerts", "REST/API/Events")
+
+SHOW_LEGEND()
+@enduml

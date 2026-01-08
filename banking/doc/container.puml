@@ -1,0 +1,43 @@
+@startuml banking_container
+' C4 Containers
+!include C4_Container.puml
+LAYOUT_WITH_LEGEND()
+
+title C2 — Containers: finance-app and environment
+
+Person(user, "End User")
+System_Boundary(app, "finance-app") {
+  Container(webapp, "Web App (SPA)", "React/Angular", "UI for accounts, transactions, filters, categories, and tags")
+  Container(banking, "Banking Service", "Spring Boot (REST)", "API for accounts/transactions, CSV import, categorization, notifications")
+  ContainerDb(db, "PostgreSQL", "RDBMS", "Accounts, transactions, hierarchical categories, tags, states")
+  Container(queue, "RabbitMQ", "AMQP", "Domain events (TransactionImported, TransactionCategorized)")
+}
+
+Container_Ext(keycloak, "Keycloak", "IAM (OIDC/OAuth2)", "Authentication/authorization with roles/claims")
+Container_Ext(notify, "Notification Service", "HTTPs/SMTP", "Email/push/webhook delivery")
+
+Rel(user, webapp, "Interaction", "HTTPs")
+Rel(webapp, keycloak, "OIDC Login (PKCE)", "HTTPs")
+Rel(webapp, banking, "REST API (CSV import, queries)", "HTTPs + JWT")
+Rel(webapp, queue, "Sends transactions (async)", "AMQP/TLS")
+Rel(queue, banking, "Consumes transactions (async)", "AMQP/TLS")
+Rel(banking, db, "Data access", "JDBC + SSL")
+Rel(banking, queue, "Publishes suspicious transaction events", "AMQP/TLS")
+Rel(queue, notify, "Notification Service consumes events and sends emails", "AMQP/TLS")
+Rel(banking, notify, "Sends direct notifications (sync)", "HTTPs/SMTP")
+Rel(banking, keycloak, "Token introspection / roles", "HTTPs")
+
+Note right of banking
+  Multi-tenant: Logical isolation by tenant_id
+end note
+
+Note right of db
+  Security: Encryption at rest and in transit; RLS/filters by tenant_id
+end note
+
+Note right of queue
+  Observability: Event correlation by tenant_id
+end note
+
+SHOW_LEGEND()
+@enduml

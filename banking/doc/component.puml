@@ -1,0 +1,66 @@
+
+@startuml banking_component
+' C4 Components
+!include C4_Component.puml
+LAYOUT_WITH_LEGEND()
+
+title C3 — Components: Banking Service (Spring Boot)
+
+Container(banking, "Banking Service", "Spring Boot (REST)", "Banking module backend")
+
+ContainerDb(db, "PostgreSQL", "RDBMS", "Persistence (multi-tenant)")
+Container(queue, "RabbitMQ", "AMQP", "Domain events and manual transactions")
+Container_Ext(notify, "Notification Service", "HTTPs/SMTP", "Notification channels")
+Container_Ext(keycloak, "Keycloak", "IAM", "Authentication/authorization")
+
+
+' ---- Internal components of the Banking Service ----
+Component(accounts_api, "Accounts API", "REST Controller", "CRUD for accounts (type, currency, alias) — RF-001")
+Component(trans_api, "Transactions API", "REST Controller", "Query/filter, states, balance — RF-004/RF-005")
+Component(importer, "CSV Importer", "Service", "Validation, idempotency, storage, reporting — RF-002. Imports transactions via API REST (CSV)")
+Component(categorizer, "Categorization Engine", "Service", "Rules + ML; hierarchy, manual correction — RF-003")
+Component(tags_mgr, "Tags Manager", "Service", "Tag and filter management — RF-008")
+Component(notif_rules, "Notification Rules", "Service", "Thresholds/anomalies; triggers alerts — RF-006")
+Component(repo, "Repository Layer", "JPA/Repositories", "Data access with tenant_id filter — RF-007/RF-009")
+Component(event_pub, "Event Publisher", "AMQP Producer", "Publishes events (TransactionImported, TransactionCategorized)")
+
+Component(manual_consumer, "Manual Transaction Consumer", "AMQP Consumer", "Processes transactions manually created from the frontend (one by one via RabbitMQ)")
+
+
+' ---- Internal relationships ----
+Rel(accounts_api, repo, "Account CRUD", "JPA")
+Rel(trans_api, repo, "Query transactions/balance", "JPA")
+Rel(importer, repo, "Insert/update transactions (idempotency)", "JPA")
+Rel(importer, event_pub, "Publish TransactionImported", "AMQP")
+Rel(manual_consumer, repo, "Insert manual transactions", "JPA")
+Rel(manual_consumer, event_pub, "Publish TransactionImported", "AMQP")
+Rel(categorizer, repo, "Read/update category and state", "JPA")
+Rel(categorizer, event_pub, "Publish TransactionCategorized", "AMQP")
+Rel(tags_mgr, repo, "Tag and association management", "JPA")
+Rel(notif_rules, trans_api, "Evaluate events/conditions", "Local service")
+Rel(notif_rules, notify, "Send notifications", "HTTPs/SMTP")
+
+Rel(queue, manual_consumer, "Receives manual transactions from frontend", "AMQP")
+
+
+' ---- Relationships with external containers ----
+Rel(repo, db, "Multi-tenant persistence", "JDBC + SSL")
+Rel(event_pub, queue, "Event publishing", "AMQP/TLS")
+Rel(accounts_api, keycloak, "Authorization by roles/claims", "OIDC")
+Rel(trans_api, keycloak, "Authorization by roles/claims", "OIDC")
+
+
+' ---- Quality notes (NFR) ----
+AddProperty(banking, "Security", "Keycloak (OIDC), encryption in transit; auditing")
+AddProperty(banking, "Performance", "p95 balance query ≤ NFR target")
+AddProperty(banking, "Availability", "SLO/SLA defined in NFR")
+AddProperty(banking, "Observability", "Metrics/Logs/Tracing with tenant_id")
+
+Note right of queue
+  Transactions manually created by the user in the frontend are sent one by one via RabbitMQ (AMQP) and processed by the Banking Service.
+  Bulk imports (CSV) are processed via API REST and the CSV Importer.
+end note
+AddProperty(repo, "Multi-tenant", "All queries filter by tenant_id")
+
+SHOW_LEGEND()
+@enduml
