@@ -5,16 +5,19 @@ import org.springframework.stereotype.Component;
 import es.triana.company.banking.model.api.AccountDTO;
 import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.AccountType;
+import es.triana.company.banking.model.db.Institution;
 
 @Component
 public class AccountMapper {
     public AccountDTO toDto(Account account) {
     AccountType accountType = account.getAccountType();
+    Institution institution = account.getInstitution();
 
         return AccountDTO.builder()
                 .id(account.getId())
                 .tenantId(account.getTenantId())
-                .institutionId(account.getInstitutionId())
+                .institutionId(institution != null ? institution.getId() : null)
+                .institutionName(institution != null ? institution.getName() : null)
                 .name(account.getName())
                 .iban(account.getIban())
                 .accountTypeId(accountType != null ? accountType.getId() : null)
@@ -32,7 +35,6 @@ public class AccountMapper {
         Account account = Account.builder()
         .id(accountDTO.getId())
         .tenantId(accountDTO.getTenantId())
-        .institutionId(accountDTO.getInstitutionId())
         .name(accountDTO.getName())
         .iban(accountDTO.getIban())
         .currency(accountDTO.getCurrency())

@@ -33,6 +33,8 @@ public class AccountDTO {
     @Positive(message = "Institution id must be greater than zero")
     private Long institutionId;
 
+    private String institutionName;
+
     @Size(max = 34, message = "IBAN must not exceed 34 characters")
     private String iban;
 

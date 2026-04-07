@@ -9,9 +9,12 @@ import org.springframework.stereotype.Service;
 import es.triana.company.banking.model.api.AccountDTO;
 import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.AccountType;
+import es.triana.company.banking.model.db.Institution;
 import es.triana.company.banking.repository.AccountTypeRepository;
 import es.triana.company.banking.repository.AccountsRepository;
+import es.triana.company.banking.repository.InstitutionRepository;
 import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
+import es.triana.company.banking.service.exception.InstitutionNotFoundException;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
 import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
 import es.triana.company.banking.service.exception.TenantMismatchException;
@@ -24,6 +27,8 @@ public class AccountsService {
     private AccountsRepository accountsRepository;
     @Autowired
     private AccountTypeRepository accountTypeRepository;
+    @Autowired
+    private InstitutionRepository institutionRepository;
     @Autowired
     private AccountMapper accountMapper;
 
@@ -52,6 +57,7 @@ public class AccountsService {
         normalizeAccount(accountEntity);
         validateUniqueIbanForCreate(accountEntity);
         accountEntity.setAccountType(resolveAccountType(account.getAccountTypeId()));
+        accountEntity.setInstitution(resolveInstitution(account.getInstitutionId()));
         accountEntity.setCreatedAt(LocalDateTime.now());
         accountEntity.setUpdatedAt(LocalDateTime.now());
         return accountMapper.toDto(accountsRepository.save(accountEntity));
@@ -87,6 +93,7 @@ public class AccountsService {
         existingAccount.setName(normalizeName(updatedAccount.getName()));
         existingAccount.setIban(normalizeIban(updatedAccount.getIban()));
         existingAccount.setAccountType(resolveAccountType(updatedAccount.getAccountTypeId()));
+        existingAccount.setInstitution(resolveInstitution(updatedAccount.getInstitutionId()));
         existingAccount.setCurrency(normalizeCurrency(updatedAccount.getCurrency()));
         existingAccount.setLastBalanceReal(updatedAccount.getLastBalanceReal());
         existingAccount.setLastBalanceRealDate(updatedAccount.getLastBalanceRealDate());
@@ -102,6 +109,15 @@ public class AccountsService {
 
         return accountTypeRepository.findById(accountTypeId)
                 .orElseThrow(() -> new AccountTypeNotFoundException(accountTypeId));
+    }
+
+    private Institution resolveInstitution(Long institutionId) {
+        if (institutionId == null) {
+            return null;
+        }
+
+        return institutionRepository.findById(institutionId)
+                .orElseThrow(() -> new InstitutionNotFoundException(institutionId));
     }
 
     private void validateUniqueIbanForCreate(Account account) {

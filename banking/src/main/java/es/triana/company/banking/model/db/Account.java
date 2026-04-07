@@ -30,8 +30,9 @@ public class Account {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    @Column(name = "institution_id")
-    private Long institutionId;
+    @ManyToOne
+    @JoinColumn(name = "institution_id")
+    private Institution institution;
 
     @Column(name = "name", nullable = false)
     private String name;
