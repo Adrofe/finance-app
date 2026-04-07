@@ -11,7 +11,10 @@ import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.AccountType;
 import es.triana.company.banking.repository.AccountTypeRepository;
 import es.triana.company.banking.repository.AccountsRepository;
+import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
+import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
+import es.triana.company.banking.service.exception.TenantMismatchException;
 import es.triana.company.banking.service.mapper.AccountMapper;
 
 @Service
@@ -46,6 +49,8 @@ public class AccountsService {
 
     public AccountDTO createAccount(AccountDTO account) {
         Account accountEntity = accountMapper.toEntity(account);
+        normalizeAccount(accountEntity);
+        validateUniqueIbanForCreate(accountEntity);
         accountEntity.setAccountType(resolveAccountType(account.getAccountTypeId()));
         accountEntity.setCreatedAt(LocalDateTime.now());
         accountEntity.setUpdatedAt(LocalDateTime.now());
@@ -69,17 +74,20 @@ public class AccountsService {
         Account existingAccount = accountsRepository.findById(updatedAccount.getId())
                 .orElseThrow(() -> new AccountNotFoundException(updatedAccount.getId()));
 
+        validateTenantOwnership(existingAccount, updatedAccount);
+
         updateEntityFromDto(existingAccount, updatedAccount);
+        validateUniqueIbanForUpdate(existingAccount);
         existingAccount.setUpdatedAt(LocalDateTime.now());
 
         return accountMapper.toDto(accountsRepository.save(existingAccount));
     }
 
     private void updateEntityFromDto(Account existingAccount, AccountDTO updatedAccount) {
-        existingAccount.setName(updatedAccount.getName());
-        existingAccount.setIban(updatedAccount.getIban());
+        existingAccount.setName(normalizeName(updatedAccount.getName()));
+        existingAccount.setIban(normalizeIban(updatedAccount.getIban()));
         existingAccount.setAccountType(resolveAccountType(updatedAccount.getAccountTypeId()));
-        existingAccount.setCurrency(updatedAccount.getCurrency());
+        existingAccount.setCurrency(normalizeCurrency(updatedAccount.getCurrency()));
         existingAccount.setLastBalanceReal(updatedAccount.getLastBalanceReal());
         existingAccount.setLastBalanceRealDate(updatedAccount.getLastBalanceRealDate());
         existingAccount.setLastBalanceAvailable(updatedAccount.getLastBalanceAvailable());
@@ -93,6 +101,47 @@ public class AccountsService {
         }
 
         return accountTypeRepository.findById(accountTypeId)
-                .orElseThrow(() -> new IllegalArgumentException("Account type not found with id: " + accountTypeId));
+                .orElseThrow(() -> new AccountTypeNotFoundException(accountTypeId));
+    }
+
+    private void validateUniqueIbanForCreate(Account account) {
+        if (account.getIban() != null && accountsRepository.existsByTenantIdAndIban(account.getTenantId(), account.getIban())) {
+            throw new DuplicateAccountIbanException(account.getIban(), account.getTenantId());
+        }
+    }
+
+    private void validateUniqueIbanForUpdate(Account account) {
+        if (account.getIban() != null && accountsRepository.existsByTenantIdAndIbanAndIdNot(account.getTenantId(), account.getIban(), account.getId())) {
+            throw new DuplicateAccountIbanException(account.getIban(), account.getTenantId());
+        }
+    }
+
+    private void validateTenantOwnership(Account existingAccount, AccountDTO updatedAccount) {
+        if (updatedAccount.getTenantId() != null && !existingAccount.getTenantId().equals(updatedAccount.getTenantId())) {
+            throw new TenantMismatchException(existingAccount.getId());
+        }
+    }
+
+    private void normalizeAccount(Account account) {
+        account.setName(normalizeName(account.getName()));
+        account.setIban(normalizeIban(account.getIban()));
+        account.setCurrency(normalizeCurrency(account.getCurrency()));
+    }
+
+    private String normalizeName(String name) {
+        return name == null ? null : name.trim();
+    }
+
+    private String normalizeIban(String iban) {
+        if (iban == null) {
+            return null;
+        }
+
+        String normalizedIban = iban.replace(" ", "").trim().toUpperCase();
+        return normalizedIban.isEmpty() ? null : normalizedIban;
+    }
+
+    private String normalizeCurrency(String currency) {
+        return currency == null ? null : currency.trim().toUpperCase();
     }
 }
