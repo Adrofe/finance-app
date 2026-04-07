@@ -2,12 +2,16 @@ package es.triana.company.banking.controller;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RestController;
 
 import es.triana.company.banking.model.api.AccountDTO;
 import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.service.AccountsService;
+import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
+import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
+import es.triana.company.banking.service.exception.TenantMismatchException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -43,10 +47,15 @@ public class AccountsController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<AccountDTO>> createAccount(@RequestBody AccountDTO newAccount) {
-        AccountDTO createdAccount = accountsService.createAccount(newAccount);
-        ApiResponse<AccountDTO> response = new ApiResponse<>(201, "Account created successfully", createdAccount);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    public ResponseEntity<ApiResponse<AccountDTO>> createAccount(@Valid @RequestBody AccountDTO newAccount) {
+        try {
+            AccountDTO createdAccount = accountsService.createAccount(newAccount);
+            ApiResponse<AccountDTO> response = new ApiResponse<>(201, "Account created successfully", createdAccount);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (DuplicateAccountIbanException | AccountTypeNotFoundException e) {
+            ApiResponse<AccountDTO> response = new ApiResponse<>(400, e.getMessage(), null);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -80,11 +89,14 @@ public class AccountsController {
     }
 
     @PutMapping
-    public ResponseEntity<ApiResponse<AccountDTO>> updateAccount(@RequestBody AccountDTO updatedAccount) {
+    public ResponseEntity<ApiResponse<AccountDTO>> updateAccount(@Valid @RequestBody AccountDTO updatedAccount) {
         try {
             AccountDTO account = accountsService.updateAccount(updatedAccount);
             ApiResponse<AccountDTO> response = new ApiResponse<>(201, "Account updated successfully", account);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (DuplicateAccountIbanException | AccountTypeNotFoundException | TenantMismatchException e) {
+            ApiResponse<AccountDTO> response = new ApiResponse<>(400, e.getMessage(), null);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         } catch (AccountNotFoundException e) {
             ApiResponse<AccountDTO> response = new ApiResponse<>(404, e.getMessage(), null);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
