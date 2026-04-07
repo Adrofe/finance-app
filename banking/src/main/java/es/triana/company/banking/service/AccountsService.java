@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 
 import es.triana.company.banking.model.api.AccountDTO;
 import es.triana.company.banking.model.db.Account;
+import es.triana.company.banking.model.db.AccountType;
+import es.triana.company.banking.repository.AccountTypeRepository;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
 import es.triana.company.banking.service.mapper.AccountMapper;
@@ -17,6 +19,8 @@ public class AccountsService {
 
     @Autowired
     private AccountsRepository accountsRepository;
+    @Autowired
+    private AccountTypeRepository accountTypeRepository;
     @Autowired
     private AccountMapper accountMapper;
 
@@ -42,6 +46,7 @@ public class AccountsService {
 
     public AccountDTO createAccount(AccountDTO account) {
         Account accountEntity = accountMapper.toEntity(account);
+        accountEntity.setAccountType(resolveAccountType(account.getAccountTypeId()));
         accountEntity.setCreatedAt(LocalDateTime.now());
         accountEntity.setUpdatedAt(LocalDateTime.now());
         return accountMapper.toDto(accountsRepository.save(accountEntity));
@@ -73,12 +78,21 @@ public class AccountsService {
     private void updateEntityFromDto(Account existingAccount, AccountDTO updatedAccount) {
         existingAccount.setName(updatedAccount.getName());
         existingAccount.setIban(updatedAccount.getIban());
-        existingAccount.setType(updatedAccount.getType());
+        existingAccount.setAccountType(resolveAccountType(updatedAccount.getAccountTypeId()));
         existingAccount.setCurrency(updatedAccount.getCurrency());
         existingAccount.setLastBalanceReal(updatedAccount.getLastBalanceReal());
         existingAccount.setLastBalanceRealDate(updatedAccount.getLastBalanceRealDate());
         existingAccount.setLastBalanceAvailable(updatedAccount.getLastBalanceAvailable());
         existingAccount.setLastBalanceAvailableDate(updatedAccount.getLastBalanceAvailableDate());
         existingAccount.setIsActive(updatedAccount.getIsActive());
+    }
+
+    private AccountType resolveAccountType(Long accountTypeId) {
+        if (accountTypeId == null) {
+            return null;
+        }
+
+        return accountTypeRepository.findById(accountTypeId)
+                .orElseThrow(() -> new IllegalArgumentException("Account type not found with id: " + accountTypeId));
     }
 }

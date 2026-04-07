@@ -18,7 +18,8 @@ public class AccountDTO {
     private Long tenantId;
     private Long institutionId;
     private String iban;
-    private Long type;
+    private Long accountTypeId;
+    private String accountTypeName;
     private String currency;
     private Double lastBalanceReal;
     private LocalDateTime lastBalanceRealDate;

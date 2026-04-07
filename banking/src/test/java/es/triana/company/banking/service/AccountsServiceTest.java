@@ -14,6 +14,8 @@ import org.mockito.MockitoAnnotations;
 
 import es.triana.company.banking.model.api.AccountDTO;
 import es.triana.company.banking.model.db.Account;
+import es.triana.company.banking.model.db.AccountType;
+import es.triana.company.banking.repository.AccountTypeRepository;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
 import es.triana.company.banking.service.mapper.AccountMapper;
@@ -22,6 +24,9 @@ class AccountsServiceTest {
 
     @Mock
     private AccountsRepository accountsRepository;
+
+    @Mock
+    private AccountTypeRepository accountTypeRepository;
 
     @Mock
     private AccountMapper accountMapper;
@@ -77,15 +82,18 @@ class AccountsServiceTest {
     @Test
     void testCreateAccount() {
         Account account = new Account();
-        AccountDTO accountDTO = new AccountDTO();
+        AccountType accountType = AccountType.builder().id(1L).name("CHECKING").build();
+        AccountDTO accountDTO = AccountDTO.builder().accountTypeId(1L).build();
 
         when(accountMapper.toEntity(accountDTO)).thenReturn(account);
+        when(accountTypeRepository.findById(1L)).thenReturn(Optional.of(accountType));
         when(accountsRepository.save(account)).thenReturn(account);
         when(accountMapper.toDto(account)).thenReturn(accountDTO);
 
         AccountDTO result = accountsService.createAccount(accountDTO);
 
         assertNotNull(result);
+        assertEquals(accountType, account.getAccountType());
         verify(accountsRepository, times(1)).save(account);
     }
 
@@ -109,10 +117,11 @@ class AccountsServiceTest {
     void testUpdateAccount() {
         Account existingAccount = new Account();
         existingAccount.setId(1L);
-        AccountDTO updatedAccountDTO = new AccountDTO();
-        updatedAccountDTO.setId(1L);
+        AccountType accountType = AccountType.builder().id(2L).name("SAVINGS").build();
+        AccountDTO updatedAccountDTO = AccountDTO.builder().id(1L).accountTypeId(2L).build();
 
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(existingAccount));
+        when(accountTypeRepository.findById(2L)).thenReturn(Optional.of(accountType));
         when(accountsRepository.save(existingAccount)).thenReturn(existingAccount);
         when(accountMapper.toDto(existingAccount)).thenReturn(updatedAccountDTO);
 
@@ -120,6 +129,7 @@ class AccountsServiceTest {
 
         assertNotNull(result);
         assertEquals(1L, result.getId());
+        assertEquals(accountType, existingAccount.getAccountType());
         verify(accountsRepository, times(1)).save(existingAccount);
     }
 

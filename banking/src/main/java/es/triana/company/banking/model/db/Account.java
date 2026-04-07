@@ -7,12 +7,16 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
+@Table(name = "accounts", schema = "banking")
 @Data
 @Builder
 @NoArgsConstructor
@@ -35,8 +39,9 @@ public class Account {
     @Column(name = "iban")
     private String iban;
 
-    @Column(name = "type")
-    private Long type;
+    @ManyToOne
+    @JoinColumn(name = "type")
+    private AccountType accountType;
 
     @Column(name = "currency")
     private String currency;
