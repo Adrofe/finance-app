@@ -40,7 +40,7 @@ public class AccountsControllerTest {
 
     @Test
     public void testGetAllsAccountsByTenantId() {
-        List<AccountDTO> tenant1Accounts = List.of(new AccountDTO(1L, "Account A", 1000.0, 1));
+        List<AccountDTO> tenant1Accounts = List.of(AccountDTO.builder().id(1L).name("Account A").balance(1000.0).tenantId(1L).build());
         when(accountsService.getAccountsByTenant("1")).thenReturn(tenant1Accounts);
 
         ResponseEntity<ApiResponse<List<AccountDTO>>> response = accountsController.getAllAccounts("1");
@@ -54,8 +54,8 @@ public class AccountsControllerTest {
 
     @Test
     public void testGetAllsAccounts(){
-        List<AccountDTO> mockAccounts = List.of(new AccountDTO(1L, "Account A", 1000.0, 1),
-                                               new AccountDTO(2L, "Account B", 2000.0, 2));
+        List<AccountDTO> mockAccounts = List.of(AccountDTO.builder().id(1L).name("Account A").balance(1000.0).tenantId(1L).build(),
+                                               AccountDTO.builder().id(2L).name("Account B").balance(2000.0).tenantId(2L).build());
         when(accountsService.getAccountsByTenant(null)).thenReturn(mockAccounts);
 
         ResponseEntity<ApiResponse<List<AccountDTO>>> response = accountsController.getAllAccounts(null);
@@ -67,9 +67,9 @@ public class AccountsControllerTest {
 
     @Test
     public void testCreateAccount(){
-        AccountDTO newAccount = new AccountDTO(null, "New Account", 500.0, 1);
+        AccountDTO newAccount = AccountDTO.builder().id(null).name("New Account").balance(500.0).tenantId(1L).build();
 
-        when(accountsService.createAccount(newAccount)).thenReturn(new AccountDTO(3L, "New Account", 500.0, 1));
+        when(accountsService.createAccount(newAccount)).thenReturn(AccountDTO.builder().id(3L).name("New Account").balance(500.0).tenantId(1L).build());
 
         ResponseEntity<ApiResponse<AccountDTO>> response = accountsController.createAccount(newAccount);
 
@@ -102,7 +102,7 @@ public class AccountsControllerTest {
     @Test
     public void testGetAccountById(){
         Long id = 1L;
-        AccountDTO account = new AccountDTO(id, "Account A", 1000.0, 1);
+        AccountDTO account = AccountDTO.builder().id(id).name("Account A").balance(1000.0).tenantId(1L).build();
 
         when(accountsService.getAccountById(id)).thenReturn(account);
 
@@ -126,7 +126,7 @@ public class AccountsControllerTest {
 
     @Test
     public void testUpdateAccount(){
-        AccountDTO updatedAccount = new AccountDTO(1L, "Updated Account", 1500.0, 1);
+        AccountDTO updatedAccount = AccountDTO.builder().id(1L).name("Updated Account").balance(1500.0).tenantId(1L).build();
 
         when(accountsService.updateAccount(updatedAccount)).thenReturn(updatedAccount);
 
