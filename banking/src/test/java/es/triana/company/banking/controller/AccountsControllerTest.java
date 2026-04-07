@@ -130,10 +130,10 @@ public class AccountsControllerTest {
 
         when(accountsService.updateAccount(updatedAccount)).thenReturn(updatedAccount);
 
-        ResponseEntity<ApiResponse<AccountDTO>> response = accountsController.updateAccount(updatedAccount);
+        ResponseEntity<ApiResponse<AccountDTO>> response = accountsController.updateAccount(1L, updatedAccount);
 
         verify(accountsService).updateAccount(updatedAccount);
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("Updated Account", response.getBody().getData().getName());
     }
 }

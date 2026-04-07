@@ -38,8 +38,7 @@ public class AccountsController {
         List<AccountDTO> accounts = accountsService.getAccountsByTenant(tenantId);
 
         if (accounts == null || accounts.isEmpty()) {
-            ApiResponse<List<AccountDTO>> response = new ApiResponse<>(204, "No accounts found", null);
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).body(response);
+            return ResponseEntity.noContent().build();
         }
 
         ApiResponse<List<AccountDTO>> response = new ApiResponse<>(200, "Accounts retrieved successfully", accounts);
@@ -88,12 +87,19 @@ public class AccountsController {
         }
     }
 
-    @PutMapping
-    public ResponseEntity<ApiResponse<AccountDTO>> updateAccount(@Valid @RequestBody AccountDTO updatedAccount) {
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<AccountDTO>> updateAccount(@PathVariable Long id, @Valid @RequestBody AccountDTO updatedAccount) {
         try {
+            if (updatedAccount.getId() == null) {
+                updatedAccount.setId(id);
+            } else if (!updatedAccount.getId().equals(id)) {
+                ApiResponse<AccountDTO> response = new ApiResponse<>(400, "Path id does not match body id", null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
             AccountDTO account = accountsService.updateAccount(updatedAccount);
-            ApiResponse<AccountDTO> response = new ApiResponse<>(201, "Account updated successfully", account);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            ApiResponse<AccountDTO> response = new ApiResponse<>(200, "Account updated successfully", account);
+            return ResponseEntity.ok(response);
         } catch (DuplicateAccountIbanException | AccountTypeNotFoundException | TenantMismatchException e) {
             ApiResponse<AccountDTO> response = new ApiResponse<>(400, e.getMessage(), null);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
