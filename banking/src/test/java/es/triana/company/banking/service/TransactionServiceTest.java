@@ -40,6 +40,9 @@ class TransactionServiceTest {
     @Spy
     private TransactionMapper transactionMapper = new TransactionMapper();
 
+    @Mock
+    private AccountsService accountsService;
+
     @InjectMocks
     private TransactionService transactionService;
 
@@ -436,6 +439,85 @@ class TransactionServiceTest {
             verify(transactionRepository).save(captor.capture());
             assertEquals(1L, captor.getValue().getStatusId());
         }
+
+        @Test
+        @DisplayName("should update balance for simple transaction (no destination)")
+        void updateBalanceForSimpleTransaction() {
+            TransactionDTO dto = buildValidDto();
+            dto.setDestinationAccountId(null);
+            dto.setAmount(100.0);
+            Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
+            saved.setDestinationAccountId(null);
+            saved.setAmount(BigDecimal.valueOf(100.0));
+
+            stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
+            when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
+            when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
+
+            transactionService.createTransaction(dto, TENANT_ID);
+
+            // Should call updateAccountBalance once for source account with the amount directly
+            verify(accountsService).updateAccountBalance(
+                eq(SOURCE_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(100.0))
+            );
+            verify(accountsService, times(1)).updateAccountBalance(anyLong(), anyLong(), any(BigDecimal.class));
+        }
+
+        @Test
+        @DisplayName("should update balance for simple transaction with negative amount (expense)")
+        void updateBalanceForExpense() {
+            TransactionDTO dto = buildValidDto();
+            dto.setDestinationAccountId(null);
+            dto.setAmount(-50.0);
+            Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
+            saved.setDestinationAccountId(null);
+            saved.setAmount(BigDecimal.valueOf(-50.0));
+
+            stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
+            when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
+            when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
+
+            transactionService.createTransaction(dto, TENANT_ID);
+
+            // Should subtract from balance (negative amount)
+            verify(accountsService).updateAccountBalance(
+                eq(SOURCE_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(-50.0))
+            );
+        }
+
+        @Test
+        @DisplayName("should update balance for both accounts in transfer")
+        void updateBalanceForTransfer() {
+            TransactionDTO dto = buildValidDto();
+            dto.setAmount(200.0);
+            Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
+            saved.setAmount(BigDecimal.valueOf(200.0));
+
+            stubBothAccounts();
+            when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
+            when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
+
+            transactionService.createTransaction(dto, TENANT_ID);
+
+            // Should subtract from source account
+            verify(accountsService).updateAccountBalance(
+                eq(SOURCE_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(-200.0))
+            );
+            // Should add to destination account
+            verify(accountsService).updateAccountBalance(
+                eq(DESTINATION_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(200.0))
+            );
+            // Should be called exactly twice
+            verify(accountsService, times(2)).updateAccountBalance(anyLong(), anyLong(), any(BigDecimal.class));
+        }
     }
 
     // =========================================================================
@@ -692,6 +774,85 @@ class TransactionServiceTest {
             verify(transactionRepository).save(existing);
         }
 
+
+        @Test
+        @DisplayName("should revert old balance and apply new balance on update")
+        void updateBalanceOnTransactionUpdate() {
+            TransactionDTO dto = buildValidDto();
+            dto.setAmount(300.0);
+            dto.setDestinationAccountId(null);
+            
+            Transaction existing = buildTransaction(TRANSACTION_ID, TENANT_ID);
+            existing.setAmount(BigDecimal.valueOf(100.0));
+            existing.setDestinationAccountId(null);
+            
+            Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
+            saved.setAmount(BigDecimal.valueOf(300.0));
+            saved.setDestinationAccountId(null);
+
+            when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
+                    .thenReturn(Optional.of(existing));
+            stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
+            when(transactionRepository.existsByTenantIdAndExternalTxIdAndIdNot(TENANT_ID, "EXT-001", TRANSACTION_ID))
+                    .thenReturn(false);
+            when(transactionRepository.save(existing)).thenReturn(saved);
+
+            transactionService.updateTransaction(TRANSACTION_ID, dto, TENANT_ID);
+
+            // Should revert old balance: -100
+            verify(accountsService).updateAccountBalance(
+                eq(SOURCE_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(-100.0))
+            );
+            // Should apply new balance: +300
+            verify(accountsService).updateAccountBalance(
+                eq(SOURCE_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(300.0))
+            );
+            verify(accountsService, times(2)).updateAccountBalance(anyLong(), anyLong(), any(BigDecimal.class));
+        }
+
+        @Test
+        @DisplayName("should update balances when converting simple tx to transfer")
+        void updateBalanceWhenConvertingToTransfer() {
+            TransactionDTO dto = buildValidDto();
+            dto.setDestinationAccountId(DESTINATION_ACCOUNT_ID);
+            dto.setAmount(150.0);
+            
+            Transaction existing = buildTransaction(TRANSACTION_ID, TENANT_ID);
+            existing.setAmount(BigDecimal.valueOf(150.0));
+            existing.setDestinationAccountId(null); // Was simple transaction
+            
+            Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
+            saved.setAmount(BigDecimal.valueOf(150.0));
+            saved.setDestinationAccountId(DESTINATION_ACCOUNT_ID); // Now transfer
+
+            when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
+                    .thenReturn(Optional.of(existing));
+            stubBothAccounts();
+            when(transactionRepository.existsByTenantIdAndExternalTxIdAndIdNot(TENANT_ID, "EXT-001", TRANSACTION_ID))
+                    .thenReturn(false);
+            when(transactionRepository.save(existing)).thenReturn(saved);
+
+            transactionService.updateTransaction(TRANSACTION_ID, dto, TENANT_ID);
+
+                // The source account receives the same delta twice:
+                // once to revert the original simple transaction, and once to apply the new transfer.
+                verify(accountsService, times(2)).updateAccountBalance(
+                eq(SOURCE_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(-150.0))
+            );
+            verify(accountsService).updateAccountBalance(
+                eq(DESTINATION_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(150.0))
+            );
+            verify(accountsService, times(3)).updateAccountBalance(anyLong(), anyLong(), any(BigDecimal.class));
+        }
+
         @Test
         @DisplayName("should reject update when transaction not found [BR-004]")
         void rejectNotFound() {
@@ -735,6 +896,54 @@ class TransactionServiceTest {
 
             TransactionDTO result = transactionService.updateTransaction(TRANSACTION_ID, dto, TENANT_ID);
             assertNotNull(result);
+        }
+
+        @Test
+        @DisplayName("should revert balance when deleting simple transaction")
+        void revertBalanceOnDeleteSimpleTransaction() {
+            Transaction tx = buildTransaction(TRANSACTION_ID, TENANT_ID);
+            tx.setAmount(BigDecimal.valueOf(75.0));
+            tx.setDestinationAccountId(null);
+            
+            when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
+                    .thenReturn(Optional.of(tx));
+
+            transactionService.deleteTransaction(TRANSACTION_ID, TENANT_ID);
+
+            // Should revert: subtract the amount
+            verify(accountsService).updateAccountBalance(
+                eq(SOURCE_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(-75.0))
+            );
+            verify(transactionRepository).delete(tx);
+        }
+
+        @Test
+        @DisplayName("should revert balance for both accounts when deleting transfer")
+        void revertBalanceOnDeleteTransfer() {
+            Transaction tx = buildTransaction(TRANSACTION_ID, TENANT_ID);
+            tx.setAmount(BigDecimal.valueOf(500.0));
+            
+            when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
+                    .thenReturn(Optional.of(tx));
+
+            transactionService.deleteTransaction(TRANSACTION_ID, TENANT_ID);
+
+            // Should revert: add back to source (was subtracted)
+            verify(accountsService).updateAccountBalance(
+                eq(SOURCE_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(500.0))
+            );
+            // Should revert: subtract from destination (was added)
+            verify(accountsService).updateAccountBalance(
+                eq(DESTINATION_ACCOUNT_ID), 
+                eq(TENANT_ID), 
+                eq(BigDecimal.valueOf(-500.0))
+            );
+            verify(accountsService, times(2)).updateAccountBalance(anyLong(), anyLong(), any(BigDecimal.class));
+            verify(transactionRepository).delete(tx);
         }
 
         @Test

@@ -21,14 +21,17 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountsRepository accountsRepository;
     private final TransactionMapper transactionMapper;
+    private final AccountsService accountsService;
 
     public TransactionService(
             TransactionRepository transactionRepository,
             AccountsRepository accountsRepository,
-            TransactionMapper transactionMapper) {
+            TransactionMapper transactionMapper,
+            AccountsService accountsService) {
         this.transactionRepository = transactionRepository;
         this.accountsRepository = accountsRepository;
         this.transactionMapper = transactionMapper;
+        this.accountsService = accountsService;
     }
 
     public TransactionDTO createTransaction(TransactionDTO transactionDTO, Long tenantId) {
@@ -50,6 +53,8 @@ public class TransactionService {
         Transaction transaction = transactionMapper.toEntity(transactionDTO, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(transaction);
+        applyBalanceForCreate(savedTransaction, tenantId);
+        
         return transactionMapper.toDto(savedTransaction);
     }
 
@@ -113,6 +118,11 @@ public class TransactionService {
         Transaction existingTransaction = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found with id: " + transactionId));
 
+        // Store old transaction data to revert balance effects
+        Long oldSourceAccountId = existingTransaction.getSourceAccountId();
+        Long oldDestinationAccountId = existingTransaction.getDestinationAccountId();
+        java.math.BigDecimal oldAmount = existingTransaction.getAmount();
+
         Account sourceAccount = getRequiredAccount(transactionDTO.getSourceAccountId(), "Source");
         validateAccountBelongsToTenant(sourceAccount, tenantId, transactionDTO.getSourceAccountId(), "Source");
 
@@ -129,6 +139,10 @@ public class TransactionService {
         transactionMapper.updateEntity(existingTransaction, transactionDTO, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(existingTransaction);
+        
+        revertBalanceForUpdate(oldSourceAccountId, oldDestinationAccountId, oldAmount, tenantId);
+        applyBalanceForUpdate(savedTransaction, tenantId);
+        
         return transactionMapper.toDto(savedTransaction);
     }
 
@@ -138,7 +152,12 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found with id: " + transactionId));
 
+        Long sourceAccountId = transaction.getSourceAccountId();
+        Long destinationAccountId = transaction.getDestinationAccountId();
+        java.math.BigDecimal amount = transaction.getAmount();
+        
         transactionRepository.delete(transaction);
+        revertBalanceForDelete(sourceAccountId, destinationAccountId, amount, tenantId);
     }
 
     public Double getAccountBalance(Long accountId, Long tenantId) {
@@ -274,6 +293,109 @@ public class TransactionService {
         }
 
         return 0.0;
+    }
+
+    /**
+     * Applies balance updates for a newly created transaction.
+     * For simple transactions (no destination): adds amount directly to source account.
+     * For internal transfers: subtracts from source, adds to destination.
+     * 
+     * @param transaction The created transaction
+     * @param tenantId The tenant ID for validation
+     */
+    private void applyBalanceForCreate(Transaction transaction, Long tenantId) {
+        if (transaction.getDestinationAccountId() == null) {
+            // Simple transaction: add amount directly (can be positive or negative)
+            accountsService.updateAccountBalance(
+                transaction.getSourceAccountId(), 
+                tenantId, 
+                transaction.getAmount()
+            );
+        } else {
+            // Internal transfer: subtract from source, add to destination
+            accountsService.updateAccountBalance(
+                transaction.getSourceAccountId(), 
+                tenantId, 
+                transaction.getAmount().negate()
+            );
+            accountsService.updateAccountBalance(
+                transaction.getDestinationAccountId(), 
+                tenantId, 
+                transaction.getAmount()
+            );
+        }
+    }
+
+    /**
+     * Reverts balance effects of the old transaction before applying updates.
+     * This is the opposite operation of what was originally applied.
+     * 
+     * @param oldSourceAccountId The old source account ID
+     * @param oldDestinationAccountId The old destination account ID (null for simple transactions)
+     * @param oldAmount The old transaction amount
+     * @param tenantId The tenant ID for validation
+     */
+    private void revertBalanceForUpdate(Long oldSourceAccountId, Long oldDestinationAccountId, 
+                                        java.math.BigDecimal oldAmount, Long tenantId) {
+        if (oldDestinationAccountId == null) {
+            // Was a simple transaction: subtract the old amount
+            accountsService.updateAccountBalance(oldSourceAccountId, tenantId, oldAmount.negate());
+        } else {
+            // Was a transfer: revert by adding to source, subtracting from destination
+            accountsService.updateAccountBalance(oldSourceAccountId, tenantId, oldAmount);
+            accountsService.updateAccountBalance(oldDestinationAccountId, tenantId, oldAmount.negate());
+        }
+    }
+
+    /**
+     * Applies balance updates for the updated transaction.
+     * Same logic as create operation.
+     * 
+     * @param transaction The updated transaction
+     * @param tenantId The tenant ID for validation
+     */
+    private void applyBalanceForUpdate(Transaction transaction, Long tenantId) {
+        if (transaction.getDestinationAccountId() == null) {
+            // Simple transaction: add amount
+            accountsService.updateAccountBalance(
+                transaction.getSourceAccountId(), 
+                tenantId, 
+                transaction.getAmount()
+            );
+        } else {
+            // Transfer: subtract from source, add to destination
+            accountsService.updateAccountBalance(
+                transaction.getSourceAccountId(), 
+                tenantId, 
+                transaction.getAmount().negate()
+            );
+            accountsService.updateAccountBalance(
+                transaction.getDestinationAccountId(), 
+                tenantId, 
+                transaction.getAmount()
+            );
+        }
+    }
+
+    /**
+     * Reverts balance effects of a deleted transaction.
+     * This undoes what was originally applied when the transaction was created.
+     * 
+     * @param sourceAccountId The source account ID
+     * @param destinationAccountId The destination account ID (null for simple transactions)
+     * @param amount The transaction amount
+     * @param tenantId The tenant ID for validation
+     */
+    private void revertBalanceForDelete(Long sourceAccountId, Long destinationAccountId, 
+                                        java.math.BigDecimal amount, Long tenantId) {
+        if (destinationAccountId == null) {
+            // Was a simple transaction: subtract the amount to revert
+            accountsService.updateAccountBalance(sourceAccountId, tenantId, amount.negate());
+        } else {
+            // Was a transfer: add to source (revert subtraction), subtract from destination (revert addition)
+            accountsService.updateAccountBalance(sourceAccountId, tenantId, amount);
+            accountsService.updateAccountBalance(destinationAccountId, tenantId, amount.negate());
+        }
     }
 
 }

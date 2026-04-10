@@ -3,6 +3,7 @@ package es.triana.company.banking.service;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -186,5 +187,104 @@ class AccountsServiceTest {
         when(accountTypeRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(AccountTypeNotFoundException.class, () -> accountsService.createAccount(accountDTO));
+    }
+
+    @Test
+    void testUpdateAccountBalanceWithPositiveDelta() {
+        Account account = new Account();
+        account.setId(1L);
+        account.setTenantId(1L);
+        account.setLastBalanceReal(100.0);
+
+        when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
+        when(accountsRepository.save(account)).thenReturn(account);
+
+        accountsService.updateAccountBalance(1L, 1L, new BigDecimal("50.00"));
+
+        assertEquals(150.0, account.getLastBalanceReal());
+        assertNotNull(account.getLastBalanceRealDate());
+        assertNotNull(account.getUpdatedAt());
+        verify(accountsRepository, times(1)).save(account);
+    }
+
+    @Test
+    void testUpdateAccountBalanceWithNegativeDelta() {
+        Account account = new Account();
+        account.setId(1L);
+        account.setTenantId(1L);
+        account.setLastBalanceReal(100.0);
+
+        when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
+        when(accountsRepository.save(account)).thenReturn(account);
+
+        accountsService.updateAccountBalance(1L, 1L, new BigDecimal("-30.00"));
+
+        assertEquals(70.0, account.getLastBalanceReal());
+        assertNotNull(account.getLastBalanceRealDate());
+        assertNotNull(account.getUpdatedAt());
+        verify(accountsRepository, times(1)).save(account);
+    }
+
+    @Test
+    void testUpdateAccountBalanceWithNullInitialBalance() {
+        Account account = new Account();
+        account.setId(1L);
+        account.setTenantId(1L);
+        account.setLastBalanceReal(null);
+
+        when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
+        when(accountsRepository.save(account)).thenReturn(account);
+
+        accountsService.updateAccountBalance(1L, 1L, new BigDecimal("25.00"));
+
+        assertEquals(25.0, account.getLastBalanceReal());
+        assertNotNull(account.getLastBalanceRealDate());
+        assertNotNull(account.getUpdatedAt());
+        verify(accountsRepository, times(1)).save(account);
+    }
+
+    @Test
+    void testUpdateAccountBalanceAccountNotFound() {
+        when(accountsRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThrows(AccountNotFoundException.class, 
+            () -> accountsService.updateAccountBalance(99L, 1L, new BigDecimal("50.00")));
+    }
+
+    @Test
+    void testUpdateAccountBalanceWrongTenant() {
+        Account account = new Account();
+        account.setId(1L);
+        account.setTenantId(1L);
+        account.setLastBalanceReal(100.0);
+
+        when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
+
+        assertThrows(AccountNotFoundException.class, 
+            () -> accountsService.updateAccountBalance(1L, 2L, new BigDecimal("50.00")));
+    }
+
+    @Test
+    void testUpdateAccountBalanceNullAccountId() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, 
+            () -> accountsService.updateAccountBalance(null, 1L, new BigDecimal("50.00")));
+        
+        assertEquals("Account id is required", exception.getMessage());
+    }
+
+    @Test
+    void testUpdateAccountBalanceNullTenantId() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, 
+            () -> accountsService.updateAccountBalance(1L, null, new BigDecimal("50.00")));
+        
+        assertEquals("Tenant id is required", exception.getMessage());
+    }
+
+    @Test
+    void testUpdateAccountBalanceNullAmountDelta() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, 
+            () -> accountsService.updateAccountBalance(1L, 1L, null));
+        
+        assertEquals("Amount delta is required", exception.getMessage());
     }
 }
