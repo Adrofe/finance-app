@@ -1,5 +1,6 @@
 package es.triana.company.banking.model.db;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -42,7 +43,7 @@ public class Transaction {
     private LocalDate valueDate;
 
     @Column(name = "amount", nullable = false, precision = 18, scale = 2)
-    private Double amount;
+    private BigDecimal amount;
 
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;
