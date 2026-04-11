@@ -28,11 +28,13 @@ import es.triana.company.banking.model.db.Category;
 import es.triana.company.banking.model.db.Merchant;
 import es.triana.company.banking.model.db.Transaction;
 import es.triana.company.banking.model.db.TransactionStatus;
+import es.triana.company.banking.model.db.TransactionType;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.repository.CategoryRepository;
 import es.triana.company.banking.repository.MerchantRepository;
 import es.triana.company.banking.repository.TransactionRepository;
 import es.triana.company.banking.repository.TransactionStatusRepository;
+import es.triana.company.banking.repository.TransactionTypeRepository;
 import es.triana.company.banking.service.mapper.TransactionMapper;
 
 class TransactionServiceTest {
@@ -52,6 +54,9 @@ class TransactionServiceTest {
     @Mock
     private TransactionStatusRepository transactionStatusRepository;
 
+    @Mock
+    private TransactionTypeRepository transactionTypeRepository;
+
     @Spy
     private TransactionMapper transactionMapper = new TransactionMapper();
 
@@ -69,10 +74,13 @@ class TransactionServiceTest {
     private static final Long CATEGORY_ID = 5L;
     private static final Long MERCHANT_ID = 3L;
     private static final Long STATUS_ID = 1L;
+    private static final Long TYPE_ID = 1L;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(transactionTypeRepository.findById(anyLong()))
+                .thenAnswer(invocation -> Optional.of(buildTransactionType(invocation.getArgument(0))));
     }
 
     // =========================================================================
@@ -130,6 +138,14 @@ class TransactionServiceTest {
                 .build();
     }
 
+    private TransactionType buildTransactionType(Long id) {
+        return TransactionType.builder()
+                .id(id)
+                .name("EXPENSE")
+                .description("Expense transaction")
+                .build();
+    }
+
     private Transaction buildTransaction(Long id, Long tenantId) {
         return Transaction.builder()
                 .id(id)
@@ -143,7 +159,7 @@ class TransactionServiceTest {
                 .descriptionRaw("Test transaction")
                 .externalTxId("EXT-001")
                 .status(buildStatus(STATUS_ID))
-                .transactionType(1L)
+                .transactionType(buildTransactionType(TYPE_ID))
                 .category(buildCategory(CATEGORY_ID))
                 .merchant(buildMerchant(MERCHANT_ID))
                 .createdAt(LocalDateTime.now())
@@ -587,6 +603,7 @@ class TransactionServiceTest {
             stubBothAccounts();
             stubCategoryLookup(CATEGORY_ID);
             stubMerchantLookup(MERCHANT_ID);
+            stubStatusLookup(STATUS_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 

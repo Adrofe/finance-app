@@ -14,11 +14,13 @@ import es.triana.company.banking.model.db.Category;
 import es.triana.company.banking.model.db.Merchant;
 import es.triana.company.banking.model.db.Transaction;
 import es.triana.company.banking.model.db.TransactionStatus;
+import es.triana.company.banking.model.db.TransactionType;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.repository.CategoryRepository;
 import es.triana.company.banking.repository.MerchantRepository;
 import es.triana.company.banking.repository.TransactionRepository;
 import es.triana.company.banking.repository.TransactionStatusRepository;
+import es.triana.company.banking.repository.TransactionTypeRepository;
 import es.triana.company.banking.service.mapper.TransactionMapper;
 
 @Service
@@ -29,6 +31,7 @@ public class TransactionService {
     private final CategoryRepository categoryRepository;
     private final MerchantRepository merchantRepository;
     private final TransactionStatusRepository transactionStatusRepository;
+    private final TransactionTypeRepository transactionTypeRepository;
     private final TransactionMapper transactionMapper;
     private final AccountsService accountsService;
 
@@ -38,6 +41,7 @@ public class TransactionService {
             CategoryRepository categoryRepository,
             MerchantRepository merchantRepository,
             TransactionStatusRepository transactionStatusRepository,
+            TransactionTypeRepository transactionTypeRepository,
             TransactionMapper transactionMapper,
             AccountsService accountsService) {
         this.transactionRepository = transactionRepository;
@@ -45,6 +49,7 @@ public class TransactionService {
         this.categoryRepository = categoryRepository;
         this.merchantRepository = merchantRepository;
         this.transactionStatusRepository = transactionStatusRepository;
+        this.transactionTypeRepository = transactionTypeRepository;
         this.transactionMapper = transactionMapper;
         this.accountsService = accountsService;
     }
@@ -66,10 +71,11 @@ public class TransactionService {
         Merchant merchant = resolveMerchant(transactionDTO.getMerchantId());
         Category category = resolveCategory(transactionDTO.getCategoryId());
         TransactionStatus status = resolveStatus(transactionDTO.getStatusId());
+        TransactionType transactionType = resolveTransactionType(transactionDTO.getTypeId());
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
-        Transaction transaction = transactionMapper.toEntity(transactionDTO, sourceAccount, destinationAccount, merchant, category, status, tenantId, normalizedCurrency, timestamp);
+        Transaction transaction = transactionMapper.toEntity(transactionDTO, sourceAccount, destinationAccount, merchant, category, status, transactionType, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(transaction);
         applyBalanceForCreate(savedTransaction, tenantId);
@@ -156,10 +162,11 @@ public class TransactionService {
         Merchant merchant = resolveMerchant(transactionDTO.getMerchantId());
         Category category = resolveCategory(transactionDTO.getCategoryId());
         TransactionStatus status = resolveStatus(transactionDTO.getStatusId());
+        TransactionType transactionType = resolveTransactionType(transactionDTO.getTypeId());
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
-        transactionMapper.updateEntity(existingTransaction, transactionDTO, sourceAccount, destinationAccount, merchant, category, status, tenantId, normalizedCurrency, timestamp);
+        transactionMapper.updateEntity(existingTransaction, transactionDTO, sourceAccount, destinationAccount, merchant, category, status, transactionType, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(existingTransaction);
         
@@ -290,6 +297,15 @@ public class TransactionService {
 
         return transactionStatusRepository.findById(resolvedStatusId)
                 .orElseThrow(() -> new IllegalArgumentException("Status not found with id: " + resolvedStatusId));
+    }
+
+    private TransactionType resolveTransactionType(Long typeId) {
+        if (typeId == null) {
+            return null;
+        }
+
+        return transactionTypeRepository.findById(typeId)
+                .orElseThrow(() -> new IllegalArgumentException("Transaction type not found with id: " + typeId));
     }
 
     private void validateAccountBelongsToTenant(Account account, Long tenantId, Long accountId, String role) {

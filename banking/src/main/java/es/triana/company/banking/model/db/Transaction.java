@@ -70,8 +70,9 @@ public class Transaction {
     @JoinColumn(name = "status_id")
     private TransactionStatus status;
 
-    @Column(name = "transaction_type")
-    private Long transactionType;
+    @ManyToOne
+    @JoinColumn(name = "transaction_type")
+    private TransactionType transactionType;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
