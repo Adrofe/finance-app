@@ -66,8 +66,9 @@ public class Transaction {
     @Column(name = "external_tx_id", length = 128)
     private String externalTxId;
 
-    @Column(name = "status_id")
-    private Long statusId;
+    @ManyToOne
+    @JoinColumn(name = "status_id")
+    private TransactionStatus status;
 
     @Column(name = "transaction_type")
     private Long transactionType;

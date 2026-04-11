@@ -10,6 +10,7 @@ import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.Category;
 import es.triana.company.banking.model.db.Merchant;
 import es.triana.company.banking.model.db.Transaction;
+import es.triana.company.banking.model.db.TransactionStatus;
 
 @Component
 public class TransactionMapper {
@@ -38,6 +39,7 @@ public class TransactionMapper {
 			Account destinationAccount,
 			Merchant merchant,
 			Category category,
+			TransactionStatus status,
 			Long tenantId,
 			String normalizedCurrency,
 			LocalDateTime timestamp) {
@@ -53,7 +55,7 @@ public class TransactionMapper {
 				.merchant(merchant)
 				.category(category)
 				.externalTxId(normalizeExternalId(transactionDTO.getExternalId()))
-				.statusId(transactionDTO.getStatusId() != null ? transactionDTO.getStatusId() : 1L)
+				.status(status)
 				.transactionType(transactionDTO.getTypeId())
 				.createdAt(timestamp)
 				.updatedAt(timestamp)
@@ -73,7 +75,7 @@ public class TransactionMapper {
 				.merchantId(transaction.getMerchant() != null ? transaction.getMerchant().getId() : null)
 				.categoryId(transaction.getCategory() != null ? transaction.getCategory().getId() : null)
 				.externalId(transaction.getExternalTxId())
-				.statusId(transaction.getStatusId())
+				.statusId(transaction.getStatus() != null ? transaction.getStatus().getId() : null)
 				.typeId(transaction.getTransactionType())
 				.createdAt(transaction.getCreatedAt() != null ? transaction.getCreatedAt().toLocalDate() : null)
 				.updatedAt(transaction.getUpdatedAt() != null ? transaction.getUpdatedAt().toLocalDate() : null)
@@ -87,6 +89,7 @@ public class TransactionMapper {
 			Account destinationAccount,
 			Merchant merchant,
 			Category category,
+			TransactionStatus status,
 			Long tenantId,
 			String normalizedCurrency,
 			LocalDateTime timestamp) {
@@ -101,7 +104,7 @@ public class TransactionMapper {
 		transaction.setMerchant(merchant);
 		transaction.setCategory(category);
 		transaction.setExternalTxId(normalizeExternalId(transactionDTO.getExternalId()));
-		transaction.setStatusId(transactionDTO.getStatusId() != null ? transactionDTO.getStatusId() : 1L);
+		transaction.setStatus(status);
 		transaction.setTransactionType(transactionDTO.getTypeId());
 		transaction.setUpdatedAt(timestamp);
 	}

@@ -13,10 +13,12 @@ import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.Category;
 import es.triana.company.banking.model.db.Merchant;
 import es.triana.company.banking.model.db.Transaction;
+import es.triana.company.banking.model.db.TransactionStatus;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.repository.CategoryRepository;
 import es.triana.company.banking.repository.MerchantRepository;
 import es.triana.company.banking.repository.TransactionRepository;
+import es.triana.company.banking.repository.TransactionStatusRepository;
 import es.triana.company.banking.service.mapper.TransactionMapper;
 
 @Service
@@ -26,6 +28,7 @@ public class TransactionService {
     private final AccountsRepository accountsRepository;
     private final CategoryRepository categoryRepository;
     private final MerchantRepository merchantRepository;
+    private final TransactionStatusRepository transactionStatusRepository;
     private final TransactionMapper transactionMapper;
     private final AccountsService accountsService;
 
@@ -34,12 +37,14 @@ public class TransactionService {
             AccountsRepository accountsRepository,
             CategoryRepository categoryRepository,
             MerchantRepository merchantRepository,
+            TransactionStatusRepository transactionStatusRepository,
             TransactionMapper transactionMapper,
             AccountsService accountsService) {
         this.transactionRepository = transactionRepository;
         this.accountsRepository = accountsRepository;
         this.categoryRepository = categoryRepository;
         this.merchantRepository = merchantRepository;
+        this.transactionStatusRepository = transactionStatusRepository;
         this.transactionMapper = transactionMapper;
         this.accountsService = accountsService;
     }
@@ -60,10 +65,11 @@ public class TransactionService {
 
         Merchant merchant = resolveMerchant(transactionDTO.getMerchantId());
         Category category = resolveCategory(transactionDTO.getCategoryId());
+        TransactionStatus status = resolveStatus(transactionDTO.getStatusId());
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
-    Transaction transaction = transactionMapper.toEntity(transactionDTO, sourceAccount, destinationAccount, merchant, category, tenantId, normalizedCurrency, timestamp);
+        Transaction transaction = transactionMapper.toEntity(transactionDTO, sourceAccount, destinationAccount, merchant, category, status, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(transaction);
         applyBalanceForCreate(savedTransaction, tenantId);
@@ -149,10 +155,11 @@ public class TransactionService {
 
         Merchant merchant = resolveMerchant(transactionDTO.getMerchantId());
         Category category = resolveCategory(transactionDTO.getCategoryId());
+        TransactionStatus status = resolveStatus(transactionDTO.getStatusId());
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
-    transactionMapper.updateEntity(existingTransaction, transactionDTO, sourceAccount, destinationAccount, merchant, category, tenantId, normalizedCurrency, timestamp);
+        transactionMapper.updateEntity(existingTransaction, transactionDTO, sourceAccount, destinationAccount, merchant, category, status, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(existingTransaction);
         
@@ -276,6 +283,13 @@ public class TransactionService {
 
         return merchantRepository.findById(merchantId)
                 .orElseThrow(() -> new IllegalArgumentException("Merchant not found with id: " + merchantId));
+    }
+
+    private TransactionStatus resolveStatus(Long statusId) {
+        Long resolvedStatusId = statusId != null ? statusId : 1L;
+
+        return transactionStatusRepository.findById(resolvedStatusId)
+                .orElseThrow(() -> new IllegalArgumentException("Status not found with id: " + resolvedStatusId));
     }
 
     private void validateAccountBelongsToTenant(Account account, Long tenantId, Long accountId, String role) {
