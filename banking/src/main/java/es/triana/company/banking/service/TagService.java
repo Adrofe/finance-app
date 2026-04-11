@@ -65,7 +65,6 @@ public class TagService {
     private TagDTO toDto(Tag tag) {
         return TagDTO.builder()
                 .id(tag.getId())
-                .tenantId(tag.getTenantId())
                 .name(tag.getName())
                 .build();
     }

@@ -42,7 +42,7 @@ public class TagsControllerTest {
 
     @Test
     public void getTags() {
-        List<TagDTO> tags = List.of(TagDTO.builder().id(7L).tenantId(1L).name("vacation").build());
+        List<TagDTO> tags = List.of(TagDTO.builder().id(7L).name("vacation").build());
 
         when(tagService.getTagsByTenant(1L)).thenReturn(tags);
 
@@ -55,8 +55,8 @@ public class TagsControllerTest {
 
     @Test
     public void createTag() {
-        TagDTO tagDTO = TagDTO.builder().tenantId(1L).name("work").build();
-        TagDTO createdTag = TagDTO.builder().id(8L).tenantId(1L).name("work").build();
+        TagDTO tagDTO = TagDTO.builder().name("work").build();
+        TagDTO createdTag = TagDTO.builder().id(8L).name("work").build();
 
         when(tagService.createTag(tagDTO, 1L)).thenReturn(createdTag);
 

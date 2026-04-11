@@ -73,9 +73,10 @@ public class TransactionsController {
         }
     }
 
-    @GetMapping("/tenant/{tenantId}")
-    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTenant(@PathVariable Long tenantId) {
+    @GetMapping("/tenant")
+    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTenant() {
         try {
+            Long tenantId = tenantContext.getCurrentTenantId();
             List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByTenant(tenantId));
             ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
             return ResponseEntity.ok(response);
@@ -145,9 +146,10 @@ public class TransactionsController {
         }
     }
 
-    @GetMapping("/tenant/{tenantId}/balance")
-    public ResponseEntity<ApiResponse<Double>> getTenantBalance(@PathVariable Long tenantId) {
+    @GetMapping("/tenant/balance")
+    public ResponseEntity<ApiResponse<Double>> getTenantBalance() {
         try {
+            Long tenantId = tenantContext.getCurrentTenantId();
             Double balance = (Double) transactionService.getTenantBalance(tenantId);
             ApiResponse<Double> response = new ApiResponse<>(200, "Tenant balance retrieved successfully", balance);
             return ResponseEntity.ok(response);

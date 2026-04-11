@@ -140,7 +140,7 @@ public class TransactionsControllerTest {
         
         when(transactionsService.getTransactionsByTenant(tenantId)).thenReturn(transactions);
 
-        ResponseEntity<ApiResponse<List<TransactionDTO>>> response = transactionsController.getTransactionsByTenant(tenantId);
+        ResponseEntity<ApiResponse<List<TransactionDTO>>> response = transactionsController.getTransactionsByTenant();
 
         verify(transactionsService).getTransactionsByTenant(tenantId);
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -269,7 +269,7 @@ public class TransactionsControllerTest {
 
         when(transactionsService.getTenantBalance(tenantId)).thenReturn(balance);
 
-        ResponseEntity<ApiResponse<Double>> response = transactionsController.getTenantBalance(tenantId);
+        ResponseEntity<ApiResponse<Double>> response = transactionsController.getTenantBalance();
 
         verify(transactionsService).getTenantBalance(tenantId);
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -281,7 +281,7 @@ public class TransactionsControllerTest {
         Long tenantId = 999L;
         when(transactionsService.getTenantBalance(tenantId)).thenThrow(new NoSuchElementException("Tenant not found with id: 999"));
 
-        ResponseEntity<ApiResponse<Double>> response = transactionsController.getTenantBalance(tenantId);
+        ResponseEntity<ApiResponse<Double>> response = transactionsController.getTenantBalance();
 
         verify(transactionsService).getTenantBalance(tenantId);
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
@@ -318,7 +318,6 @@ public class TransactionsControllerTest {
 
     private TransactionDTO buildTransactionDto() {
         return TransactionDTO.builder()
-            .tenantId(1L)
             .sourceAccountId(1L)
             .destinationAccountId(2L)
             .bookingDate(LocalDateTime.of(2026, 1, 10, 12, 0))

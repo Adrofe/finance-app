@@ -321,7 +321,6 @@ class TransactionServiceTest {
         @DisplayName("should reject when DTO tenantId does not match authenticated tenant [BR-004]")
         void rejectTenantMismatch() {
             TransactionDTO dto = buildValidDto();
-            dto.setTenantId(OTHER_TENANT_ID);
 
             IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
@@ -502,7 +501,6 @@ class TransactionServiceTest {
         @DisplayName("should allow same external_tx_id for different tenants [FR-009]")
         void allowSameExternalIdDifferentTenant() {
             TransactionDTO dto = buildValidDto();
-            dto.setTenantId(null);
             Transaction saved = buildTransaction(TRANSACTION_ID, OTHER_TENANT_ID);
 
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, OTHER_TENANT_ID));
@@ -542,7 +540,6 @@ class TransactionServiceTest {
         @DisplayName("should accept when DTO tenantId matches authenticated tenant")
         void acceptMatchingTenantId() {
             TransactionDTO dto = buildValidDto();
-            dto.setTenantId(TENANT_ID);
             Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
 
             stubBothAccounts();
@@ -1417,7 +1414,6 @@ class TransactionServiceTest {
         @DisplayName("create enforces tenantId on the persisted entity")
         void createEnforcesTenant() {
             TransactionDTO dto = buildValidDto();
-            dto.setTenantId(null);
             Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
 
             stubBothAccounts();

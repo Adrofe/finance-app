@@ -12,6 +12,5 @@ import lombok.NoArgsConstructor;
 public class TagDTO {
 
     private Long id;
-    private Long tenantId;
     private String name;
 }

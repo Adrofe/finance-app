@@ -54,8 +54,9 @@ public class AccountsService {
                 .toList();
     }
 
-    public AccountDTO createAccount(AccountDTO account) {
+    public AccountDTO createAccount(AccountDTO account, Long tenantId) {
         Account accountEntity = accountMapper.toEntity(account);
+        accountEntity.setTenantId(tenantId);
         normalizeAccount(accountEntity);
         validateUniqueIbanForCreate(accountEntity);
         accountEntity.setAccountType(resolveAccountType(account.getAccountTypeId()));
@@ -78,11 +79,11 @@ public class AccountsService {
                 .orElseThrow(() -> new AccountNotFoundException(id));
     }
 
-    public AccountDTO updateAccount(AccountDTO updatedAccount) {
+    public AccountDTO updateAccount(AccountDTO updatedAccount, Long tenantId) {
         Account existingAccount = accountsRepository.findById(updatedAccount.getId())
                 .orElseThrow(() -> new AccountNotFoundException(updatedAccount.getId()));
 
-        validateTenantOwnership(existingAccount, updatedAccount);
+        validateTenantOwnership(existingAccount, tenantId);
 
         updateEntityFromDto(existingAccount, updatedAccount);
         validateUniqueIbanForUpdate(existingAccount);
@@ -134,8 +135,8 @@ public class AccountsService {
         }
     }
 
-    private void validateTenantOwnership(Account existingAccount, AccountDTO updatedAccount) {
-        if (updatedAccount.getTenantId() != null && !existingAccount.getTenantId().equals(updatedAccount.getTenantId())) {
+    private void validateTenantOwnership(Account existingAccount, Long tenantId) {
+        if (!existingAccount.getTenantId().equals(tenantId)) {
             throw new TenantMismatchException(existingAccount.getId());
         }
     }

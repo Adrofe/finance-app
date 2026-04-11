@@ -45,7 +45,7 @@ public class AccountsControllerTest {
 
     @Test
     public void testGetAllsAccountsByTenantId() {
-        List<AccountDTO> tenant1Accounts = List.of(AccountDTO.builder().id(1L).name("Account A").balance(1000.0).tenantId(1L).build());
+        List<AccountDTO> tenant1Accounts = List.of(AccountDTO.builder().id(1L).name("Account A").balance(1000.0).build());
         when(accountsService.getAccountsByTenant("1")).thenReturn(tenant1Accounts);
 
         ResponseEntity<ApiResponse<List<AccountDTO>>> response = accountsController.getAllAccounts();
@@ -59,8 +59,8 @@ public class AccountsControllerTest {
 
     @Test
     public void testGetAllsAccounts(){
-        List<AccountDTO> mockAccounts = List.of(AccountDTO.builder().id(1L).name("Account A").balance(1000.0).tenantId(1L).build(),
-                                               AccountDTO.builder().id(2L).name("Account B").balance(2000.0).tenantId(2L).build());
+        List<AccountDTO> mockAccounts = List.of(AccountDTO.builder().id(1L).name("Account A").balance(1000.0).build(),
+                                               AccountDTO.builder().id(2L).name("Account B").balance(2000.0).build());
         when(accountsService.getAccountsByTenant("1")).thenReturn(mockAccounts);
 
         ResponseEntity<ApiResponse<List<AccountDTO>>> response = accountsController.getAllAccounts();
@@ -72,13 +72,13 @@ public class AccountsControllerTest {
 
     @Test
     public void testCreateAccount(){
-        AccountDTO newAccount = AccountDTO.builder().id(null).name("New Account").balance(500.0).tenantId(1L).build();
+        AccountDTO newAccount = AccountDTO.builder().id(null).name("New Account").balance(500.0).build();
 
-        when(accountsService.createAccount(newAccount)).thenReturn(AccountDTO.builder().id(3L).name("New Account").balance(500.0).tenantId(1L).build());
+        when(accountsService.createAccount(newAccount, 1L)).thenReturn(AccountDTO.builder().id(3L).name("New Account").balance(500.0).build());
 
         ResponseEntity<ApiResponse<AccountDTO>> response = accountsController.createAccount(newAccount);
 
-        verify(accountsService).createAccount(newAccount);
+        verify(accountsService).createAccount(newAccount, 1L);
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertEquals(3L, response.getBody().getData().getId());
     }
@@ -107,7 +107,7 @@ public class AccountsControllerTest {
     @Test
     public void testGetAccountById(){
         Long id = 1L;
-        AccountDTO account = AccountDTO.builder().id(id).name("Account A").balance(1000.0).tenantId(1L).build();
+        AccountDTO account = AccountDTO.builder().id(id).name("Account A").balance(1000.0).build();
 
         when(accountsService.getAccountById(id)).thenReturn(account);
 
@@ -131,13 +131,13 @@ public class AccountsControllerTest {
 
     @Test
     public void testUpdateAccount(){
-        AccountDTO updatedAccount = AccountDTO.builder().id(1L).name("Updated Account").balance(1500.0).tenantId(1L).build();
+        AccountDTO updatedAccount = AccountDTO.builder().id(1L).name("Updated Account").balance(1500.0).build();
 
-        when(accountsService.updateAccount(updatedAccount)).thenReturn(updatedAccount);
+        when(accountsService.updateAccount(updatedAccount, 1L)).thenReturn(updatedAccount);
 
         ResponseEntity<ApiResponse<AccountDTO>> response = accountsController.updateAccount(1L, updatedAccount);
 
-        verify(accountsService).updateAccount(updatedAccount);
+        verify(accountsService).updateAccount(updatedAccount, 1L);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("Updated Account", response.getBody().getData().getName());
     }
