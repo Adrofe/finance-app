@@ -26,12 +26,14 @@ import es.triana.company.banking.model.api.TransactionDTO;
 import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.Category;
 import es.triana.company.banking.model.db.Merchant;
+import es.triana.company.banking.model.db.Tag;
 import es.triana.company.banking.model.db.Transaction;
 import es.triana.company.banking.model.db.TransactionStatus;
 import es.triana.company.banking.model.db.TransactionType;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.repository.CategoryRepository;
 import es.triana.company.banking.repository.MerchantRepository;
+import es.triana.company.banking.repository.TagRepository;
 import es.triana.company.banking.repository.TransactionRepository;
 import es.triana.company.banking.repository.TransactionStatusRepository;
 import es.triana.company.banking.repository.TransactionTypeRepository;
@@ -50,6 +52,9 @@ class TransactionServiceTest {
 
     @Mock
     private MerchantRepository merchantRepository;
+
+    @Mock
+    private TagRepository tagRepository;
 
     @Mock
     private TransactionStatusRepository transactionStatusRepository;
@@ -73,6 +78,7 @@ class TransactionServiceTest {
     private static final Long TRANSACTION_ID = 100L;
     private static final Long CATEGORY_ID = 5L;
     private static final Long MERCHANT_ID = 3L;
+    private static final Long TAG_ID = 7L;
     private static final Long STATUS_ID = 1L;
     private static final Long TYPE_ID = 1L;
 
@@ -130,6 +136,14 @@ class TransactionServiceTest {
                 .build();
     }
 
+    private Tag buildTag(Long id, Long tenantId) {
+        return Tag.builder()
+                .id(id)
+                .tenantId(tenantId)
+                .name("Test Tag")
+                .build();
+    }
+
     private TransactionStatus buildStatus(Long id) {
         return TransactionStatus.builder()
                 .id(id)
@@ -162,6 +176,7 @@ class TransactionServiceTest {
                 .transactionType(buildTransactionType(TYPE_ID))
                 .category(buildCategory(CATEGORY_ID))
                 .merchant(buildMerchant(MERCHANT_ID))
+                .tags(new java.util.LinkedHashSet<>(List.of(buildTag(TAG_ID, tenantId))))
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -182,6 +197,10 @@ class TransactionServiceTest {
 
     private void stubMerchantLookup(Long merchantId) {
         when(merchantRepository.findById(merchantId)).thenReturn(Optional.of(buildMerchant(merchantId)));
+    }
+
+    private void stubTagLookup(Long tagId) {
+        when(tagRepository.findByIdAndTenantId(tagId, TENANT_ID)).thenReturn(Optional.of(buildTag(tagId, TENANT_ID)));
     }
 
     private void stubStatusLookup(Long statusId) {
@@ -255,6 +274,28 @@ class TransactionServiceTest {
             ArgumentCaptor<Transaction> captor = ArgumentCaptor.forClass(Transaction.class);
             verify(transactionRepository).save(captor.capture());
             assertEquals("EUR", captor.getValue().getCurrency());
+        }
+
+        @Test
+        @DisplayName("should resolve and persist tags when tagIds are provided")
+        void createTransactionWithTags() {
+            TransactionDTO dto = buildValidDto();
+            dto.setTagIds(List.of(TAG_ID));
+            Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
+
+            stubBothAccounts();
+            stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
+            stubTagLookup(TAG_ID);
+            stubStatusLookup(STATUS_ID);
+            when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
+            when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
+
+            transactionService.createTransaction(dto, TENANT_ID);
+
+            ArgumentCaptor<Transaction> captor = ArgumentCaptor.forClass(Transaction.class);
+            verify(transactionRepository).save(captor.capture());
+            assertEquals(List.of(TAG_ID), captor.getValue().getTags().stream().map(Tag::getId).sorted().toList());
         }
 
         // --- Validation: null payload ---

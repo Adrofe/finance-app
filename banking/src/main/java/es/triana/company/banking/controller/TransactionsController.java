@@ -169,6 +169,21 @@ public class TransactionsController {
         }
     }
 
+    @GetMapping("/tag/{tagId}")
+    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTag(@PathVariable Long tagId) {
+        try {
+            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByTag(tagId, DEFAULT_TENANT_ID));
+            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(400, e.getMessage(), null);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (RuntimeException e) {
+            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(404, e.getMessage(), null);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private List<TransactionDTO> castTransactionList(Object value) {
         return (List<TransactionDTO>) value;

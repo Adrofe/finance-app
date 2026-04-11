@@ -3,13 +3,18 @@ package es.triana.company.banking.model.db;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinTable;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -73,6 +78,15 @@ public class Transaction {
     @ManyToOne
     @JoinColumn(name = "transaction_type")
     private TransactionType transactionType;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "transaction_tags",
+        schema = "banking",
+        joinColumns = @JoinColumn(name = "transaction_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id"))
+    @Builder.Default
+    private Set<Tag> tags = new LinkedHashSet<>();
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

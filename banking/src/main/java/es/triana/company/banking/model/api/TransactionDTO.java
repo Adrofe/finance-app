@@ -2,6 +2,7 @@ package es.triana.company.banking.model.api;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,6 +24,7 @@ public class TransactionDTO {
     private String description;
     private Long merchantId;
     private Long categoryId;
+    private List<Long> tagIds;
     private String externalId;
     private Long statusId;
     private Long typeId;

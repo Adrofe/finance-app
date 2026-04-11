@@ -2,6 +2,8 @@ package es.triana.company.banking.service.mapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
@@ -9,6 +11,7 @@ import es.triana.company.banking.model.api.TransactionDTO;
 import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.Category;
 import es.triana.company.banking.model.db.Merchant;
+import es.triana.company.banking.model.db.Tag;
 import es.triana.company.banking.model.db.Transaction;
 import es.triana.company.banking.model.db.TransactionStatus;
 import es.triana.company.banking.model.db.TransactionType;
@@ -42,6 +45,7 @@ public class TransactionMapper {
 			Category category,
 			TransactionStatus status,
 			TransactionType transactionType,
+			Set<Tag> tags,
 			Long tenantId,
 			String normalizedCurrency,
 			LocalDateTime timestamp) {
@@ -56,6 +60,7 @@ public class TransactionMapper {
 				.descriptionRaw(normalizeDescription(transactionDTO.getDescription()))
 				.merchant(merchant)
 				.category(category)
+				.tags(tags)
 				.externalTxId(normalizeExternalId(transactionDTO.getExternalId()))
 				.status(status)
 				.transactionType(transactionType)
@@ -76,6 +81,7 @@ public class TransactionMapper {
 				.description(transaction.getDescriptionRaw())
 				.merchantId(transaction.getMerchant() != null ? transaction.getMerchant().getId() : null)
 				.categoryId(transaction.getCategory() != null ? transaction.getCategory().getId() : null)
+				.tagIds(mapTagIds(transaction.getTags()))
 				.externalId(transaction.getExternalTxId())
 				.statusId(transaction.getStatus() != null ? transaction.getStatus().getId() : null)
 				.typeId(transaction.getTransactionType() != null ? transaction.getTransactionType().getId() : null)
@@ -93,6 +99,7 @@ public class TransactionMapper {
 			Category category,
 			TransactionStatus status,
 			TransactionType transactionType,
+			Set<Tag> tags,
 			Long tenantId,
 			String normalizedCurrency,
 			LocalDateTime timestamp) {
@@ -106,9 +113,21 @@ public class TransactionMapper {
 		transaction.setDescriptionRaw(normalizeDescription(transactionDTO.getDescription()));
 		transaction.setMerchant(merchant);
 		transaction.setCategory(category);
+		transaction.setTags(tags);
 		transaction.setExternalTxId(normalizeExternalId(transactionDTO.getExternalId()));
 		transaction.setStatus(status);
 		transaction.setTransactionType(transactionType);
 		transaction.setUpdatedAt(timestamp);
+	}
+
+	private List<Long> mapTagIds(Set<Tag> tags) {
+		if (tags == null || tags.isEmpty()) {
+			return List.of();
+		}
+
+		return tags.stream()
+				.map(Tag::getId)
+				.sorted()
+				.toList();
 	}
 }
