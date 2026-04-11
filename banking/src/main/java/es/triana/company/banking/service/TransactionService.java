@@ -10,8 +10,10 @@ import org.springframework.stereotype.Service;
 
 import es.triana.company.banking.model.api.TransactionDTO;
 import es.triana.company.banking.model.db.Account;
+import es.triana.company.banking.model.db.Category;
 import es.triana.company.banking.model.db.Transaction;
 import es.triana.company.banking.repository.AccountsRepository;
+import es.triana.company.banking.repository.CategoryRepository;
 import es.triana.company.banking.repository.TransactionRepository;
 import es.triana.company.banking.service.mapper.TransactionMapper;
 
@@ -20,16 +22,19 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final AccountsRepository accountsRepository;
+    private final CategoryRepository categoryRepository;
     private final TransactionMapper transactionMapper;
     private final AccountsService accountsService;
 
     public TransactionService(
             TransactionRepository transactionRepository,
             AccountsRepository accountsRepository,
+            CategoryRepository categoryRepository,
             TransactionMapper transactionMapper,
             AccountsService accountsService) {
         this.transactionRepository = transactionRepository;
         this.accountsRepository = accountsRepository;
+        this.categoryRepository = categoryRepository;
         this.transactionMapper = transactionMapper;
         this.accountsService = accountsService;
     }
@@ -47,10 +52,11 @@ public class TransactionService {
 
         validateExternalIdUniqueness(transactionDTO.getExternalId(), tenantId);
 
+        Category category = resolveCategory(transactionDTO.getCategoryId());
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
-        Transaction transaction = transactionMapper.toEntity(transactionDTO, tenantId, normalizedCurrency, timestamp);
+        Transaction transaction = transactionMapper.toEntity(transactionDTO, category, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(transaction);
         applyBalanceForCreate(savedTransaction, tenantId);
@@ -133,10 +139,11 @@ public class TransactionService {
 
         validateExternalIdUniquenessForUpdate(transactionDTO.getExternalId(), tenantId, transactionId);
 
+        Category category = resolveCategory(transactionDTO.getCategoryId());
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
-        transactionMapper.updateEntity(existingTransaction, transactionDTO, tenantId, normalizedCurrency, timestamp);
+        transactionMapper.updateEntity(existingTransaction, transactionDTO, category, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(existingTransaction);
         
@@ -199,7 +206,7 @@ public class TransactionService {
     public List<TransactionDTO> getTransactionsByCategory(Long categoryId, Long tenantId) {
         validateTenantAccess(categoryId, tenantId, "Category id is required");
 
-        return transactionRepository.findAllByTenantIdAndCategoryIdOrderByBookingDateDescIdDesc(tenantId, categoryId)
+        return transactionRepository.findAllByTenantIdAndCategory_IdOrderByBookingDateDescIdDesc(tenantId, categoryId)
                 .stream()
                 .map(transactionMapper::toDto)
                 .toList();
@@ -242,6 +249,15 @@ public class TransactionService {
     private Account getRequiredAccount(Long accountId, String role) {
         return accountsRepository.findById(accountId)
                 .orElseThrow(() -> new IllegalArgumentException(role + " account not found with id: " + accountId));
+    }
+
+    private Category resolveCategory(Long categoryId) {
+        if (categoryId == null) {
+            return null;
+        }
+
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new IllegalArgumentException("Category not found with id: " + categoryId));
     }
 
     private void validateAccountBelongsToTenant(Account account, Long tenantId, Long accountId, String role) {

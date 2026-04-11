@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import org.springframework.stereotype.Component;
 
 import es.triana.company.banking.model.api.TransactionDTO;
+import es.triana.company.banking.model.db.Category;
 import es.triana.company.banking.model.db.Transaction;
 
 @Component
@@ -31,6 +32,7 @@ public class TransactionMapper {
 
 	public Transaction toEntity(
 			TransactionDTO transactionDTO,
+			Category category,
 			Long tenantId,
 			String normalizedCurrency,
 			LocalDateTime timestamp) {
@@ -44,7 +46,7 @@ public class TransactionMapper {
 				.currency(normalizedCurrency)
 				.descriptionRaw(normalizeDescription(transactionDTO.getDescription()))
 				.merchantId(transactionDTO.getMerchantId())
-				.categoryId(transactionDTO.getCategoryId())
+				.category(category)
 				.externalTxId(normalizeExternalId(transactionDTO.getExternalId()))
 				.statusId(transactionDTO.getStatusId() != null ? transactionDTO.getStatusId() : 1L)
 				.transactionType(transactionDTO.getTypeId())
@@ -64,7 +66,7 @@ public class TransactionMapper {
 				.currency(transaction.getCurrency())
 				.description(transaction.getDescriptionRaw())
 				.merchantId(transaction.getMerchantId())
-				.categoryId(transaction.getCategoryId())
+				.categoryId(transaction.getCategory() != null ? transaction.getCategory().getId() : null)
 				.externalId(transaction.getExternalTxId())
 				.statusId(transaction.getStatusId())
 				.typeId(transaction.getTransactionType())
@@ -76,6 +78,7 @@ public class TransactionMapper {
 	public void updateEntity(
 			Transaction transaction,
 			TransactionDTO transactionDTO,
+			Category category,
 			Long tenantId,
 			String normalizedCurrency,
 			LocalDateTime timestamp) {
@@ -88,7 +91,7 @@ public class TransactionMapper {
 		transaction.setCurrency(normalizedCurrency);
 		transaction.setDescriptionRaw(normalizeDescription(transactionDTO.getDescription()));
 		transaction.setMerchantId(transactionDTO.getMerchantId());
-		transaction.setCategoryId(transactionDTO.getCategoryId());
+		transaction.setCategory(category);
 		transaction.setExternalTxId(normalizeExternalId(transactionDTO.getExternalId()));
 		transaction.setStatusId(transactionDTO.getStatusId() != null ? transactionDTO.getStatusId() : 1L);
 		transaction.setTransactionType(transactionDTO.getTypeId());

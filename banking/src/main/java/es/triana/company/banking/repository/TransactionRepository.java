@@ -20,7 +20,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
 	List<Transaction> findAllByTenantIdOrderByBookingDateDescIdDesc(Long tenantId);
 
-	List<Transaction> findAllByTenantIdAndCategoryIdOrderByBookingDateDescIdDesc(Long tenantId, Long categoryId);
+	List<Transaction> findAllByTenantIdAndCategory_IdOrderByBookingDateDescIdDesc(Long tenantId, Long categoryId);
 
 	List<Transaction> findAllByTenantIdAndBookingDateBetweenOrderByBookingDateDescIdDesc(Long tenantId, LocalDate startDate,
 			LocalDate endDate);
