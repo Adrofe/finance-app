@@ -159,6 +159,21 @@ public class TransactionsControllerTest {
     }
 
     @Test
+    public void getTransactionsByTag() {
+        Long tagId = 7L;
+        Long tenantId = 1L;
+        List<TransactionDTO> transactions = List.of(buildTransactionDto());
+
+        when(transactionsService.getTransactionsByTag(tagId, tenantId)).thenReturn(transactions);
+
+        ResponseEntity<ApiResponse<List<TransactionDTO>>> response = transactionsController.getTransactionsByTag(tagId);
+
+        verify(transactionsService).getTransactionsByTag(tagId, tenantId);
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(1, response.getBody().getData().size());
+    }
+
+    @Test
     public void updateTransaction() {
         Long transactionId = 1L;
         TransactionDTO transactionDTO = buildTransactionDto();
