@@ -12,6 +12,7 @@ import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
 import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
 import es.triana.company.banking.service.exception.TenantMismatchException;
+import es.triana.company.banking.security.TenantContext;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -23,7 +24,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 
 
 @RestController
@@ -32,10 +32,14 @@ public class AccountsController {
 
     @Autowired
     private AccountsService accountsService;
+
+    @Autowired
+    private TenantContext tenantContext;
     
     @GetMapping
-    public ResponseEntity<ApiResponse<List<AccountDTO>>> getAllAccounts(@RequestParam(required = false) String tenantId) {
-        List<AccountDTO> accounts = accountsService.getAccountsByTenant(tenantId);
+    public ResponseEntity<ApiResponse<List<AccountDTO>>> getAllAccounts() {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        List<AccountDTO> accounts = accountsService.getAccountsByTenant(String.valueOf(tenantId));
 
         if (accounts == null || accounts.isEmpty()) {
             return ResponseEntity.noContent().build();

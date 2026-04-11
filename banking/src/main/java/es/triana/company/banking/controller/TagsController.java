@@ -17,23 +17,25 @@ import org.springframework.web.bind.annotation.RestController;
 import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.model.api.TagDTO;
 import es.triana.company.banking.service.TagService;
+import es.triana.company.banking.security.TenantContext;
 
 @RestController
 @RequestMapping("/v1/api/tags")
 public class TagsController {
 
-    private static final Long DEFAULT_TENANT_ID = 1L;
-
     private final TagService tagService;
+    private final TenantContext tenantContext;
 
-    public TagsController(TagService tagService) {
+    public TagsController(TagService tagService, TenantContext tenantContext) {
         this.tagService = tagService;
+        this.tenantContext = tenantContext;
     }
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<TagDTO>>> getTags() {
         try {
-            List<TagDTO> tags = tagService.getTagsByTenant(DEFAULT_TENANT_ID);
+            Long tenantId = tenantContext.getCurrentTenantId();
+            List<TagDTO> tags = tagService.getTagsByTenant(tenantId);
             ApiResponse<List<TagDTO>> response = new ApiResponse<>(200, "Tags retrieved successfully", tags);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -45,7 +47,7 @@ public class TagsController {
     @PostMapping
     public ResponseEntity<ApiResponse<TagDTO>> createTag(@Valid @RequestBody TagDTO tagDTO) {
         try {
-            Long tenantId = resolveTenantId(tagDTO.getTenantId());
+            Long tenantId = tenantContext.getCurrentTenantId();
             TagDTO createdTag = tagService.createTag(tagDTO, tenantId);
             ApiResponse<TagDTO> response = new ApiResponse<>(201, "Tag created successfully", createdTag);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -58,16 +60,13 @@ public class TagsController {
     @DeleteMapping("/{tagId}")
     public ResponseEntity<ApiResponse<Void>> deleteTag(@PathVariable Long tagId) {
         try {
-            tagService.deleteTag(tagId, DEFAULT_TENANT_ID);
+            Long tenantId = tenantContext.getCurrentTenantId();
+            tagService.deleteTag(tagId, tenantId);
             ApiResponse<Void> response = new ApiResponse<>(204, "Tag deleted successfully", null);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).body(response);
         } catch (IllegalArgumentException e) {
             ApiResponse<Void> response = new ApiResponse<>(400, e.getMessage(), null);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
-    }
-
-    private Long resolveTenantId(Long tenantId) {
-        return tenantId != null ? tenantId : DEFAULT_TENANT_ID;
     }
 }

@@ -22,6 +22,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.model.api.TransactionDTO;
+import es.triana.company.banking.security.TenantContext;
 import es.triana.company.banking.service.TransactionService;
 
 @SpringBootTest
@@ -34,9 +35,13 @@ public class TransactionsControllerTest {
     @Mock
     private TransactionService transactionsService;
 
+    @Mock
+    private TenantContext tenantContext;
+
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(tenantContext.getCurrentTenantId()).thenReturn(1L);
     }
 
     @Test

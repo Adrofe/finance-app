@@ -18,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.model.api.TagDTO;
+import es.triana.company.banking.security.TenantContext;
 import es.triana.company.banking.service.TagService;
 
 @SpringBootTest
@@ -30,9 +31,13 @@ public class TagsControllerTest {
     @Mock
     private TagService tagService;
 
+    @Mock
+    private TenantContext tenantContext;
+
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(tenantContext.getCurrentTenantId()).thenReturn(1L);
     }
 
     @Test

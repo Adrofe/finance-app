@@ -15,6 +15,7 @@ import org.mockito.MockitoAnnotations;
 
 import es.triana.company.banking.model.api.AccountDTO;
 import es.triana.company.banking.model.api.ApiResponse;
+import es.triana.company.banking.security.TenantContext;
 import es.triana.company.banking.service.AccountsService;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
 
@@ -33,9 +34,13 @@ public class AccountsControllerTest {
     @Mock
     private AccountsService accountsService;
 
+    @Mock
+    private TenantContext tenantContext;
+
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(tenantContext.getCurrentTenantId()).thenReturn(1L);
     }
 
     @Test
@@ -43,7 +48,7 @@ public class AccountsControllerTest {
         List<AccountDTO> tenant1Accounts = List.of(AccountDTO.builder().id(1L).name("Account A").balance(1000.0).tenantId(1L).build());
         when(accountsService.getAccountsByTenant("1")).thenReturn(tenant1Accounts);
 
-        ResponseEntity<ApiResponse<List<AccountDTO>>> response = accountsController.getAllAccounts("1");
+        ResponseEntity<ApiResponse<List<AccountDTO>>> response = accountsController.getAllAccounts();
 
         verify(accountsService).getAccountsByTenant("1");
 
@@ -56,10 +61,10 @@ public class AccountsControllerTest {
     public void testGetAllsAccounts(){
         List<AccountDTO> mockAccounts = List.of(AccountDTO.builder().id(1L).name("Account A").balance(1000.0).tenantId(1L).build(),
                                                AccountDTO.builder().id(2L).name("Account B").balance(2000.0).tenantId(2L).build());
-        when(accountsService.getAccountsByTenant(null)).thenReturn(mockAccounts);
+        when(accountsService.getAccountsByTenant("1")).thenReturn(mockAccounts);
 
-        ResponseEntity<ApiResponse<List<AccountDTO>>> response = accountsController.getAllAccounts(null);
-        verify(accountsService).getAccountsByTenant(null);
+        ResponseEntity<ApiResponse<List<AccountDTO>>> response = accountsController.getAllAccounts();
+        verify(accountsService).getAccountsByTenant("1");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(2, response.getBody().getData().size());
