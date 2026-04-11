@@ -12,6 +12,7 @@ import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
 import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
 import es.triana.company.banking.service.exception.TenantMismatchException;
+import es.triana.company.banking.security.TenantContext;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -23,7 +24,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 
 
 @RestController
@@ -32,10 +32,14 @@ public class AccountsController {
 
     @Autowired
     private AccountsService accountsService;
+
+    @Autowired
+    private TenantContext tenantContext;
     
     @GetMapping
-    public ResponseEntity<ApiResponse<List<AccountDTO>>> getAllAccounts(@RequestParam(required = false) String tenantId) {
-        List<AccountDTO> accounts = accountsService.getAccountsByTenant(tenantId);
+    public ResponseEntity<ApiResponse<List<AccountDTO>>> getAllAccounts() {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        List<AccountDTO> accounts = accountsService.getAccountsByTenant(String.valueOf(tenantId));
 
         if (accounts == null || accounts.isEmpty()) {
             return ResponseEntity.noContent().build();
@@ -48,7 +52,8 @@ public class AccountsController {
     @PostMapping
     public ResponseEntity<ApiResponse<AccountDTO>> createAccount(@Valid @RequestBody AccountDTO newAccount) {
         try {
-            AccountDTO createdAccount = accountsService.createAccount(newAccount);
+            Long tenantId = tenantContext.getCurrentTenantId();
+            AccountDTO createdAccount = accountsService.createAccount(newAccount, tenantId);
             ApiResponse<AccountDTO> response = new ApiResponse<>(201, "Account created successfully", createdAccount);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (DuplicateAccountIbanException | AccountTypeNotFoundException e) {
@@ -90,6 +95,8 @@ public class AccountsController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<AccountDTO>> updateAccount(@PathVariable Long id, @Valid @RequestBody AccountDTO updatedAccount) {
         try {
+            Long tenantId = tenantContext.getCurrentTenantId();
+            
             if (updatedAccount.getId() == null) {
                 updatedAccount.setId(id);
             } else if (!updatedAccount.getId().equals(id)) {
@@ -97,7 +104,7 @@ public class AccountsController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }
 
-            AccountDTO account = accountsService.updateAccount(updatedAccount);
+            AccountDTO account = accountsService.updateAccount(updatedAccount, tenantId);
             ApiResponse<AccountDTO> response = new ApiResponse<>(200, "Account updated successfully", account);
             return ResponseEntity.ok(response);
         } catch (DuplicateAccountIbanException | AccountTypeNotFoundException | TenantMismatchException e) {

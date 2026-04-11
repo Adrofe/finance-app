@@ -316,18 +316,6 @@ class TransactionServiceTest {
             assertEquals("Tenant id is required", ex.getMessage());
         }
 
-        // --- Validation: tenant mismatch (BR-004, BR-007) ---
-        @Test
-        @DisplayName("should reject when DTO tenantId does not match authenticated tenant [BR-004]")
-        void rejectTenantMismatch() {
-            TransactionDTO dto = buildValidDto();
-            dto.setTenantId(OTHER_TENANT_ID);
-
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                    () -> transactionService.createTransaction(dto, TENANT_ID));
-            assertEquals("Transaction tenant does not match authenticated tenant", ex.getMessage());
-        }
-
         // --- Validation: missing source account ---
         @Test
         @DisplayName("should reject null source account id")
@@ -502,7 +490,6 @@ class TransactionServiceTest {
         @DisplayName("should allow same external_tx_id for different tenants [FR-009]")
         void allowSameExternalIdDifferentTenant() {
             TransactionDTO dto = buildValidDto();
-            dto.setTenantId(null);
             Transaction saved = buildTransaction(TRANSACTION_ID, OTHER_TENANT_ID);
 
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, OTHER_TENANT_ID));
@@ -535,25 +522,6 @@ class TransactionServiceTest {
             TransactionDTO result = transactionService.createTransaction(dto, TENANT_ID);
             assertNotNull(result);
             verify(transactionRepository, never()).existsByTenantIdAndExternalTxId(anyLong(), anyString());
-        }
-
-        // --- DTO tenantId matching authenticated tenant is valid ---
-        @Test
-        @DisplayName("should accept when DTO tenantId matches authenticated tenant")
-        void acceptMatchingTenantId() {
-            TransactionDTO dto = buildValidDto();
-            dto.setTenantId(TENANT_ID);
-            Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
-
-            stubBothAccounts();
-            stubCategoryLookup(CATEGORY_ID);
-            stubMerchantLookup(MERCHANT_ID);
-            stubStatusLookup(STATUS_ID);
-            when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
-            when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
-
-            TransactionDTO result = transactionService.createTransaction(dto, TENANT_ID);
-            assertNotNull(result);
         }
 
         // --- Default statusId when not provided ---
@@ -1417,7 +1385,6 @@ class TransactionServiceTest {
         @DisplayName("create enforces tenantId on the persisted entity")
         void createEnforcesTenant() {
             TransactionDTO dto = buildValidDto();
-            dto.setTenantId(null);
             Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
 
             stubBothAccounts();

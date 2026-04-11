@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -285,10 +284,6 @@ public class TransactionService {
 
         if (tenantId == null) {
             throw new IllegalArgumentException("Tenant id is required");
-        }
-
-        if (transactionDTO.getTenantId() != null && !Objects.equals(transactionDTO.getTenantId(), tenantId)) {
-            throw new IllegalArgumentException("Transaction tenant does not match authenticated tenant");
         }
 
         if (transactionDTO.getSourceAccountId() == null) {

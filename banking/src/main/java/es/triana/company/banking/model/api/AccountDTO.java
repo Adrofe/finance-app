@@ -26,10 +26,6 @@ public class AccountDTO {
 
     private Double balance;
 
-    @NotNull(message = "Tenant id is required")
-    @Positive(message = "Tenant id must be greater than zero")
-    private Long tenantId;
-
     @Positive(message = "Institution id must be greater than zero")
     private Long institutionId;
 

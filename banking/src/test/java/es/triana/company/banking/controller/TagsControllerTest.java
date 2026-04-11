@@ -18,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.model.api.TagDTO;
+import es.triana.company.banking.security.TenantContext;
 import es.triana.company.banking.service.TagService;
 
 @SpringBootTest
@@ -30,14 +31,18 @@ public class TagsControllerTest {
     @Mock
     private TagService tagService;
 
+    @Mock
+    private TenantContext tenantContext;
+
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(tenantContext.getCurrentTenantId()).thenReturn(1L);
     }
 
     @Test
     public void getTags() {
-        List<TagDTO> tags = List.of(TagDTO.builder().id(7L).tenantId(1L).name("vacation").build());
+        List<TagDTO> tags = List.of(TagDTO.builder().id(7L).name("vacation").build());
 
         when(tagService.getTagsByTenant(1L)).thenReturn(tags);
 
@@ -50,8 +55,8 @@ public class TagsControllerTest {
 
     @Test
     public void createTag() {
-        TagDTO tagDTO = TagDTO.builder().tenantId(1L).name("work").build();
-        TagDTO createdTag = TagDTO.builder().id(8L).tenantId(1L).name("work").build();
+        TagDTO tagDTO = TagDTO.builder().name("work").build();
+        TagDTO createdTag = TagDTO.builder().id(8L).name("work").build();
 
         when(tagService.createTag(tagDTO, 1L)).thenReturn(createdTag);
 

@@ -22,6 +22,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.model.api.TransactionDTO;
+import es.triana.company.banking.security.TenantContext;
 import es.triana.company.banking.service.TransactionService;
 
 @SpringBootTest
@@ -34,9 +35,13 @@ public class TransactionsControllerTest {
     @Mock
     private TransactionService transactionsService;
 
+    @Mock
+    private TenantContext tenantContext;
+
     @BeforeEach
     public void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(tenantContext.getCurrentTenantId()).thenReturn(1L);
     }
 
     @Test
@@ -135,7 +140,7 @@ public class TransactionsControllerTest {
         
         when(transactionsService.getTransactionsByTenant(tenantId)).thenReturn(transactions);
 
-        ResponseEntity<ApiResponse<List<TransactionDTO>>> response = transactionsController.getTransactionsByTenant(tenantId);
+        ResponseEntity<ApiResponse<List<TransactionDTO>>> response = transactionsController.getTransactionsByTenant();
 
         verify(transactionsService).getTransactionsByTenant(tenantId);
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -264,7 +269,7 @@ public class TransactionsControllerTest {
 
         when(transactionsService.getTenantBalance(tenantId)).thenReturn(balance);
 
-        ResponseEntity<ApiResponse<Double>> response = transactionsController.getTenantBalance(tenantId);
+        ResponseEntity<ApiResponse<Double>> response = transactionsController.getTenantBalance();
 
         verify(transactionsService).getTenantBalance(tenantId);
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -274,9 +279,10 @@ public class TransactionsControllerTest {
     @Test
     public void getTenantBalanceForNonExistentTenant() {
         Long tenantId = 999L;
+        when(tenantContext.getCurrentTenantId()).thenReturn(tenantId);
         when(transactionsService.getTenantBalance(tenantId)).thenThrow(new NoSuchElementException("Tenant not found with id: 999"));
 
-        ResponseEntity<ApiResponse<Double>> response = transactionsController.getTenantBalance(tenantId);
+        ResponseEntity<ApiResponse<Double>> response = transactionsController.getTenantBalance();
 
         verify(transactionsService).getTenantBalance(tenantId);
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
@@ -313,7 +319,6 @@ public class TransactionsControllerTest {
 
     private TransactionDTO buildTransactionDto() {
         return TransactionDTO.builder()
-            .tenantId(1L)
             .sourceAccountId(1L)
             .destinationAccountId(2L)
             .bookingDate(LocalDateTime.of(2026, 1, 10, 12, 0))

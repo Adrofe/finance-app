@@ -71,7 +71,6 @@ public class TransactionMapper {
 
 	public TransactionDTO toDto(Transaction transaction) {
 		return TransactionDTO.builder()
-				.tenantId(transaction.getTenantId())
 				.sourceAccountId(transaction.getSourceAccount() != null ? transaction.getSourceAccount().getId() : null)
 				.destinationAccountId(transaction.getDestinationAccount() != null ? transaction.getDestinationAccount().getId() : null)
 				.bookingDate(transaction.getBookingDate() != null ? transaction.getBookingDate().atStartOfDay() : null)

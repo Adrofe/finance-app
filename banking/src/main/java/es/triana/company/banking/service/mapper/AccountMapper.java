@@ -15,7 +15,6 @@ public class AccountMapper {
 
         return AccountDTO.builder()
                 .id(account.getId())
-                .tenantId(account.getTenantId())
                 .institutionId(institution != null ? institution.getId() : null)
                 .institutionName(institution != null ? institution.getName() : null)
                 .name(account.getName())
@@ -34,7 +33,6 @@ public class AccountMapper {
     public Account toEntity(AccountDTO accountDTO) {
         Account account = Account.builder()
         .id(accountDTO.getId())
-        .tenantId(accountDTO.getTenantId())
         .name(accountDTO.getName())
         .iban(accountDTO.getIban())
         .currency(accountDTO.getCurrency())

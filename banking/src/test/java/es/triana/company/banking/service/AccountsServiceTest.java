@@ -89,7 +89,7 @@ class AccountsServiceTest {
         account.setTenantId(1L);
         account.setIban("ES7620770024003102575766");
         AccountType accountType = AccountType.builder().id(1L).name("CHECKING").build();
-        AccountDTO accountDTO = AccountDTO.builder().tenantId(1L).accountTypeId(1L).currency("EUR").name("Main account").build();
+        AccountDTO accountDTO = AccountDTO.builder().accountTypeId(1L).currency("EUR").name("Main account").build();
 
         when(accountMapper.toEntity(accountDTO)).thenReturn(account);
         when(accountsRepository.existsByTenantIdAndIban(1L, "ES7620770024003102575766")).thenReturn(false);
@@ -97,7 +97,7 @@ class AccountsServiceTest {
         when(accountsRepository.save(account)).thenReturn(account);
         when(accountMapper.toDto(account)).thenReturn(accountDTO);
 
-        AccountDTO result = accountsService.createAccount(accountDTO);
+        AccountDTO result = accountsService.createAccount(accountDTO, 1L);
 
         assertNotNull(result);
         assertEquals(accountType, account.getAccountType());
@@ -126,7 +126,7 @@ class AccountsServiceTest {
         existingAccount.setId(1L);
         existingAccount.setTenantId(1L);
         AccountType accountType = AccountType.builder().id(2L).name("SAVINGS").build();
-        AccountDTO updatedAccountDTO = AccountDTO.builder().id(1L).tenantId(1L).accountTypeId(2L).currency("EUR").name("Updated Account").build();
+        AccountDTO updatedAccountDTO = AccountDTO.builder().id(1L).accountTypeId(2L).currency("EUR").name("Updated Account").build();
 
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(existingAccount));
         when(accountsRepository.existsByTenantIdAndIbanAndIdNot(1L, null, 1L)).thenReturn(false);
@@ -134,7 +134,7 @@ class AccountsServiceTest {
         when(accountsRepository.save(existingAccount)).thenReturn(existingAccount);
         when(accountMapper.toDto(existingAccount)).thenReturn(updatedAccountDTO);
 
-        AccountDTO result = accountsService.updateAccount(updatedAccountDTO);
+        AccountDTO result = accountsService.updateAccount(updatedAccountDTO, 1L);
 
         assertNotNull(result);
         assertEquals(1L, result.getId());
@@ -144,11 +144,11 @@ class AccountsServiceTest {
 
     @Test
     void testUpdateAccountNotFound() {
-        AccountDTO updatedAccountDTO = AccountDTO.builder().id(1L).tenantId(1L).accountTypeId(1L).currency("EUR").name("Updated Account").build();
+        AccountDTO updatedAccountDTO = AccountDTO.builder().id(1L).accountTypeId(1L).currency("EUR").name("Updated Account").build();
 
         when(accountsRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(AccountNotFoundException.class, () -> accountsService.updateAccount(updatedAccountDTO));
+        assertThrows(AccountNotFoundException.class, () -> accountsService.updateAccount(updatedAccountDTO, 1L));
     }
 
     @Test
@@ -156,12 +156,12 @@ class AccountsServiceTest {
         Account account = new Account();
         account.setTenantId(1L);
         account.setIban("ES7620770024003102575766");
-        AccountDTO accountDTO = AccountDTO.builder().tenantId(1L).accountTypeId(1L).currency("EUR").name("Main account").build();
+        AccountDTO accountDTO = AccountDTO.builder().accountTypeId(1L).currency("EUR").name("Main account").build();
 
         when(accountMapper.toEntity(accountDTO)).thenReturn(account);
         when(accountsRepository.existsByTenantIdAndIban(1L, "ES7620770024003102575766")).thenReturn(true);
 
-        assertThrows(DuplicateAccountIbanException.class, () -> accountsService.createAccount(accountDTO));
+        assertThrows(DuplicateAccountIbanException.class, () -> accountsService.createAccount(accountDTO, 1L));
     }
 
     @Test
@@ -169,24 +169,24 @@ class AccountsServiceTest {
         Account existingAccount = new Account();
         existingAccount.setId(1L);
         existingAccount.setTenantId(1L);
-        AccountDTO updatedAccountDTO = AccountDTO.builder().id(1L).tenantId(2L).accountTypeId(1L).currency("EUR").name("Updated Account").build();
+        AccountDTO updatedAccountDTO = AccountDTO.builder().id(1L).accountTypeId(1L).currency("EUR").name("Updated Account").build();
 
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(existingAccount));
 
-        assertThrows(TenantMismatchException.class, () -> accountsService.updateAccount(updatedAccountDTO));
+        assertThrows(TenantMismatchException.class, () -> accountsService.updateAccount(updatedAccountDTO, 2L));
     }
 
     @Test
     void testCreateAccountWithUnknownAccountType() {
         Account account = new Account();
         account.setTenantId(1L);
-        AccountDTO accountDTO = AccountDTO.builder().tenantId(1L).accountTypeId(99L).currency("EUR").name("Main account").build();
+        AccountDTO accountDTO = AccountDTO.builder().accountTypeId(99L).currency("EUR").name("Main account").build();
 
         when(accountMapper.toEntity(accountDTO)).thenReturn(account);
         when(accountsRepository.existsByTenantIdAndIban(1L, null)).thenReturn(false);
         when(accountTypeRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(AccountTypeNotFoundException.class, () -> accountsService.createAccount(accountDTO));
+        assertThrows(AccountTypeNotFoundException.class, () -> accountsService.createAccount(accountDTO, 1L));
     }
 
     @Test

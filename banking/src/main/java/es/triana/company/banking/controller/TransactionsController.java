@@ -20,23 +20,24 @@ import org.springframework.web.bind.annotation.RestController;
 import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.model.api.TransactionDTO;
 import es.triana.company.banking.service.TransactionService;
+import es.triana.company.banking.security.TenantContext;
 
 @RestController
 @RequestMapping("/v1/api/transactions")
 public class TransactionsController {
 
-    private static final Long DEFAULT_TENANT_ID = 1L;
-
     private final TransactionService transactionService;
+    private final TenantContext tenantContext;
 
-    public TransactionsController(TransactionService transactionService) {
+    public TransactionsController(TransactionService transactionService, TenantContext tenantContext) {
         this.transactionService = transactionService;
+        this.tenantContext = tenantContext;
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<TransactionDTO>> createTransaction(@Valid @RequestBody TransactionDTO transactionDTO) {
         try {
-            Long tenantId = resolveTenantId(transactionDTO.getTenantId());
+            Long tenantId = tenantContext.getCurrentTenantId();
             TransactionDTO createdTransaction = (TransactionDTO) transactionService.createTransaction(transactionDTO, tenantId);
             ApiResponse<TransactionDTO> response = new ApiResponse<>(201, "Transaction created successfully", createdTransaction);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -49,7 +50,8 @@ public class TransactionsController {
     @GetMapping("/{transactionId}")
     public ResponseEntity<ApiResponse<TransactionDTO>> getTransactionById(@PathVariable Long transactionId) {
         try {
-            TransactionDTO transaction = (TransactionDTO) transactionService.getTransactionById(transactionId, DEFAULT_TENANT_ID);
+            Long tenantId = tenantContext.getCurrentTenantId();
+            TransactionDTO transaction = (TransactionDTO) transactionService.getTransactionById(transactionId, tenantId);
             ApiResponse<TransactionDTO> response = new ApiResponse<>(200, "Transaction retrieved successfully", transaction);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -61,7 +63,8 @@ public class TransactionsController {
     @GetMapping("/account/{accountId}")
     public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByAccount(@PathVariable Long accountId) {
         try {
-            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByAccount(accountId, DEFAULT_TENANT_ID));
+            Long tenantId = tenantContext.getCurrentTenantId();
+            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByAccount(accountId, tenantId));
             ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -70,9 +73,10 @@ public class TransactionsController {
         }
     }
 
-    @GetMapping("/tenant/{tenantId}")
-    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTenant(@PathVariable Long tenantId) {
+    @GetMapping("/tenant")
+    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTenant() {
         try {
+            Long tenantId = tenantContext.getCurrentTenantId();
             List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByTenant(tenantId));
             ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
             return ResponseEntity.ok(response);
@@ -86,7 +90,8 @@ public class TransactionsController {
     public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByDateRange(@RequestParam LocalDate startDate,
             @RequestParam LocalDate endDate) {
         try {
-            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByDateRange(startDate, endDate, DEFAULT_TENANT_ID));
+            Long tenantId = tenantContext.getCurrentTenantId();
+            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByDateRange(startDate, endDate, tenantId));
             ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -99,7 +104,7 @@ public class TransactionsController {
     public ResponseEntity<ApiResponse<TransactionDTO>> updateTransaction(@PathVariable Long transactionId,
             @Valid @RequestBody TransactionDTO transactionDTO) {
         try {
-            Long tenantId = resolveTenantId(transactionDTO.getTenantId());
+            Long tenantId = tenantContext.getCurrentTenantId();
             TransactionDTO updatedTransaction = (TransactionDTO) transactionService.updateTransaction(transactionId, transactionDTO, tenantId);
             ApiResponse<TransactionDTO> response = new ApiResponse<>(200, "Transaction updated successfully", updatedTransaction);
             return ResponseEntity.ok(response);
@@ -112,7 +117,8 @@ public class TransactionsController {
     @DeleteMapping("/{transactionId}")
     public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable Long transactionId) {
         try {
-            transactionService.deleteTransaction(transactionId, DEFAULT_TENANT_ID);
+            Long tenantId = tenantContext.getCurrentTenantId();
+            transactionService.deleteTransaction(transactionId, tenantId);
             ApiResponse<Void> response = new ApiResponse<>(204, "Transaction deleted successfully", null);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).body(response);
         } catch (IllegalArgumentException e) {
@@ -127,7 +133,8 @@ public class TransactionsController {
     @GetMapping("/account/{accountId}/balance")
     public ResponseEntity<ApiResponse<Double>> getAccountBalance(@PathVariable Long accountId) {
         try {
-            Double balance = (Double) transactionService.getAccountBalance(accountId, DEFAULT_TENANT_ID);
+            Long tenantId = tenantContext.getCurrentTenantId();
+            Double balance = (Double) transactionService.getAccountBalance(accountId, tenantId);
             ApiResponse<Double> response = new ApiResponse<>(200, "Account balance retrieved successfully", balance);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -139,9 +146,10 @@ public class TransactionsController {
         }
     }
 
-    @GetMapping("/tenant/{tenantId}/balance")
-    public ResponseEntity<ApiResponse<Double>> getTenantBalance(@PathVariable Long tenantId) {
+    @GetMapping("/tenant/balance")
+    public ResponseEntity<ApiResponse<Double>> getTenantBalance() {
         try {
+            Long tenantId = tenantContext.getCurrentTenantId();
             Double balance = (Double) transactionService.getTenantBalance(tenantId);
             ApiResponse<Double> response = new ApiResponse<>(200, "Tenant balance retrieved successfully", balance);
             return ResponseEntity.ok(response);
@@ -157,7 +165,8 @@ public class TransactionsController {
     @GetMapping("/category/{categoryId}")
     public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByCategory(@PathVariable Long categoryId) {
         try {
-            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByCategory(categoryId, DEFAULT_TENANT_ID));
+            Long tenantId = tenantContext.getCurrentTenantId();
+            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByCategory(categoryId, tenantId));
             ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -172,7 +181,8 @@ public class TransactionsController {
     @GetMapping("/tag/{tagId}")
     public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTag(@PathVariable Long tagId) {
         try {
-            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByTag(tagId, DEFAULT_TENANT_ID));
+            Long tenantId = tenantContext.getCurrentTenantId();
+            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByTag(tagId, tenantId));
             ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -187,10 +197,5 @@ public class TransactionsController {
     @SuppressWarnings("unchecked")
     private List<TransactionDTO> castTransactionList(Object value) {
         return (List<TransactionDTO>) value;
-    }
-
-    private Long resolveTenantId(Long tenantId) {
-        //TODO: In a real application, you would extract the tenant ID from the authenticated user's context or a request header
-        return tenantId != null ? tenantId : DEFAULT_TENANT_ID;
     }
 }
