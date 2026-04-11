@@ -279,6 +279,7 @@ public class TransactionsControllerTest {
     @Test
     public void getTenantBalanceForNonExistentTenant() {
         Long tenantId = 999L;
+        when(tenantContext.getCurrentTenantId()).thenReturn(tenantId);
         when(transactionsService.getTenantBalance(tenantId)).thenThrow(new NoSuchElementException("Tenant not found with id: 999"));
 
         ResponseEntity<ApiResponse<Double>> response = transactionsController.getTenantBalance();
