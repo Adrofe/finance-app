@@ -6,6 +6,8 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+
 import es.triana.company.banking.model.api.AccountDTO;
 import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.AccountType;
@@ -159,5 +161,45 @@ public class AccountsService {
 
     private String normalizeCurrency(String currency) {
         return currency == null ? null : currency.trim().toUpperCase();
+    }
+
+    /**
+     * Updates account balance incrementally by adding a delta amount.
+     * This method is designed to be called when transactions are created, updated, or deleted.
+     * 
+     * @param accountId The ID of the account to update
+     * @param tenantId The tenant ID for security validation
+     * @param amountDelta The amount to add to the current balance (can be negative)
+     */
+    public void updateAccountBalance(Long accountId, Long tenantId, BigDecimal amountDelta) {
+        if (accountId == null) {
+            throw new IllegalArgumentException("Account id is required");
+        }
+
+        if (tenantId == null) {
+            throw new IllegalArgumentException("Tenant id is required");
+        }
+
+        if (amountDelta == null) {
+            throw new IllegalArgumentException("Amount delta is required");
+        }
+
+        Account account = accountsRepository.findById(accountId)
+                .orElseThrow(() -> new AccountNotFoundException(accountId));
+
+        if (!account.getTenantId().equals(tenantId)) {
+            throw new AccountNotFoundException(accountId);
+        }
+
+        Double currentBalance = account.getLastBalanceReal() != null 
+                ? account.getLastBalanceReal() 
+                : 0.0;
+        
+        double newBalance = currentBalance + amountDelta.doubleValue();
+        
+        account.setLastBalanceReal(newBalance);
+        account.setLastBalanceRealDate(LocalDateTime.now());
+        account.setUpdatedAt(LocalDateTime.now());
+        accountsRepository.save(account);
     }
 }
