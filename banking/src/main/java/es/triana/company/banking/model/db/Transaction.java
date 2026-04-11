@@ -32,11 +32,13 @@ public class Transaction {
     @Column(name = "tenant_id", nullable = false)
     private Long tenantId;
 
-    @Column(name = "source_account_id", nullable = false)
-    private Long sourceAccountId;
+    @ManyToOne
+    @JoinColumn(name = "source_account_id", nullable = false)
+    private Account sourceAccount;
 
-    @Column(name = "destination_account_id")
-    private Long destinationAccountId;
+    @ManyToOne
+    @JoinColumn(name = "destination_account_id")
+    private Account destinationAccount;
 
     @Column(name = "booking_date", nullable = false)
     private LocalDate bookingDate;

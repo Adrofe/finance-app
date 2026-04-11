@@ -45,8 +45,9 @@ public class TransactionService {
         Account sourceAccount = getRequiredAccount(transactionDTO.getSourceAccountId(), "Source");
         validateAccountBelongsToTenant(sourceAccount, tenantId, transactionDTO.getSourceAccountId(), "Source");
 
+        Account destinationAccount = null;
         if (transactionDTO.getDestinationAccountId() != null) {
-            Account destinationAccount = getRequiredAccount(transactionDTO.getDestinationAccountId(), "Destination");
+            destinationAccount = getRequiredAccount(transactionDTO.getDestinationAccountId(), "Destination");
             validateAccountBelongsToTenant(destinationAccount, tenantId, transactionDTO.getDestinationAccountId(), "Destination");
         }
 
@@ -56,7 +57,7 @@ public class TransactionService {
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
-        Transaction transaction = transactionMapper.toEntity(transactionDTO, category, tenantId, normalizedCurrency, timestamp);
+        Transaction transaction = transactionMapper.toEntity(transactionDTO, sourceAccount, destinationAccount, category, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(transaction);
         applyBalanceForCreate(savedTransaction, tenantId);
@@ -125,15 +126,16 @@ public class TransactionService {
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found with id: " + transactionId));
 
         // Store old transaction data to revert balance effects
-        Long oldSourceAccountId = existingTransaction.getSourceAccountId();
-        Long oldDestinationAccountId = existingTransaction.getDestinationAccountId();
+        Long oldSourceAccountId = existingTransaction.getSourceAccount().getId();
+        Long oldDestinationAccountId = existingTransaction.getDestinationAccount() != null ? existingTransaction.getDestinationAccount().getId() : null;
         java.math.BigDecimal oldAmount = existingTransaction.getAmount();
 
         Account sourceAccount = getRequiredAccount(transactionDTO.getSourceAccountId(), "Source");
         validateAccountBelongsToTenant(sourceAccount, tenantId, transactionDTO.getSourceAccountId(), "Source");
 
+        Account destinationAccount = null;
         if (transactionDTO.getDestinationAccountId() != null) {
-            Account destinationAccount = getRequiredAccount(transactionDTO.getDestinationAccountId(), "Destination");
+            destinationAccount = getRequiredAccount(transactionDTO.getDestinationAccountId(), "Destination");
             validateAccountBelongsToTenant(destinationAccount, tenantId, transactionDTO.getDestinationAccountId(), "Destination");
         }
 
@@ -143,7 +145,7 @@ public class TransactionService {
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
-        transactionMapper.updateEntity(existingTransaction, transactionDTO, category, tenantId, normalizedCurrency, timestamp);
+        transactionMapper.updateEntity(existingTransaction, transactionDTO, sourceAccount, destinationAccount, category, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(existingTransaction);
         
@@ -159,8 +161,8 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found with id: " + transactionId));
 
-        Long sourceAccountId = transaction.getSourceAccountId();
-        Long destinationAccountId = transaction.getDestinationAccountId();
+        Long sourceAccountId = transaction.getSourceAccount().getId();
+        Long destinationAccountId = transaction.getDestinationAccount() != null ? transaction.getDestinationAccount().getId() : null;
         java.math.BigDecimal amount = transaction.getAmount();
         
         transactionRepository.delete(transaction);
@@ -320,22 +322,22 @@ public class TransactionService {
      * @param tenantId The tenant ID for validation
      */
     private void applyBalanceForCreate(Transaction transaction, Long tenantId) {
-        if (transaction.getDestinationAccountId() == null) {
+        if (transaction.getDestinationAccount() == null) {
             // Simple transaction: add amount directly (can be positive or negative)
             accountsService.updateAccountBalance(
-                transaction.getSourceAccountId(), 
+                transaction.getSourceAccount().getId(), 
                 tenantId, 
                 transaction.getAmount()
             );
         } else {
             // Internal transfer: subtract from source, add to destination
             accountsService.updateAccountBalance(
-                transaction.getSourceAccountId(), 
+                transaction.getSourceAccount().getId(), 
                 tenantId, 
                 transaction.getAmount().negate()
             );
             accountsService.updateAccountBalance(
-                transaction.getDestinationAccountId(), 
+                transaction.getDestinationAccount().getId(), 
                 tenantId, 
                 transaction.getAmount()
             );
@@ -371,22 +373,22 @@ public class TransactionService {
      * @param tenantId The tenant ID for validation
      */
     private void applyBalanceForUpdate(Transaction transaction, Long tenantId) {
-        if (transaction.getDestinationAccountId() == null) {
+        if (transaction.getDestinationAccount() == null) {
             // Simple transaction: add amount
             accountsService.updateAccountBalance(
-                transaction.getSourceAccountId(), 
+                transaction.getSourceAccount().getId(), 
                 tenantId, 
                 transaction.getAmount()
             );
         } else {
             // Transfer: subtract from source, add to destination
             accountsService.updateAccountBalance(
-                transaction.getSourceAccountId(), 
+                transaction.getSourceAccount().getId(), 
                 tenantId, 
                 transaction.getAmount().negate()
             );
             accountsService.updateAccountBalance(
-                transaction.getDestinationAccountId(), 
+                transaction.getDestinationAccount().getId(), 
                 tenantId, 
                 transaction.getAmount()
             );

@@ -107,8 +107,8 @@ class TransactionServiceTest {
         return Transaction.builder()
                 .id(id)
                 .tenantId(tenantId)
-                .sourceAccountId(SOURCE_ACCOUNT_ID)
-                .destinationAccountId(DESTINATION_ACCOUNT_ID)
+                .sourceAccount(buildAccount(SOURCE_ACCOUNT_ID, tenantId))
+                .destinationAccount(buildAccount(DESTINATION_ACCOUNT_ID, tenantId))
                 .bookingDate(LocalDate.of(2026, 1, 15))
                 .valueDate(LocalDate.of(2026, 1, 15))
                 .amount(BigDecimal.valueOf(250.0))
@@ -168,7 +168,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             dto.setDestinationAccountId(null);
             Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
-            saved.setDestinationAccountId(null);
+            saved.setDestinationAccount(null);
 
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
             stubCategoryLookup(CATEGORY_ID);
@@ -475,7 +475,7 @@ class TransactionServiceTest {
             dto.setDestinationAccountId(null);
             dto.setAmount(100.0);
             Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
-            saved.setDestinationAccountId(null);
+            saved.setDestinationAccount(null);
             saved.setAmount(BigDecimal.valueOf(100.0));
 
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
@@ -501,7 +501,7 @@ class TransactionServiceTest {
             dto.setDestinationAccountId(null);
             dto.setAmount(-50.0);
             Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
-            saved.setDestinationAccountId(null);
+            saved.setDestinationAccount(null);
             saved.setAmount(BigDecimal.valueOf(-50.0));
 
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
@@ -816,11 +816,11 @@ class TransactionServiceTest {
             
             Transaction existing = buildTransaction(TRANSACTION_ID, TENANT_ID);
             existing.setAmount(BigDecimal.valueOf(100.0));
-            existing.setDestinationAccountId(null);
+            existing.setDestinationAccount(null);
             
             Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
             saved.setAmount(BigDecimal.valueOf(300.0));
-            saved.setDestinationAccountId(null);
+            saved.setDestinationAccount(null);
 
             when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
                     .thenReturn(Optional.of(existing));
@@ -856,11 +856,11 @@ class TransactionServiceTest {
             
             Transaction existing = buildTransaction(TRANSACTION_ID, TENANT_ID);
             existing.setAmount(BigDecimal.valueOf(150.0));
-            existing.setDestinationAccountId(null); // Was simple transaction
+            existing.setDestinationAccount(null); // Was simple transaction
             
             Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
             saved.setAmount(BigDecimal.valueOf(150.0));
-            saved.setDestinationAccountId(DESTINATION_ACCOUNT_ID); // Now transfer
+            saved.setDestinationAccount(buildAccount(DESTINATION_ACCOUNT_ID, TENANT_ID)); // Now transfer
 
             when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
                     .thenReturn(Optional.of(existing));
@@ -939,7 +939,7 @@ class TransactionServiceTest {
         void revertBalanceOnDeleteSimpleTransaction() {
             Transaction tx = buildTransaction(TRANSACTION_ID, TENANT_ID);
             tx.setAmount(BigDecimal.valueOf(75.0));
-            tx.setDestinationAccountId(null);
+            tx.setDestinationAccount(null);
             
             when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
                     .thenReturn(Optional.of(tx));

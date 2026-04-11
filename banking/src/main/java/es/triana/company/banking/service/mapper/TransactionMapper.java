@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import org.springframework.stereotype.Component;
 
 import es.triana.company.banking.model.api.TransactionDTO;
+import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.Category;
 import es.triana.company.banking.model.db.Transaction;
 
@@ -32,14 +33,16 @@ public class TransactionMapper {
 
 	public Transaction toEntity(
 			TransactionDTO transactionDTO,
+			Account sourceAccount,
+			Account destinationAccount,
 			Category category,
 			Long tenantId,
 			String normalizedCurrency,
 			LocalDateTime timestamp) {
 		return Transaction.builder()
 				.tenantId(tenantId)
-				.sourceAccountId(transactionDTO.getSourceAccountId())
-				.destinationAccountId(transactionDTO.getDestinationAccountId())
+				.sourceAccount(sourceAccount)
+				.destinationAccount(destinationAccount)
 				.bookingDate(transactionDTO.getBookingDate().toLocalDate())
 				.valueDate(transactionDTO.getValueDate() != null ? transactionDTO.getValueDate().toLocalDate() : null)
 				.amount(BigDecimal.valueOf(transactionDTO.getAmount()))
@@ -58,8 +61,8 @@ public class TransactionMapper {
 	public TransactionDTO toDto(Transaction transaction) {
 		return TransactionDTO.builder()
 				.tenantId(transaction.getTenantId())
-				.sourceAccountId(transaction.getSourceAccountId())
-				.destinationAccountId(transaction.getDestinationAccountId())
+				.sourceAccountId(transaction.getSourceAccount() != null ? transaction.getSourceAccount().getId() : null)
+				.destinationAccountId(transaction.getDestinationAccount() != null ? transaction.getDestinationAccount().getId() : null)
 				.bookingDate(transaction.getBookingDate() != null ? transaction.getBookingDate().atStartOfDay() : null)
 				.valueDate(transaction.getValueDate() != null ? transaction.getValueDate().atStartOfDay() : null)
 				.amount(transaction.getAmount() != null ? transaction.getAmount().doubleValue() : null)
@@ -78,13 +81,15 @@ public class TransactionMapper {
 	public void updateEntity(
 			Transaction transaction,
 			TransactionDTO transactionDTO,
+			Account sourceAccount,
+			Account destinationAccount,
 			Category category,
 			Long tenantId,
 			String normalizedCurrency,
 			LocalDateTime timestamp) {
 		transaction.setTenantId(tenantId);
-		transaction.setSourceAccountId(transactionDTO.getSourceAccountId());
-		transaction.setDestinationAccountId(transactionDTO.getDestinationAccountId());
+		transaction.setSourceAccount(sourceAccount);
+		transaction.setDestinationAccount(destinationAccount);
 		transaction.setBookingDate(transactionDTO.getBookingDate().toLocalDate());
 		transaction.setValueDate(transactionDTO.getValueDate() != null ? transactionDTO.getValueDate().toLocalDate() : null);
 		transaction.setAmount(BigDecimal.valueOf(transactionDTO.getAmount()));
