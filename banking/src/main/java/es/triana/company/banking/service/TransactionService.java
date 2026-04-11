@@ -231,11 +231,11 @@ public class TransactionService {
         }
 
         if (account.getLastBalanceReal() != null) {
-            return account.getLastBalanceReal();
+            return account.getLastBalanceReal().doubleValue();
         }
 
         if (account.getLastBalanceAvailable() != null) {
-            return account.getLastBalanceAvailable();
+            return account.getLastBalanceAvailable().doubleValue();
         }
 
         return 0.0;
@@ -404,11 +404,11 @@ public class TransactionService {
 
     private double resolveCurrentBalance(Account account) {
         if (account.getLastBalanceReal() != null) {
-            return account.getLastBalanceReal();
+            return account.getLastBalanceReal().doubleValue();
         }
 
         if (account.getLastBalanceAvailable() != null) {
-            return account.getLastBalanceAvailable();
+            return account.getLastBalanceAvailable().doubleValue();
         }
 
         return 0.0;

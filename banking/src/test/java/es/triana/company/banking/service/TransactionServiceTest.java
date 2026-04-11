@@ -124,8 +124,8 @@ class TransactionServiceTest {
                 .id(id)
                 .tenantId(tenantId)
                 .name("Test Account")
-                .lastBalanceReal(1000.0)
-                .lastBalanceAvailable(950.0)
+                .lastBalanceReal(BigDecimal.valueOf(1000.0))
+                .lastBalanceAvailable(BigDecimal.valueOf(950.0))
                 .build();
     }
 
@@ -1171,8 +1171,8 @@ class TransactionServiceTest {
         @DisplayName("should return lastBalanceReal when available")
         void returnBalanceReal() {
             Account account = buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID);
-            account.setLastBalanceReal(1500.0);
-            account.setLastBalanceAvailable(1200.0);
+            account.setLastBalanceReal(BigDecimal.valueOf(1500.0));
+            account.setLastBalanceAvailable(BigDecimal.valueOf(1200.0));
             stubAccountLookup(SOURCE_ACCOUNT_ID, account);
 
             Double balance = transactionService.getAccountBalance(SOURCE_ACCOUNT_ID, TENANT_ID);
@@ -1185,7 +1185,7 @@ class TransactionServiceTest {
         void fallbackToBalanceAvailable() {
             Account account = buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID);
             account.setLastBalanceReal(null);
-            account.setLastBalanceAvailable(800.0);
+            account.setLastBalanceAvailable(BigDecimal.valueOf(800.0));
             stubAccountLookup(SOURCE_ACCOUNT_ID, account);
 
             Double balance = transactionService.getAccountBalance(SOURCE_ACCOUNT_ID, TENANT_ID);
@@ -1251,9 +1251,9 @@ class TransactionServiceTest {
         @DisplayName("should aggregate balances of all tenant accounts")
         void aggregateBalance() {
             Account acc1 = buildAccount(10L, TENANT_ID);
-            acc1.setLastBalanceReal(1000.0);
+            acc1.setLastBalanceReal(BigDecimal.valueOf(1000.0));
             Account acc2 = buildAccount(11L, TENANT_ID);
-            acc2.setLastBalanceReal(2000.0);
+            acc2.setLastBalanceReal(BigDecimal.valueOf(2000.0));
 
             when(accountsRepository.findByTenantId(TENANT_ID)).thenReturn(List.of(acc1, acc2));
 
@@ -1267,9 +1267,9 @@ class TransactionServiceTest {
         void mixedBalances() {
             Account acc1 = buildAccount(10L, TENANT_ID);
             acc1.setLastBalanceReal(null);
-            acc1.setLastBalanceAvailable(500.0);
+            acc1.setLastBalanceAvailable(BigDecimal.valueOf(500.0));
             Account acc2 = buildAccount(11L, TENANT_ID);
-            acc2.setLastBalanceReal(1500.0);
+            acc2.setLastBalanceReal(BigDecimal.valueOf(1500.0));
 
             when(accountsRepository.findByTenantId(TENANT_ID)).thenReturn(List.of(acc1, acc2));
 
