@@ -55,8 +55,9 @@ public class Transaction {
     @Column(name = "description_raw")
     private String descriptionRaw;
 
-    @Column(name = "merchant_id")
-    private Long merchantId;
+    @ManyToOne
+    @JoinColumn(name = "merchant_id")
+    private Merchant merchant;
 
     @ManyToOne
     @JoinColumn(name = "category_id")

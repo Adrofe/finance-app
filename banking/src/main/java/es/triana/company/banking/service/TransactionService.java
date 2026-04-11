@@ -11,9 +11,11 @@ import org.springframework.stereotype.Service;
 import es.triana.company.banking.model.api.TransactionDTO;
 import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.Category;
+import es.triana.company.banking.model.db.Merchant;
 import es.triana.company.banking.model.db.Transaction;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.repository.CategoryRepository;
+import es.triana.company.banking.repository.MerchantRepository;
 import es.triana.company.banking.repository.TransactionRepository;
 import es.triana.company.banking.service.mapper.TransactionMapper;
 
@@ -23,6 +25,7 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountsRepository accountsRepository;
     private final CategoryRepository categoryRepository;
+    private final MerchantRepository merchantRepository;
     private final TransactionMapper transactionMapper;
     private final AccountsService accountsService;
 
@@ -30,11 +33,13 @@ public class TransactionService {
             TransactionRepository transactionRepository,
             AccountsRepository accountsRepository,
             CategoryRepository categoryRepository,
+            MerchantRepository merchantRepository,
             TransactionMapper transactionMapper,
             AccountsService accountsService) {
         this.transactionRepository = transactionRepository;
         this.accountsRepository = accountsRepository;
         this.categoryRepository = categoryRepository;
+        this.merchantRepository = merchantRepository;
         this.transactionMapper = transactionMapper;
         this.accountsService = accountsService;
     }
@@ -53,11 +58,12 @@ public class TransactionService {
 
         validateExternalIdUniqueness(transactionDTO.getExternalId(), tenantId);
 
+        Merchant merchant = resolveMerchant(transactionDTO.getMerchantId());
         Category category = resolveCategory(transactionDTO.getCategoryId());
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
-        Transaction transaction = transactionMapper.toEntity(transactionDTO, sourceAccount, destinationAccount, category, tenantId, normalizedCurrency, timestamp);
+    Transaction transaction = transactionMapper.toEntity(transactionDTO, sourceAccount, destinationAccount, merchant, category, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(transaction);
         applyBalanceForCreate(savedTransaction, tenantId);
@@ -141,11 +147,12 @@ public class TransactionService {
 
         validateExternalIdUniquenessForUpdate(transactionDTO.getExternalId(), tenantId, transactionId);
 
+        Merchant merchant = resolveMerchant(transactionDTO.getMerchantId());
         Category category = resolveCategory(transactionDTO.getCategoryId());
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
-        transactionMapper.updateEntity(existingTransaction, transactionDTO, sourceAccount, destinationAccount, category, tenantId, normalizedCurrency, timestamp);
+    transactionMapper.updateEntity(existingTransaction, transactionDTO, sourceAccount, destinationAccount, merchant, category, tenantId, normalizedCurrency, timestamp);
 
         Transaction savedTransaction = transactionRepository.save(existingTransaction);
         
@@ -260,6 +267,15 @@ public class TransactionService {
 
         return categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new IllegalArgumentException("Category not found with id: " + categoryId));
+    }
+
+    private Merchant resolveMerchant(Long merchantId) {
+        if (merchantId == null) {
+            return null;
+        }
+
+        return merchantRepository.findById(merchantId)
+                .orElseThrow(() -> new IllegalArgumentException("Merchant not found with id: " + merchantId));
     }
 
     private void validateAccountBelongsToTenant(Account account, Long tenantId, Long accountId, String role) {

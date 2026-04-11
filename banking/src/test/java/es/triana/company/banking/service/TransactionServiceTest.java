@@ -25,9 +25,11 @@ import org.mockito.Spy;
 import es.triana.company.banking.model.api.TransactionDTO;
 import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.Category;
+import es.triana.company.banking.model.db.Merchant;
 import es.triana.company.banking.model.db.Transaction;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.repository.CategoryRepository;
+import es.triana.company.banking.repository.MerchantRepository;
 import es.triana.company.banking.repository.TransactionRepository;
 import es.triana.company.banking.service.mapper.TransactionMapper;
 
@@ -41,6 +43,9 @@ class TransactionServiceTest {
 
     @Mock
     private CategoryRepository categoryRepository;
+
+    @Mock
+    private MerchantRepository merchantRepository;
 
     @Spy
     private TransactionMapper transactionMapper = new TransactionMapper();
@@ -57,6 +62,7 @@ class TransactionServiceTest {
     private static final Long DESTINATION_ACCOUNT_ID = 20L;
     private static final Long TRANSACTION_ID = 100L;
     private static final Long CATEGORY_ID = 5L;
+    private static final Long MERCHANT_ID = 3L;
 
     @BeforeEach
     void setUp() {
@@ -80,7 +86,7 @@ class TransactionServiceTest {
                 .statusId(1L)
                 .typeId(1L)
                 .categoryId(CATEGORY_ID)
-                .merchantId(3L)
+                .merchantId(MERCHANT_ID)
                 .build();
     }
 
@@ -103,6 +109,13 @@ class TransactionServiceTest {
                 .build();
     }
 
+    private Merchant buildMerchant(Long id) {
+        return Merchant.builder()
+                .id(id)
+                .name("Test Merchant")
+                .build();
+    }
+
     private Transaction buildTransaction(Long id, Long tenantId) {
         return Transaction.builder()
                 .id(id)
@@ -118,7 +131,7 @@ class TransactionServiceTest {
                 .statusId(1L)
                 .transactionType(1L)
                 .category(buildCategory(CATEGORY_ID))
-                .merchantId(3L)
+                .merchant(buildMerchant(MERCHANT_ID))
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -137,6 +150,10 @@ class TransactionServiceTest {
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(buildCategory(categoryId)));
     }
 
+    private void stubMerchantLookup(Long merchantId) {
+        when(merchantRepository.findById(merchantId)).thenReturn(Optional.of(buildMerchant(merchantId)));
+    }
+
     // =========================================================================
     // createTransaction
     // =========================================================================
@@ -151,6 +168,7 @@ class TransactionServiceTest {
             Transaction saved = buildTransaction(TRANSACTION_ID, TENANT_ID);
             stubBothAccounts();
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
@@ -172,6 +190,7 @@ class TransactionServiceTest {
 
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
@@ -190,6 +209,7 @@ class TransactionServiceTest {
 
             stubBothAccounts();
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
@@ -277,6 +297,7 @@ class TransactionServiceTest {
 
             stubBothAccounts();
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
@@ -388,6 +409,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             stubBothAccounts();
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(true);
 
             IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
@@ -406,6 +428,7 @@ class TransactionServiceTest {
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, OTHER_TENANT_ID));
             stubAccountLookup(DESTINATION_ACCOUNT_ID, buildAccount(DESTINATION_ACCOUNT_ID, OTHER_TENANT_ID));
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(OTHER_TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
@@ -424,6 +447,7 @@ class TransactionServiceTest {
 
             stubBothAccounts();
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
             TransactionDTO result = transactionService.createTransaction(dto, TENANT_ID);
@@ -441,6 +465,7 @@ class TransactionServiceTest {
 
             stubBothAccounts();
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
@@ -458,6 +483,7 @@ class TransactionServiceTest {
 
             stubBothAccounts();
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
@@ -480,6 +506,7 @@ class TransactionServiceTest {
 
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
@@ -506,6 +533,7 @@ class TransactionServiceTest {
 
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
@@ -529,6 +557,7 @@ class TransactionServiceTest {
 
             stubBothAccounts();
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
@@ -795,6 +824,7 @@ class TransactionServiceTest {
                     .thenReturn(Optional.of(existing));
             stubBothAccounts();
                 stubCategoryLookup(CATEGORY_ID);
+                stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxIdAndIdNot(TENANT_ID, "EXT-001", TRANSACTION_ID))
                     .thenReturn(false);
             when(transactionRepository.save(existing)).thenReturn(saved);
@@ -826,6 +856,7 @@ class TransactionServiceTest {
                     .thenReturn(Optional.of(existing));
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
                 stubCategoryLookup(CATEGORY_ID);
+                stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxIdAndIdNot(TENANT_ID, "EXT-001", TRANSACTION_ID))
                     .thenReturn(false);
             when(transactionRepository.save(existing)).thenReturn(saved);
@@ -866,6 +897,7 @@ class TransactionServiceTest {
                     .thenReturn(Optional.of(existing));
             stubBothAccounts();
                 stubCategoryLookup(CATEGORY_ID);
+                stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxIdAndIdNot(TENANT_ID, "EXT-001", TRANSACTION_ID))
                     .thenReturn(false);
             when(transactionRepository.save(existing)).thenReturn(saved);
@@ -908,6 +940,7 @@ class TransactionServiceTest {
                     .thenReturn(Optional.of(existing));
             stubBothAccounts();
                 stubCategoryLookup(CATEGORY_ID);
+                stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxIdAndIdNot(TENANT_ID, "EXT-001", TRANSACTION_ID))
                     .thenReturn(true);
 
@@ -926,6 +959,7 @@ class TransactionServiceTest {
                     .thenReturn(Optional.of(existing));
             stubBothAccounts();
                 stubCategoryLookup(CATEGORY_ID);
+                stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxIdAndIdNot(TENANT_ID, "EXT-001", TRANSACTION_ID))
                     .thenReturn(false);
             when(transactionRepository.save(existing)).thenReturn(existing);
@@ -1296,6 +1330,7 @@ class TransactionServiceTest {
 
             stubBothAccounts();
             stubCategoryLookup(CATEGORY_ID);
+            stubMerchantLookup(MERCHANT_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(false);
             when(transactionRepository.save(any(Transaction.class))).thenReturn(saved);
 
