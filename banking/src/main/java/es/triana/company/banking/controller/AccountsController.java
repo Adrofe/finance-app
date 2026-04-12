@@ -38,7 +38,8 @@ public class AccountsController {
         List<AccountDTO> accounts = accountsService.getAccountsByTenant(String.valueOf(tenantId));
 
         if (accounts == null || accounts.isEmpty()) {
-            return ResponseEntity.noContent().build();
+            ApiResponse<List<AccountDTO>> response = new ApiResponse<>(200, "No accounts found", List.of());
+            return ResponseEntity.ok(response);
         }
 
         ApiResponse<List<AccountDTO>> response = new ApiResponse<>(200, "Accounts retrieved successfully", accounts);
