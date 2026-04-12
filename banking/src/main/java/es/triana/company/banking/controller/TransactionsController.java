@@ -73,7 +73,7 @@ public class TransactionsController {
         }
     }
 
-    @GetMapping("/tenant")
+    @GetMapping()
     public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTenant() {
         try {
             Long tenantId = tenantContext.getCurrentTenantId();
@@ -146,7 +146,7 @@ public class TransactionsController {
         }
     }
 
-    @GetMapping("/tenant/balance")
+    @GetMapping("/balance")
     public ResponseEntity<ApiResponse<Double>> getTenantBalance() {
         try {
             Long tenantId = tenantContext.getCurrentTenantId();
