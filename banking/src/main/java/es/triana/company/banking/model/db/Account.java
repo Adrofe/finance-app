@@ -1,5 +1,7 @@
 package es.triana.company.banking.model.db;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
@@ -47,17 +49,17 @@ public class Account {
     @Column(name = "currency")
     private String currency;
 
-    @Column(name = "last_balance_real")
-    private Double lastBalanceReal;
+    @Column(name = "last_balance_real", precision = 18, scale = 2)
+    private BigDecimal lastBalanceReal;
 
     @Column(name = "last_balance_real_date")
-    private LocalDateTime lastBalanceRealDate;
+    private LocalDate lastBalanceRealDate;
 
-    @Column(name = "last_balance_available")
-    private Double lastBalanceAvailable;
+    @Column(name = "last_balance_available", precision = 18, scale = 2)
+    private BigDecimal lastBalanceAvailable;
 
     @Column(name = "last_balance_available_date")
-    private LocalDateTime lastBalanceAvailableDate;
+    private LocalDate lastBalanceAvailableDate;
 
     @Column(name = "is_active")
     private Boolean isActive;

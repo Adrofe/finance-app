@@ -1,6 +1,6 @@
 package es.triana.company.banking.model.api;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -45,8 +45,8 @@ public class AccountDTO {
     private String currency;
 
     private Double lastBalanceReal;
-    private LocalDateTime lastBalanceRealDate;
+    private LocalDate lastBalanceRealDate;
     private Double lastBalanceAvailable;
-    private LocalDateTime lastBalanceAvailableDate;
+    private LocalDate lastBalanceAvailableDate;
     private Boolean isActive;
 }

@@ -1,6 +1,7 @@
 package es.triana.company.banking.service;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -98,9 +99,9 @@ public class AccountsService {
         existingAccount.setAccountType(resolveAccountType(updatedAccount.getAccountTypeId()));
         existingAccount.setInstitution(resolveInstitution(updatedAccount.getInstitutionId()));
         existingAccount.setCurrency(normalizeCurrency(updatedAccount.getCurrency()));
-        existingAccount.setLastBalanceReal(updatedAccount.getLastBalanceReal());
+        existingAccount.setLastBalanceReal(toBigDecimal(updatedAccount.getLastBalanceReal()));
         existingAccount.setLastBalanceRealDate(updatedAccount.getLastBalanceRealDate());
-        existingAccount.setLastBalanceAvailable(updatedAccount.getLastBalanceAvailable());
+        existingAccount.setLastBalanceAvailable(toBigDecimal(updatedAccount.getLastBalanceAvailable()));
         existingAccount.setLastBalanceAvailableDate(updatedAccount.getLastBalanceAvailableDate());
         existingAccount.setIsActive(updatedAccount.getIsActive());
     }
@@ -192,15 +193,19 @@ public class AccountsService {
             throw new AccountNotFoundException(accountId);
         }
 
-        Double currentBalance = account.getLastBalanceReal() != null 
-                ? account.getLastBalanceReal() 
-                : 0.0;
-        
-        double newBalance = currentBalance + amountDelta.doubleValue();
-        
+        BigDecimal currentBalance = account.getLastBalanceReal() != null
+                ? account.getLastBalanceReal()
+                : BigDecimal.ZERO;
+
+        BigDecimal newBalance = currentBalance.add(amountDelta);
+
         account.setLastBalanceReal(newBalance);
-        account.setLastBalanceRealDate(LocalDateTime.now());
+        account.setLastBalanceRealDate(LocalDate.now());
         account.setUpdatedAt(LocalDateTime.now());
         accountsRepository.save(account);
+    }
+
+    private BigDecimal toBigDecimal(Double value) {
+        return value != null ? BigDecimal.valueOf(value) : null;
     }
 }

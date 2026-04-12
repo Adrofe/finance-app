@@ -1,5 +1,7 @@
 package es.triana.company.banking.service.mapper;
 
+import java.math.BigDecimal;
+
 import org.springframework.stereotype.Component;
 
 import es.triana.company.banking.model.api.AccountDTO;
@@ -22,9 +24,9 @@ public class AccountMapper {
                 .accountTypeId(accountType != null ? accountType.getId() : null)
                 .accountTypeName(accountType != null ? accountType.getName() : null)
                 .currency(account.getCurrency())
-                .lastBalanceReal(account.getLastBalanceReal())
+            .lastBalanceReal(toDouble(account.getLastBalanceReal()))
                 .lastBalanceRealDate(account.getLastBalanceRealDate())
-                .lastBalanceAvailable(account.getLastBalanceAvailable())
+            .lastBalanceAvailable(toDouble(account.getLastBalanceAvailable()))
                 .lastBalanceAvailableDate(account.getLastBalanceAvailableDate())
                 .isActive(account.getIsActive())
                 .build();
@@ -36,12 +38,20 @@ public class AccountMapper {
         .name(accountDTO.getName())
         .iban(accountDTO.getIban())
         .currency(accountDTO.getCurrency())
-        .lastBalanceReal(accountDTO.getLastBalanceReal())
+        .lastBalanceReal(toBigDecimal(accountDTO.getLastBalanceReal()))
         .lastBalanceRealDate(accountDTO.getLastBalanceRealDate())
-        .lastBalanceAvailable(accountDTO.getLastBalanceAvailable())
+        .lastBalanceAvailable(toBigDecimal(accountDTO.getLastBalanceAvailable()))
         .lastBalanceAvailableDate(accountDTO.getLastBalanceAvailableDate())
         .isActive(accountDTO.getIsActive())
         .build();
         return account;
+    }
+
+    private Double toDouble(BigDecimal value) {
+        return value != null ? value.doubleValue() : null;
+    }
+
+    private BigDecimal toBigDecimal(Double value) {
+        return value != null ? BigDecimal.valueOf(value) : null;
     }
 }

@@ -194,14 +194,14 @@ class AccountsServiceTest {
         Account account = new Account();
         account.setId(1L);
         account.setTenantId(1L);
-        account.setLastBalanceReal(100.0);
+        account.setLastBalanceReal(new BigDecimal("100.00"));
 
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
         when(accountsRepository.save(account)).thenReturn(account);
 
         accountsService.updateAccountBalance(1L, 1L, new BigDecimal("50.00"));
 
-        assertEquals(150.0, account.getLastBalanceReal());
+        assertEquals(new BigDecimal("150.00"), account.getLastBalanceReal());
         assertNotNull(account.getLastBalanceRealDate());
         assertNotNull(account.getUpdatedAt());
         verify(accountsRepository, times(1)).save(account);
@@ -212,14 +212,14 @@ class AccountsServiceTest {
         Account account = new Account();
         account.setId(1L);
         account.setTenantId(1L);
-        account.setLastBalanceReal(100.0);
+        account.setLastBalanceReal(new BigDecimal("100.00"));
 
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
         when(accountsRepository.save(account)).thenReturn(account);
 
         accountsService.updateAccountBalance(1L, 1L, new BigDecimal("-30.00"));
 
-        assertEquals(70.0, account.getLastBalanceReal());
+        assertEquals(new BigDecimal("70.00"), account.getLastBalanceReal());
         assertNotNull(account.getLastBalanceRealDate());
         assertNotNull(account.getUpdatedAt());
         verify(accountsRepository, times(1)).save(account);
@@ -237,7 +237,7 @@ class AccountsServiceTest {
 
         accountsService.updateAccountBalance(1L, 1L, new BigDecimal("25.00"));
 
-        assertEquals(25.0, account.getLastBalanceReal());
+        assertEquals(new BigDecimal("25.00"), account.getLastBalanceReal());
         assertNotNull(account.getLastBalanceRealDate());
         assertNotNull(account.getUpdatedAt());
         verify(accountsRepository, times(1)).save(account);
@@ -256,7 +256,7 @@ class AccountsServiceTest {
         Account account = new Account();
         account.setId(1L);
         account.setTenantId(1L);
-        account.setLastBalanceReal(100.0);
+        account.setLastBalanceReal(new BigDecimal("100.00"));
 
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
 
