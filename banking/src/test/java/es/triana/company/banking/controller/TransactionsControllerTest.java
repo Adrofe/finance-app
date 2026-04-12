@@ -219,7 +219,8 @@ public class TransactionsControllerTest {
         ResponseEntity<ApiResponse<Void>> response = transactionsController.deleteTransaction(transactionId);
 
         verify(transactionsService).deleteTransaction(transactionId, tenantId);
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Transaction deleted successfully", response.getBody().getMessage());
     }
 
     @Test

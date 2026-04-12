@@ -90,7 +90,8 @@ public class AccountsControllerTest {
         ResponseEntity<ApiResponse<Void>> response = accountsController.deleteAccount(id);
 
         verify(accountsService).deleteAccount(id);
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Account deleted successfully", response.getBody().getMessage());
     }
 
     @Test

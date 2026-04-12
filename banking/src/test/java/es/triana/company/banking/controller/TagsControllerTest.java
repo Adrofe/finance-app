@@ -75,7 +75,8 @@ public class TagsControllerTest {
         ResponseEntity<ApiResponse<Void>> response = tagsController.deleteTag(7L);
 
         verify(tagService).deleteTag(7L, 1L);
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Tag deleted successfully", response.getBody().getMessage());
     }
 
     @Test

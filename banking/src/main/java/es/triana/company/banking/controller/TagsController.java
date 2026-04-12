@@ -50,7 +50,7 @@ public class TagsController {
     public ResponseEntity<ApiResponse<Void>> deleteTag(@PathVariable("tagId") Long tagId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         tagService.deleteTag(tagId, tenantId);
-        ApiResponse<Void> response = new ApiResponse<>(204, "Tag deleted successfully", null);
-        return ResponseEntity.status(204).body(response);
+        ApiResponse<Void> response = new ApiResponse<>(200, "Tag deleted successfully", null);
+        return ResponseEntity.ok(response);
     }
 }

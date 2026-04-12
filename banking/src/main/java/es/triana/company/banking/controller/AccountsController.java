@@ -57,8 +57,8 @@ public class AccountsController {
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable Long id) {
         accountsService.deleteAccount(id);
-        ApiResponse<Void> response = new ApiResponse<>(204, "Account deleted successfully", null);
-        return ResponseEntity.status(HttpStatus.NO_CONTENT).body(response);
+        ApiResponse<Void> response = new ApiResponse<>(200, "Account deleted successfully", null);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")

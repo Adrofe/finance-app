@@ -88,8 +88,8 @@ public class TransactionsController {
     public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable("transactionId") Long transactionId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         transactionService.deleteTransaction(transactionId, tenantId);
-        ApiResponse<Void> response = new ApiResponse<>(204, "Transaction deleted successfully", null);
-        return ResponseEntity.status(204).body(response);
+        ApiResponse<Void> response = new ApiResponse<>(200, "Transaction deleted successfully", null);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/account/{accountId}/balance")
