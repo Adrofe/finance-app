@@ -48,7 +48,7 @@ public class TransactionsController {
     }
 
     @GetMapping("/{transactionId}")
-    public ResponseEntity<ApiResponse<TransactionDTO>> getTransactionById(@PathVariable Long transactionId) {
+    public ResponseEntity<ApiResponse<TransactionDTO>> getTransactionById(@PathVariable("transactionId") Long transactionId) {
         try {
             Long tenantId = tenantContext.getCurrentTenantId();
             TransactionDTO transaction = (TransactionDTO) transactionService.getTransactionById(transactionId, tenantId);
@@ -61,7 +61,7 @@ public class TransactionsController {
     }
 
     @GetMapping("/account/{accountId}")
-    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByAccount(@PathVariable Long accountId) {
+    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByAccount(@PathVariable("accountId") Long accountId) {
         try {
             Long tenantId = tenantContext.getCurrentTenantId();
             List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByAccount(accountId, tenantId));
@@ -87,8 +87,9 @@ public class TransactionsController {
     }
 
     @GetMapping("/date-range")
-    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByDateRange(@RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate) {
+        public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByDateRange(
+            @RequestParam("startDate") LocalDate startDate,
+            @RequestParam("endDate") LocalDate endDate) {
         try {
             Long tenantId = tenantContext.getCurrentTenantId();
             List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByDateRange(startDate, endDate, tenantId));
@@ -101,7 +102,7 @@ public class TransactionsController {
     }
 
     @PutMapping("/{transactionId}")
-    public ResponseEntity<ApiResponse<TransactionDTO>> updateTransaction(@PathVariable Long transactionId,
+    public ResponseEntity<ApiResponse<TransactionDTO>> updateTransaction(@PathVariable("transactionId") Long transactionId,
             @Valid @RequestBody TransactionDTO transactionDTO) {
         try {
             Long tenantId = tenantContext.getCurrentTenantId();
@@ -115,7 +116,7 @@ public class TransactionsController {
     }
 
     @DeleteMapping("/{transactionId}")
-    public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable Long transactionId) {
+    public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable("transactionId") Long transactionId) {
         try {
             Long tenantId = tenantContext.getCurrentTenantId();
             transactionService.deleteTransaction(transactionId, tenantId);
@@ -131,7 +132,7 @@ public class TransactionsController {
     }
 
     @GetMapping("/account/{accountId}/balance")
-    public ResponseEntity<ApiResponse<Double>> getAccountBalance(@PathVariable Long accountId) {
+    public ResponseEntity<ApiResponse<Double>> getAccountBalance(@PathVariable("accountId") Long accountId) {
         try {
             Long tenantId = tenantContext.getCurrentTenantId();
             Double balance = (Double) transactionService.getAccountBalance(accountId, tenantId);
@@ -163,7 +164,7 @@ public class TransactionsController {
     }
 
     @GetMapping("/category/{categoryId}")
-    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByCategory(@PathVariable Long categoryId) {
+    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByCategory(@PathVariable("categoryId") Long categoryId) {
         try {
             Long tenantId = tenantContext.getCurrentTenantId();
             List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByCategory(categoryId, tenantId));
@@ -179,7 +180,7 @@ public class TransactionsController {
     }
 
     @GetMapping("/tag/{tagId}")
-    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTag(@PathVariable Long tagId) {
+    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTag(@PathVariable("tagId") Long tagId) {
         try {
             Long tenantId = tenantContext.getCurrentTenantId();
             List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByTag(tagId, tenantId));
