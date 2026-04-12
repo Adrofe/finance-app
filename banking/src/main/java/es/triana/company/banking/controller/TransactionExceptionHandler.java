@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -57,6 +58,16 @@ public class TransactionExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleAccessDeniedException(AccessDeniedException exception) {
         ApiResponse<Void> response = new ApiResponse<>(403, "Access denied", null);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException exception) {
+        String parameter = exception.getName() != null ? exception.getName() : "parameter";
+        String value = exception.getValue() != null ? exception.getValue().toString() : "null";
+        ApiResponse<Void> response = new ApiResponse<>(400,
+                "Invalid value '" + value + "' for " + parameter,
+                null);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     @ExceptionHandler(Exception.class)
