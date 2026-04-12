@@ -1,6 +1,7 @@
 package es.triana.company.banking.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -97,11 +98,11 @@ public class AccountsControllerTest {
         Long id = 999L;
         doThrow(new AccountNotFoundException("Account not found with id: " + id)).when(accountsService).deleteAccount(id);
 
-        ResponseEntity<ApiResponse<Void>> response = accountsController.deleteAccount(id);
+        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
+            () -> accountsController.deleteAccount(id));
 
         verify(accountsService).deleteAccount(id);
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertEquals("Account not found with id: " + id, response.getBody().getMessage());
+        assertEquals("Account not found with id: " + id, exception.getMessage());
     }
 
     @Test
@@ -122,11 +123,12 @@ public class AccountsControllerTest {
     public void testGetAccountByIdNotFound(){
         Long id = 999L;
         when(accountsService.getAccountById(id)).thenThrow(new AccountNotFoundException("Account not found with id: " + id));
-        ResponseEntity<ApiResponse<AccountDTO>> response = accountsController.getAccountById(id);
+
+        AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
+                () -> accountsController.getAccountById(id));
 
         verify(accountsService).getAccountById(id);
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertEquals("Account not found with id: " + id, response.getBody().getMessage());
+        assertEquals("Account not found with id: " + id, exception.getMessage());
     }
 
     @Test
