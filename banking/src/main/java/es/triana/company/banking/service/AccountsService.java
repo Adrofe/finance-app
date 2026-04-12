@@ -68,17 +68,36 @@ public class AccountsService {
         return accountMapper.toDto(accountsRepository.save(accountEntity));
     }
 
-    public void deleteAccount(Long id) {
-        if (!accountsRepository.existsById(id)) {
-            throw new AccountNotFoundException(id);
+    public void deleteAccount(Long id, Long tenantId) {
+        if (id == null) {
+            throw new AccountValidationException("Account id is required");
         }
+
+        if (tenantId == null) {
+            throw new AccountValidationException("Tenant id is required");
+        }
+
+        Account account = accountsRepository.findById(id)
+                .orElseThrow(() -> new AccountNotFoundException(id));
+
+        validateTenantOwnership(account, tenantId);
         accountsRepository.deleteById(id);
     }
 
-    public AccountDTO getAccountById(Long id) {
-        return accountsRepository.findById(id)
-                .map(accountMapper::toDto)
+    public AccountDTO getAccountById(Long id, Long tenantId) {
+        if (id == null) {
+            throw new AccountValidationException("Account id is required");
+        }
+
+        if (tenantId == null) {
+            throw new AccountValidationException("Tenant id is required");
+        }
+
+        Account account = accountsRepository.findById(id)
                 .orElseThrow(() -> new AccountNotFoundException(id));
+
+        validateTenantOwnership(account, tenantId);
+        return accountMapper.toDto(account);
     }
 
     public AccountDTO updateAccount(AccountDTO updatedAccount, Long tenantId) {

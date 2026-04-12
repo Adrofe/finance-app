@@ -65,13 +65,14 @@ class AccountsServiceTest {
     void testGetAccountById() {
         Account account = new Account();
         account.setId(1L);
+        account.setTenantId(1L);
         AccountDTO accountDTO = new AccountDTO();
         accountDTO.setId(1L);
 
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
         when(accountMapper.toDto(account)).thenReturn(accountDTO);
 
-        AccountDTO result = accountsService.getAccountById(1L);
+        AccountDTO result = accountsService.getAccountById(1L, 1L);
 
         assertNotNull(result);
         assertEquals(1L, result.getId());
@@ -81,7 +82,34 @@ class AccountsServiceTest {
     void testGetAccountByIdNotFound() {
         when(accountsRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(AccountNotFoundException.class, () -> accountsService.getAccountById(1L));
+        assertThrows(AccountNotFoundException.class, () -> accountsService.getAccountById(1L, 1L));
+    }
+
+    @Test
+    void testGetAccountByIdWrongTenant() {
+        Account account = new Account();
+        account.setId(1L);
+        account.setTenantId(1L);
+
+        when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
+
+        assertThrows(TenantMismatchException.class, () -> accountsService.getAccountById(1L, 2L));
+    }
+
+    @Test
+    void testGetAccountByIdNullId() {
+        AccountValidationException exception = assertThrows(AccountValidationException.class, 
+            () -> accountsService.getAccountById(null, 1L));
+        
+        assertEquals("Account id is required", exception.getMessage());
+    }
+
+    @Test
+    void testGetAccountByIdNullTenantId() {
+        AccountValidationException exception = assertThrows(AccountValidationException.class, 
+            () -> accountsService.getAccountById(1L, null));
+        
+        assertEquals("Tenant id is required", exception.getMessage());
     }
 
     @Test
@@ -107,18 +135,49 @@ class AccountsServiceTest {
 
     @Test
     void testDeleteAccount() {
-        when(accountsRepository.existsById(1L)).thenReturn(true);
+        Account account = new Account();
+        account.setId(1L);
+        account.setTenantId(1L);
 
-        accountsService.deleteAccount(1L);
+        when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
+
+        accountsService.deleteAccount(1L, 1L);
 
         verify(accountsRepository, times(1)).deleteById(1L);
     }
 
     @Test
     void testDeleteAccountNotFound() {
-        when(accountsRepository.existsById(1L)).thenReturn(false);
+        when(accountsRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThrows(AccountNotFoundException.class, () -> accountsService.deleteAccount(1L));
+        assertThrows(AccountNotFoundException.class, () -> accountsService.deleteAccount(1L, 1L));
+    }
+
+    @Test
+    void testDeleteAccountWrongTenant() {
+        Account account = new Account();
+        account.setId(1L);
+        account.setTenantId(1L);
+
+        when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
+
+        assertThrows(TenantMismatchException.class, () -> accountsService.deleteAccount(1L, 2L));
+    }
+
+    @Test
+    void testDeleteAccountNullId() {
+        AccountValidationException exception = assertThrows(AccountValidationException.class, 
+            () -> accountsService.deleteAccount(null, 1L));
+        
+        assertEquals("Account id is required", exception.getMessage());
+    }
+
+    @Test
+    void testDeleteAccountNullTenantId() {
+        AccountValidationException exception = assertThrows(AccountValidationException.class, 
+            () -> accountsService.deleteAccount(1L, null));
+        
+        assertEquals("Tenant id is required", exception.getMessage());
     }
 
     @Test

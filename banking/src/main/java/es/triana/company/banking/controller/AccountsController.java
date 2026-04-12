@@ -57,14 +57,16 @@ public class AccountsController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable Long id) {
-        accountsService.deleteAccount(id);
+        Long tenantId = tenantContext.getCurrentTenantId();
+        accountsService.deleteAccount(id, tenantId);
         ApiResponse<Void> response = new ApiResponse<>(200, "Account deleted successfully", null);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<AccountDTO>> getAccountById(@PathVariable Long id) {
-        AccountDTO account = accountsService.getAccountById(id);
+        Long tenantId = tenantContext.getCurrentTenantId();
+        AccountDTO account = accountsService.getAccountById(id, tenantId);
         ApiResponse<AccountDTO> response = new ApiResponse<>(200, "Account retrieved successfully", account);
         return ResponseEntity.ok(response);
     }

@@ -89,7 +89,7 @@ public class AccountsControllerTest {
         Long id = 1L;
         ResponseEntity<ApiResponse<Void>> response = accountsController.deleteAccount(id);
 
-        verify(accountsService).deleteAccount(id);
+        verify(accountsService).deleteAccount(id, 1L);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("Account deleted successfully", response.getBody().getMessage());
     }
@@ -97,12 +97,12 @@ public class AccountsControllerTest {
     @Test
     public void testDeleteAccountNotFound(){
         Long id = 999L;
-        doThrow(new AccountNotFoundException("Account not found with id: " + id)).when(accountsService).deleteAccount(id);
+        doThrow(new AccountNotFoundException("Account not found with id: " + id)).when(accountsService).deleteAccount(id, 1L);
 
         AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
             () -> accountsController.deleteAccount(id));
 
-        verify(accountsService).deleteAccount(id);
+        verify(accountsService).deleteAccount(id, 1L);
         assertEquals("Account not found with id: " + id, exception.getMessage());
     }
 
@@ -111,11 +111,11 @@ public class AccountsControllerTest {
         Long id = 1L;
         AccountDTO account = AccountDTO.builder().id(id).name("Account A").balance(1000.0).build();
 
-        when(accountsService.getAccountById(id)).thenReturn(account);
+        when(accountsService.getAccountById(id, 1L)).thenReturn(account);
 
         ResponseEntity<ApiResponse<AccountDTO>> response = accountsController.getAccountById(id);
 
-        verify(accountsService).getAccountById(id);
+        verify(accountsService).getAccountById(id, 1L);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(id, response.getBody().getData().getId());
     }
@@ -123,12 +123,12 @@ public class AccountsControllerTest {
     @Test
     public void testGetAccountByIdNotFound(){
         Long id = 999L;
-        when(accountsService.getAccountById(id)).thenThrow(new AccountNotFoundException("Account not found with id: " + id));
+        when(accountsService.getAccountById(id, 1L)).thenThrow(new AccountNotFoundException("Account not found with id: " + id));
 
         AccountNotFoundException exception = assertThrows(AccountNotFoundException.class,
                 () -> accountsController.getAccountById(id));
 
-        verify(accountsService).getAccountById(id);
+        verify(accountsService).getAccountById(id, 1L);
         assertEquals("Account not found with id: " + id, exception.getMessage());
     }
 
