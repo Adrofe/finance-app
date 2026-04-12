@@ -9,7 +9,7 @@
     <name>finance-app</name>
     <description>Finance app personal project</description>
     <properties>
-        <java.version>25</java.version>
+        <java.version>21</java.version>
         <spring.boot.version>4.0.1</spring.boot.version>
         <testcontainers.version>1.20.2</testcontainers.version>
     </properties>
@@ -41,6 +41,14 @@
     <build>
         <pluginManagement>
             <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                    <configuration>
+                        <release>${java.version}</release>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
