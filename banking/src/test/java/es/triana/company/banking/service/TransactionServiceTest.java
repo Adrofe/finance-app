@@ -9,7 +9,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +36,9 @@ import es.triana.company.banking.repository.TagRepository;
 import es.triana.company.banking.repository.TransactionRepository;
 import es.triana.company.banking.repository.TransactionStatusRepository;
 import es.triana.company.banking.repository.TransactionTypeRepository;
+import es.triana.company.banking.service.exception.TransactionConflictException;
+import es.triana.company.banking.service.exception.TransactionNotFoundException;
+import es.triana.company.banking.service.exception.TransactionValidationException;
 import es.triana.company.banking.service.mapper.TransactionMapper;
 
 class TransactionServiceTest {
@@ -302,7 +304,7 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should reject null payload")
         void rejectNullPayload() {
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.createTransaction(null, TENANT_ID));
             assertEquals("Transaction payload is required", ex.getMessage());
         }
@@ -311,7 +313,7 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should reject null tenantId [BR-004, FR-009]")
         void rejectNullTenantId() {
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.createTransaction(buildValidDto(), null));
             assertEquals("Tenant id is required", ex.getMessage());
         }
@@ -323,7 +325,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             dto.setSourceAccountId(null);
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertEquals("Source account id is required", ex.getMessage());
         }
@@ -335,7 +337,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             dto.setBookingDate(null);
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertEquals("Booking date is required", ex.getMessage());
         }
@@ -347,7 +349,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             dto.setAmount(0.0);
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertEquals("Amount must be non-zero", ex.getMessage());
         }
@@ -380,7 +382,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             dto.setAmount(null);
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertEquals("Amount must be provided", ex.getMessage());
         }
@@ -392,7 +394,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             dto.setCurrency("EURO");
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertEquals("Currency must be a 3-letter uppercase ISO code", ex.getMessage());
         }
@@ -403,7 +405,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             dto.setCurrency(null);
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertEquals("Currency must be a 3-letter uppercase ISO code", ex.getMessage());
         }
@@ -414,7 +416,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             dto.setCurrency("123");
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertEquals("Currency must be a 3-letter uppercase ISO code", ex.getMessage());
         }
@@ -426,7 +428,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             when(accountsRepository.findById(SOURCE_ACCOUNT_ID)).thenReturn(Optional.empty());
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionNotFoundException ex = assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertTrue(ex.getMessage().contains("Source account not found"));
         }
@@ -438,7 +440,7 @@ class TransactionServiceTest {
             TransactionDTO dto = buildValidDto();
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, OTHER_TENANT_ID));
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionNotFoundException ex = assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertTrue(ex.getMessage().contains("Source account not found"));
         }
@@ -451,7 +453,7 @@ class TransactionServiceTest {
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
             when(accountsRepository.findById(DESTINATION_ACCOUNT_ID)).thenReturn(Optional.empty());
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionNotFoundException ex = assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertTrue(ex.getMessage().contains("Destination account not found"));
         }
@@ -464,7 +466,7 @@ class TransactionServiceTest {
             stubAccountLookup(SOURCE_ACCOUNT_ID, buildAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
             stubAccountLookup(DESTINATION_ACCOUNT_ID, buildAccount(DESTINATION_ACCOUNT_ID, OTHER_TENANT_ID));
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionNotFoundException ex = assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertTrue(ex.getMessage().contains("Destination account not found"));
         }
@@ -480,7 +482,7 @@ class TransactionServiceTest {
             stubStatusLookup(STATUS_ID);
             when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-001")).thenReturn(true);
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionConflictException ex = assertThrows(TransactionConflictException.class,
                     () -> transactionService.createTransaction(dto, TENANT_ID));
             assertTrue(ex.getMessage().contains("already exists"));
         }
@@ -662,7 +664,7 @@ class TransactionServiceTest {
             when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
                     .thenReturn(Optional.empty());
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionNotFoundException ex = assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.getTransactionById(TRANSACTION_ID, TENANT_ID));
             assertTrue(ex.getMessage().contains("Transaction not found"));
         }
@@ -670,7 +672,7 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should reject null transactionId")
         void rejectNullTransactionId() {
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTransactionById(null, TENANT_ID));
             assertEquals("Transaction id is required", ex.getMessage());
         }
@@ -678,7 +680,7 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should reject null tenantId [BR-004]")
         void rejectNullTenantId() {
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTransactionById(TRANSACTION_ID, null));
             assertEquals("Tenant id is required", ex.getMessage());
         }
@@ -689,7 +691,7 @@ class TransactionServiceTest {
             when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
                     .thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.getTransactionById(TRANSACTION_ID, TENANT_ID));
         }
     }
@@ -723,7 +725,7 @@ class TransactionServiceTest {
             Account account = buildAccount(SOURCE_ACCOUNT_ID, OTHER_TENANT_ID);
             stubAccountLookup(SOURCE_ACCOUNT_ID, account);
 
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.getTransactionsByAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
         }
 
@@ -732,7 +734,7 @@ class TransactionServiceTest {
         void rejectNonExistentAccount() {
             when(accountsRepository.findById(SOURCE_ACCOUNT_ID)).thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.getTransactionsByAccount(SOURCE_ACCOUNT_ID, TENANT_ID));
         }
 
@@ -751,7 +753,7 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should reject null accountId")
         void rejectNullAccountId() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTransactionsByAccount(null, TENANT_ID));
         }
     }
@@ -790,7 +792,7 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should reject null tenantId [BR-004]")
         void rejectNullTenantId() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTransactionsByTenant(null));
         }
     }
@@ -832,7 +834,7 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should reject end date before start date")
         void rejectEndBeforeStart() {
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionValidationException ex = assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTransactionsByDateRange(END, START, TENANT_ID));
             assertTrue(ex.getMessage().contains("End date must be greater than or equal to start date"));
         }
@@ -840,21 +842,21 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should reject null start date")
         void rejectNullStartDate() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTransactionsByDateRange(null, END, TENANT_ID));
         }
 
         @Test
         @DisplayName("should reject null end date")
         void rejectNullEndDate() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTransactionsByDateRange(START, null, TENANT_ID));
         }
 
         @Test
         @DisplayName("should reject null tenantId")
         void rejectNullTenant() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTransactionsByDateRange(START, END, null));
         }
     }
@@ -984,7 +986,7 @@ class TransactionServiceTest {
             when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
                     .thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.updateTransaction(TRANSACTION_ID, dto, TENANT_ID));
         }
 
@@ -1003,7 +1005,7 @@ class TransactionServiceTest {
             when(transactionRepository.existsByTenantIdAndExternalTxIdAndIdNot(TENANT_ID, "EXT-001", TRANSACTION_ID))
                     .thenReturn(true);
 
-            IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                TransactionConflictException ex = assertThrows(TransactionConflictException.class,
                     () -> transactionService.updateTransaction(TRANSACTION_ID, dto, TENANT_ID));
             assertTrue(ex.getMessage().contains("already exists"));
         }
@@ -1086,21 +1088,21 @@ class TransactionServiceTest {
                     .thenReturn(Optional.of(existing));
             when(accountsRepository.findById(SOURCE_ACCOUNT_ID)).thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.updateTransaction(TRANSACTION_ID, dto, TENANT_ID));
         }
 
         @Test
         @DisplayName("should reject null transactionId")
         void rejectNullTransactionId() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.updateTransaction(null, buildValidDto(), TENANT_ID));
         }
 
         @Test
         @DisplayName("should reject null tenantId")
         void rejectNullTenantId() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.updateTransaction(TRANSACTION_ID, buildValidDto(), null));
         }
     }
@@ -1130,7 +1132,7 @@ class TransactionServiceTest {
             when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
                     .thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.deleteTransaction(TRANSACTION_ID, TENANT_ID));
         }
 
@@ -1140,7 +1142,7 @@ class TransactionServiceTest {
             when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
                     .thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.deleteTransaction(TRANSACTION_ID, TENANT_ID));
             verify(transactionRepository, never()).delete(any(Transaction.class));
         }
@@ -1148,14 +1150,14 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should reject null transactionId")
         void rejectNullTransactionId() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.deleteTransaction(null, TENANT_ID));
         }
 
         @Test
         @DisplayName("should reject null tenantId")
         void rejectNullTenantId() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.deleteTransaction(TRANSACTION_ID, null));
         }
     }
@@ -1211,7 +1213,7 @@ class TransactionServiceTest {
         void throwWhenAccountNotFound() {
             when(accountsRepository.findById(SOURCE_ACCOUNT_ID)).thenReturn(Optional.empty());
 
-            assertThrows(NoSuchElementException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.getAccountBalance(SOURCE_ACCOUNT_ID, TENANT_ID));
         }
 
@@ -1221,21 +1223,21 @@ class TransactionServiceTest {
             Account account = buildAccount(SOURCE_ACCOUNT_ID, OTHER_TENANT_ID);
             stubAccountLookup(SOURCE_ACCOUNT_ID, account);
 
-            assertThrows(NoSuchElementException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.getAccountBalance(SOURCE_ACCOUNT_ID, TENANT_ID));
         }
 
         @Test
         @DisplayName("should reject null accountId")
         void rejectNullAccountId() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.getAccountBalance(null, TENANT_ID));
         }
 
         @Test
         @DisplayName("should reject null tenantId")
         void rejectNullTenantId() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.getAccountBalance(SOURCE_ACCOUNT_ID, null));
         }
     }
@@ -1297,14 +1299,14 @@ class TransactionServiceTest {
         void throwWhenNoAccounts() {
             when(accountsRepository.findByTenantId(TENANT_ID)).thenReturn(Collections.emptyList());
 
-            assertThrows(NoSuchElementException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.getTenantBalance(TENANT_ID));
         }
 
         @Test
         @DisplayName("should throw when tenantId is null")
         void throwWhenNullTenantId() {
-            assertThrows(NoSuchElementException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTenantBalance(null));
         }
     }
@@ -1346,14 +1348,14 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should reject null categoryId")
         void rejectNullCategoryId() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTransactionsByCategory(null, TENANT_ID));
         }
 
         @Test
         @DisplayName("should reject null tenantId [BR-004]")
         void rejectNullTenantId() {
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionValidationException.class,
                     () -> transactionService.getTransactionsByCategory(CATEGORY_ID, null));
         }
     }
@@ -1407,7 +1409,7 @@ class TransactionServiceTest {
             when(transactionRepository.findByIdAndTenantId(TRANSACTION_ID, TENANT_ID))
                     .thenReturn(Optional.empty());
 
-            assertThrows(IllegalArgumentException.class,
+                assertThrows(TransactionNotFoundException.class,
                     () -> transactionService.deleteTransaction(TRANSACTION_ID, TENANT_ID));
             verify(transactionRepository, never()).deleteById(anyLong());
         }

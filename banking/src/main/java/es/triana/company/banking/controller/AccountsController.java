@@ -8,11 +8,8 @@ import org.springframework.web.bind.annotation.RestController;
 import es.triana.company.banking.model.api.AccountDTO;
 import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.service.AccountsService;
-import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
-import es.triana.company.banking.service.exception.AccountNotFoundException;
-import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
-import es.triana.company.banking.service.exception.TenantMismatchException;
 import es.triana.company.banking.security.TenantContext;
+import es.triana.company.banking.service.exception.AccountValidationException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -42,7 +39,8 @@ public class AccountsController {
         List<AccountDTO> accounts = accountsService.getAccountsByTenant(String.valueOf(tenantId));
 
         if (accounts == null || accounts.isEmpty()) {
-            return ResponseEntity.noContent().build();
+            ApiResponse<List<AccountDTO>> response = new ApiResponse<>(200, "No accounts found", List.of());
+            return ResponseEntity.ok(response);
         }
 
         ApiResponse<List<AccountDTO>> response = new ApiResponse<>(200, "Accounts retrieved successfully", accounts);
@@ -51,72 +49,39 @@ public class AccountsController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<AccountDTO>> createAccount(@Valid @RequestBody AccountDTO newAccount) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            AccountDTO createdAccount = accountsService.createAccount(newAccount, tenantId);
-            ApiResponse<AccountDTO> response = new ApiResponse<>(201, "Account created successfully", createdAccount);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (DuplicateAccountIbanException | AccountTypeNotFoundException e) {
-            ApiResponse<AccountDTO> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+        Long tenantId = tenantContext.getCurrentTenantId();
+        AccountDTO createdAccount = accountsService.createAccount(newAccount, tenantId);
+        ApiResponse<AccountDTO> response = new ApiResponse<>(201, "Account created successfully", createdAccount);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable Long id) {
-        try {
-            accountsService.deleteAccount(id);
-            ApiResponse<Void> response = new ApiResponse<>(204, "Account deleted successfully", null);
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).body(response);
-        } catch (AccountNotFoundException e) {
-            ApiResponse<Void> response = new ApiResponse<>(404, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        } catch (Exception e) {
-            ApiResponse<Void> response = new ApiResponse<>(500, "Internal server error: " + e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+        accountsService.deleteAccount(id);
+        ApiResponse<Void> response = new ApiResponse<>(200, "Account deleted successfully", null);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<AccountDTO>> getAccountById(@PathVariable Long id) {
-        try {
-            AccountDTO account = accountsService.getAccountById(id);
-            ApiResponse<AccountDTO> response = new ApiResponse<>(200, "Account retrieved successfully", account);
-            return ResponseEntity.ok(response);
-        } catch (AccountNotFoundException e) {
-            ApiResponse<AccountDTO> response = new ApiResponse<>(404, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        } catch (Exception e) {
-            ApiResponse<AccountDTO> response = new ApiResponse<>(500, "Internal server error: " + e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+        AccountDTO account = accountsService.getAccountById(id);
+        ApiResponse<AccountDTO> response = new ApiResponse<>(200, "Account retrieved successfully", account);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<AccountDTO>> updateAccount(@PathVariable Long id, @Valid @RequestBody AccountDTO updatedAccount) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            
-            if (updatedAccount.getId() == null) {
-                updatedAccount.setId(id);
-            } else if (!updatedAccount.getId().equals(id)) {
-                ApiResponse<AccountDTO> response = new ApiResponse<>(400, "Path id does not match body id", null);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-            }
+        Long tenantId = tenantContext.getCurrentTenantId();
 
-            AccountDTO account = accountsService.updateAccount(updatedAccount, tenantId);
-            ApiResponse<AccountDTO> response = new ApiResponse<>(200, "Account updated successfully", account);
-            return ResponseEntity.ok(response);
-        } catch (DuplicateAccountIbanException | AccountTypeNotFoundException | TenantMismatchException e) {
-            ApiResponse<AccountDTO> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        } catch (AccountNotFoundException e) {
-            ApiResponse<AccountDTO> response = new ApiResponse<>(404, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        } catch (Exception e) {
-            ApiResponse<AccountDTO> response = new ApiResponse<>(500, "Internal server error: " + e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        if (updatedAccount.getId() == null) {
+            updatedAccount.setId(id);
+        } else if (!updatedAccount.getId().equals(id)) {
+            throw new AccountValidationException("Path id does not match body id");
         }
+
+        AccountDTO account = accountsService.updateAccount(updatedAccount, tenantId);
+        ApiResponse<AccountDTO> response = new ApiResponse<>(200, "Account updated successfully", account);
+        return ResponseEntity.ok(response);
     }
 
 }

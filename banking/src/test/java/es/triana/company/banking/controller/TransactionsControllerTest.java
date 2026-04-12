@@ -1,6 +1,7 @@
 package es.triana.company.banking.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -8,7 +9,6 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.NoSuchElementException;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +24,8 @@ import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.model.api.TransactionDTO;
 import es.triana.company.banking.security.TenantContext;
 import es.triana.company.banking.service.TransactionService;
+import es.triana.company.banking.service.exception.TransactionNotFoundException;
+import es.triana.company.banking.service.exception.TransactionValidationException;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -64,13 +66,13 @@ public class TransactionsControllerTest {
         TransactionDTO transactionDTO = buildTransactionDto();
         Long tenantId = 1L;
         when(transactionsService.createTransaction(transactionDTO, tenantId))
-            .thenThrow(new IllegalArgumentException("Source account not found with id: 1"));
+            .thenThrow(new TransactionNotFoundException("Source account not found with id: 1"));
 
-        ResponseEntity<ApiResponse<TransactionDTO>> response = transactionsController.createTransaction(transactionDTO);
+        TransactionNotFoundException exception = assertThrows(TransactionNotFoundException.class,
+                () -> transactionsController.createTransaction(transactionDTO));
 
         verify(transactionsService).createTransaction(transactionDTO, tenantId);
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals("Source account not found with id: 1", response.getBody().getMessage());
+        assertEquals("Source account not found with id: 1", exception.getMessage());
     }
 
     @Test
@@ -78,13 +80,13 @@ public class TransactionsControllerTest {
         TransactionDTO transactionDTO = buildTransactionDto();
         Long tenantId = 1L;
         when(transactionsService.createTransaction(transactionDTO, tenantId))
-            .thenThrow(new IllegalArgumentException("Destination account not found with id: 2"));
+            .thenThrow(new TransactionNotFoundException("Destination account not found with id: 2"));
 
-        ResponseEntity<ApiResponse<TransactionDTO>> response = transactionsController.createTransaction(transactionDTO);
+        TransactionNotFoundException exception = assertThrows(TransactionNotFoundException.class,
+                () -> transactionsController.createTransaction(transactionDTO));
 
         verify(transactionsService).createTransaction(transactionDTO, tenantId);
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals("Destination account not found with id: 2", response.getBody().getMessage());
+        assertEquals("Destination account not found with id: 2", exception.getMessage());
     }
 
     @Test
@@ -94,13 +96,13 @@ public class TransactionsControllerTest {
         Long tenantId = 1L;
 
         when(transactionsService.createTransaction(transactionDTO, tenantId))
-            .thenThrow(new IllegalArgumentException("Currency must be a 3-letter uppercase ISO code"));
+            .thenThrow(new TransactionValidationException("Currency must be a 3-letter uppercase ISO code"));
 
-        ResponseEntity<ApiResponse<TransactionDTO>> response = transactionsController.createTransaction(transactionDTO);
+        TransactionValidationException exception = assertThrows(TransactionValidationException.class,
+                () -> transactionsController.createTransaction(transactionDTO));
 
         verify(transactionsService).createTransaction(transactionDTO, tenantId);
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals("Currency must be a 3-letter uppercase ISO code", response.getBody().getMessage());
+        assertEquals("Currency must be a 3-letter uppercase ISO code", exception.getMessage());
     }
 
     @Test
@@ -200,13 +202,13 @@ public class TransactionsControllerTest {
         Long tenantId = 1L;
 
         when(transactionsService.updateTransaction(transactionId, transactionDTO, tenantId))
-            .thenThrow(new IllegalArgumentException("Source account not found with id: 1"));
+            .thenThrow(new TransactionNotFoundException("Source account not found with id: 1"));
 
-        ResponseEntity<ApiResponse<TransactionDTO>> response = transactionsController.updateTransaction(transactionId, transactionDTO);
+        TransactionNotFoundException exception = assertThrows(TransactionNotFoundException.class,
+                () -> transactionsController.updateTransaction(transactionId, transactionDTO));
 
         verify(transactionsService).updateTransaction(transactionId, transactionDTO, tenantId);
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals("Source account not found with id: 1", response.getBody().getMessage());
+        assertEquals("Source account not found with id: 1", exception.getMessage());
     }
 
     @Test
@@ -217,21 +219,22 @@ public class TransactionsControllerTest {
         ResponseEntity<ApiResponse<Void>> response = transactionsController.deleteTransaction(transactionId);
 
         verify(transactionsService).deleteTransaction(transactionId, tenantId);
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Transaction deleted successfully", response.getBody().getMessage());
     }
 
     @Test
     public void deleteNonExistentTransaction() {
         Long transactionId = 999L;
         Long tenantId = 1L;
-        doThrow(new NoSuchElementException("Transaction not found with id: 999")).when(transactionsService)
+        doThrow(new TransactionNotFoundException("Transaction not found with id: 999")).when(transactionsService)
             .deleteTransaction(transactionId, tenantId);
 
-        ResponseEntity<ApiResponse<Void>> response = transactionsController.deleteTransaction(transactionId);
+        TransactionNotFoundException exception = assertThrows(TransactionNotFoundException.class,
+                () -> transactionsController.deleteTransaction(transactionId));
 
         verify(transactionsService).deleteTransaction(transactionId, tenantId);
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertEquals("Transaction not found with id: 999", response.getBody().getMessage());
+        assertEquals("Transaction not found with id: 999", exception.getMessage());
     }
 
     @Test
@@ -253,13 +256,13 @@ public class TransactionsControllerTest {
     public void getAccountBalanceForNonExistentAccount() {
         Long accountId = 999L;
         Long tenantId = 1L;
-        when(transactionsService.getAccountBalance(accountId, tenantId)).thenThrow(new NoSuchElementException("Account not found with id: 999"));
+        when(transactionsService.getAccountBalance(accountId, tenantId)).thenThrow(new TransactionNotFoundException("Account not found with id: 999"));
 
-        ResponseEntity<ApiResponse<Double>> response = transactionsController.getAccountBalance(accountId);
+        TransactionNotFoundException exception = assertThrows(TransactionNotFoundException.class,
+                () -> transactionsController.getAccountBalance(accountId));
 
         verify(transactionsService).getAccountBalance(accountId, tenantId);
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertEquals("Account not found with id: 999", response.getBody().getMessage());
+        assertEquals("Account not found with id: 999", exception.getMessage());
     }
 
     @Test
@@ -280,13 +283,13 @@ public class TransactionsControllerTest {
     public void getTenantBalanceForNonExistentTenant() {
         Long tenantId = 999L;
         when(tenantContext.getCurrentTenantId()).thenReturn(tenantId);
-        when(transactionsService.getTenantBalance(tenantId)).thenThrow(new NoSuchElementException("Tenant not found with id: 999"));
+        when(transactionsService.getTenantBalance(tenantId)).thenThrow(new TransactionNotFoundException("Tenant not found with id: 999"));
 
-        ResponseEntity<ApiResponse<Double>> response = transactionsController.getTenantBalance();
+        TransactionNotFoundException exception = assertThrows(TransactionNotFoundException.class,
+                () -> transactionsController.getTenantBalance());
 
         verify(transactionsService).getTenantBalance(tenantId);
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertEquals("Tenant not found with id: 999", response.getBody().getMessage());
+        assertEquals("Tenant not found with id: 999", exception.getMessage());
     }
 
     @Test
@@ -308,13 +311,13 @@ public class TransactionsControllerTest {
     public void getTransactionsByNonExistentCategory() {
         Long categoryId = 999L;
         Long tenantId = 1L;
-        when(transactionsService.getTransactionsByCategory(categoryId, tenantId)).thenThrow(new NoSuchElementException("Category not found with id: 999"));
+        when(transactionsService.getTransactionsByCategory(categoryId, tenantId)).thenThrow(new TransactionNotFoundException("Category not found with id: 999"));
 
-        ResponseEntity<ApiResponse<List<TransactionDTO>>> response = transactionsController.getTransactionsByCategory(categoryId);
+        TransactionNotFoundException exception = assertThrows(TransactionNotFoundException.class,
+                () -> transactionsController.getTransactionsByCategory(categoryId));
 
         verify(transactionsService).getTransactionsByCategory(categoryId, tenantId);
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertEquals("Category not found with id: 999", response.getBody().getMessage());
+        assertEquals("Category not found with id: 999", exception.getMessage());
     }
 
     private TransactionDTO buildTransactionDto() {

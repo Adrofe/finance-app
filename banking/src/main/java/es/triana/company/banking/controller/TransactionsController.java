@@ -5,7 +5,6 @@ import java.util.List;
 
 import jakarta.validation.Valid;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,166 +35,92 @@ public class TransactionsController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<TransactionDTO>> createTransaction(@Valid @RequestBody TransactionDTO transactionDTO) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            TransactionDTO createdTransaction = (TransactionDTO) transactionService.createTransaction(transactionDTO, tenantId);
-            ApiResponse<TransactionDTO> response = new ApiResponse<>(201, "Transaction created successfully", createdTransaction);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<TransactionDTO> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+        Long tenantId = tenantContext.getCurrentTenantId();
+        TransactionDTO createdTransaction = transactionService.createTransaction(transactionDTO, tenantId);
+        ApiResponse<TransactionDTO> response = new ApiResponse<>(201, "Transaction created successfully", createdTransaction);
+        return ResponseEntity.status(201).body(response);
     }
 
     @GetMapping("/{transactionId}")
-    public ResponseEntity<ApiResponse<TransactionDTO>> getTransactionById(@PathVariable Long transactionId) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            TransactionDTO transaction = (TransactionDTO) transactionService.getTransactionById(transactionId, tenantId);
-            ApiResponse<TransactionDTO> response = new ApiResponse<>(200, "Transaction retrieved successfully", transaction);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<TransactionDTO> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<ApiResponse<TransactionDTO>> getTransactionById(@PathVariable("transactionId") Long transactionId) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        TransactionDTO transaction = transactionService.getTransactionById(transactionId, tenantId);
+        ApiResponse<TransactionDTO> response = new ApiResponse<>(200, "Transaction retrieved successfully", transaction);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/account/{accountId}")
-    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByAccount(@PathVariable Long accountId) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByAccount(accountId, tenantId));
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByAccount(@PathVariable("accountId") Long accountId) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        List<TransactionDTO> transactions = transactionService.getTransactionsByAccount(accountId, tenantId);
+        ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
+        return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/tenant")
+    @GetMapping()
     public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTenant() {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByTenant(tenantId));
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+        Long tenantId = tenantContext.getCurrentTenantId();
+        List<TransactionDTO> transactions = transactionService.getTransactionsByTenant(tenantId);
+        ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/date-range")
-    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByDateRange(@RequestParam LocalDate startDate,
-            @RequestParam LocalDate endDate) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByDateRange(startDate, endDate, tenantId));
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByDateRange(
+            @RequestParam("startDate") LocalDate startDate,
+            @RequestParam("endDate") LocalDate endDate) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        List<TransactionDTO> transactions = transactionService.getTransactionsByDateRange(startDate, endDate, tenantId);
+        ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{transactionId}")
-    public ResponseEntity<ApiResponse<TransactionDTO>> updateTransaction(@PathVariable Long transactionId,
+    public ResponseEntity<ApiResponse<TransactionDTO>> updateTransaction(@PathVariable("transactionId") Long transactionId,
             @Valid @RequestBody TransactionDTO transactionDTO) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            TransactionDTO updatedTransaction = (TransactionDTO) transactionService.updateTransaction(transactionId, transactionDTO, tenantId);
-            ApiResponse<TransactionDTO> response = new ApiResponse<>(200, "Transaction updated successfully", updatedTransaction);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<TransactionDTO> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+        Long tenantId = tenantContext.getCurrentTenantId();
+        TransactionDTO updatedTransaction = transactionService.updateTransaction(transactionId, transactionDTO, tenantId);
+        ApiResponse<TransactionDTO> response = new ApiResponse<>(200, "Transaction updated successfully", updatedTransaction);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{transactionId}")
-    public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable Long transactionId) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            transactionService.deleteTransaction(transactionId, tenantId);
-            ApiResponse<Void> response = new ApiResponse<>(204, "Transaction deleted successfully", null);
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).body(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<Void> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        } catch (RuntimeException e) {
-            ApiResponse<Void> response = new ApiResponse<>(404, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
+    public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable("transactionId") Long transactionId) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        transactionService.deleteTransaction(transactionId, tenantId);
+        ApiResponse<Void> response = new ApiResponse<>(200, "Transaction deleted successfully", null);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/account/{accountId}/balance")
-    public ResponseEntity<ApiResponse<Double>> getAccountBalance(@PathVariable Long accountId) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            Double balance = (Double) transactionService.getAccountBalance(accountId, tenantId);
-            ApiResponse<Double> response = new ApiResponse<>(200, "Account balance retrieved successfully", balance);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<Double> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        } catch (RuntimeException e) {
-            ApiResponse<Double> response = new ApiResponse<>(404, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
+    public ResponseEntity<ApiResponse<Double>> getAccountBalance(@PathVariable("accountId") Long accountId) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        Double balance = transactionService.getAccountBalance(accountId, tenantId);
+        ApiResponse<Double> response = new ApiResponse<>(200, "Account balance retrieved successfully", balance);
+        return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/tenant/balance")
+    @GetMapping("/balance")
     public ResponseEntity<ApiResponse<Double>> getTenantBalance() {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            Double balance = (Double) transactionService.getTenantBalance(tenantId);
-            ApiResponse<Double> response = new ApiResponse<>(200, "Tenant balance retrieved successfully", balance);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<Double> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        } catch (RuntimeException e) {
-            ApiResponse<Double> response = new ApiResponse<>(404, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
+        Long tenantId = tenantContext.getCurrentTenantId();
+        Double balance = transactionService.getTenantBalance(tenantId);
+        ApiResponse<Double> response = new ApiResponse<>(200, "Tenant balance retrieved successfully", balance);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/category/{categoryId}")
-    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByCategory(@PathVariable Long categoryId) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByCategory(categoryId, tenantId));
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        } catch (RuntimeException e) {
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(404, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
+    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByCategory(@PathVariable("categoryId") Long categoryId) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        List<TransactionDTO> transactions = transactionService.getTransactionsByCategory(categoryId, tenantId);
+        ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/tag/{tagId}")
-    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTag(@PathVariable Long tagId) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            List<TransactionDTO> transactions = castTransactionList(transactionService.getTransactionsByTag(tagId, tenantId));
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        } catch (RuntimeException e) {
-            ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(404, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<TransactionDTO> castTransactionList(Object value) {
-        return (List<TransactionDTO>) value;
+    public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTag(@PathVariable("tagId") Long tagId) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        List<TransactionDTO> transactions = transactionService.getTransactionsByTag(tagId, tenantId);
+        ApiResponse<List<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", transactions);
+        return ResponseEntity.ok(response);
     }
 }

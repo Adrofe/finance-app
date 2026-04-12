@@ -10,15 +10,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import es.triana.company.banking.model.api.ApiResponse;
-import es.triana.company.banking.service.exception.AccountNotFoundException;
-import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
-import es.triana.company.banking.service.exception.AccountValidationException;
-import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
-import es.triana.company.banking.service.exception.InstitutionNotFoundException;
-import es.triana.company.banking.service.exception.TenantMismatchException;
+import es.triana.company.banking.service.exception.TransactionConflictException;
+import es.triana.company.banking.service.exception.TransactionNotFoundException;
+import es.triana.company.banking.service.exception.TransactionValidationException;
 
-@RestControllerAdvice(assignableTypes = AccountsController.class)
-public class AccountExceptionHandler {
+@RestControllerAdvice(assignableTypes = TransactionsController.class)
+public class TransactionExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException exception) {
@@ -32,34 +29,22 @@ public class AccountExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    @ExceptionHandler(AccountValidationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleAccountValidationException(AccountValidationException exception) {
+    @ExceptionHandler(TransactionValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTransactionValidationException(TransactionValidationException exception) {
         ApiResponse<Void> response = new ApiResponse<>(400, exception.getMessage(), null);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    @ExceptionHandler(AccountNotFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleAccountNotFoundException(AccountNotFoundException exception) {
+    @ExceptionHandler(TransactionNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTransactionNotFoundException(TransactionNotFoundException exception) {
         ApiResponse<Void> response = new ApiResponse<>(404, exception.getMessage(), null);
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
-    @ExceptionHandler({AccountTypeNotFoundException.class, InstitutionNotFoundException.class})
-    public ResponseEntity<ApiResponse<Void>> handleReferenceNotFoundExceptions(RuntimeException exception) {
-        ApiResponse<Void> response = new ApiResponse<>(404, exception.getMessage(), null);
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-    }
-
-    @ExceptionHandler(DuplicateAccountIbanException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDuplicateAccountIbanException(DuplicateAccountIbanException exception) {
+    @ExceptionHandler(TransactionConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTransactionConflictException(TransactionConflictException exception) {
         ApiResponse<Void> response = new ApiResponse<>(409, exception.getMessage(), null);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
-    }
-
-    @ExceptionHandler(TenantMismatchException.class)
-    public ResponseEntity<ApiResponse<Void>> handleTenantMismatchException(TenantMismatchException exception) {
-        ApiResponse<Void> response = new ApiResponse<>(403, exception.getMessage(), null);
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 
     @ExceptionHandler(IllegalStateException.class)

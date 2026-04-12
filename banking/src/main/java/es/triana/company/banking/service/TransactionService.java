@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -24,6 +23,9 @@ import es.triana.company.banking.repository.TagRepository;
 import es.triana.company.banking.repository.TransactionRepository;
 import es.triana.company.banking.repository.TransactionStatusRepository;
 import es.triana.company.banking.repository.TransactionTypeRepository;
+import es.triana.company.banking.service.exception.TransactionConflictException;
+import es.triana.company.banking.service.exception.TransactionNotFoundException;
+import es.triana.company.banking.service.exception.TransactionValidationException;
 import es.triana.company.banking.service.mapper.TransactionMapper;
 
 @Service
@@ -105,7 +107,7 @@ public class TransactionService {
         validateTenantAccess(transactionId, tenantId, "Transaction id is required");
 
         Transaction transaction = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Transaction not found with id: " + transactionId));
+            .orElseThrow(() -> new TransactionNotFoundException("Transaction not found with id: " + transactionId));
 
         return transactionMapper.toDto(transaction);
     }
@@ -123,7 +125,7 @@ public class TransactionService {
 
     public List<TransactionDTO> getTransactionsByTenant(Long tenantId) {
         if (tenantId == null) {
-            throw new IllegalArgumentException("Tenant id is required");
+            throw new TransactionValidationException("Tenant id is required");
         }
 
         return transactionRepository.findAllByTenantIdOrderByBookingDateDescIdDesc(tenantId).stream()
@@ -133,19 +135,19 @@ public class TransactionService {
 
     public List<TransactionDTO> getTransactionsByDateRange(LocalDate startDate, LocalDate endDate, Long tenantId) {
         if (tenantId == null) {
-            throw new IllegalArgumentException("Tenant id is required");
+            throw new TransactionValidationException("Tenant id is required");
         }
 
         if (startDate == null) {
-            throw new IllegalArgumentException("Start date is required");
+            throw new TransactionValidationException("Start date is required");
         }
 
         if (endDate == null) {
-            throw new IllegalArgumentException("End date is required");
+            throw new TransactionValidationException("End date is required");
         }
 
         if (endDate.isBefore(startDate)) {
-            throw new IllegalArgumentException("End date must be greater than or equal to start date");
+            throw new TransactionValidationException("End date must be greater than or equal to start date");
         }
 
         return transactionRepository.findAllByTenantIdAndBookingDateBetweenOrderByBookingDateDescIdDesc(tenantId, startDate, endDate)
@@ -159,7 +161,7 @@ public class TransactionService {
         validateCreateRequest(transactionDTO, tenantId);
 
         Transaction existingTransaction = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Transaction not found with id: " + transactionId));
+            .orElseThrow(() -> new TransactionNotFoundException("Transaction not found with id: " + transactionId));
 
         Long oldSourceAccountId = existingTransaction.getSourceAccount().getId();
         Long oldDestinationAccountId = existingTransaction.getDestinationAccount() != null ? existingTransaction.getDestinationAccount().getId() : null;
@@ -210,7 +212,7 @@ public class TransactionService {
         validateTenantAccess(transactionId, tenantId, "Transaction id is required");
 
         Transaction transaction = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Transaction not found with id: " + transactionId));
+            .orElseThrow(() -> new TransactionNotFoundException("Transaction not found with id: " + transactionId));
 
         Long sourceAccountId = transaction.getSourceAccount().getId();
         Long destinationAccountId = transaction.getDestinationAccount() != null ? transaction.getDestinationAccount().getId() : null;
@@ -224,10 +226,10 @@ public class TransactionService {
         validateTenantAccess(accountId, tenantId, "Account id is required");
 
         Account account = accountsRepository.findById(accountId)
-                .orElseThrow(() -> new NoSuchElementException("Account not found with id: " + accountId));
+                .orElseThrow(() -> new TransactionNotFoundException("Account not found with id: " + accountId));
 
         if (!tenantId.equals(account.getTenantId())) {
-            throw new NoSuchElementException("Account not found with id: " + accountId);
+            throw new TransactionNotFoundException("Account not found with id: " + accountId);
         }
 
         if (account.getLastBalanceReal() != null) {
@@ -243,12 +245,12 @@ public class TransactionService {
 
     public Double getTenantBalance(Long tenantId) {
         if (tenantId == null) {
-            throw new NoSuchElementException("Tenant not found with id: null");
+            throw new TransactionValidationException("Tenant id is required");
         }
 
         List<Account> accounts = accountsRepository.findByTenantId(tenantId);
         if (accounts.isEmpty()) {
-            throw new NoSuchElementException("Tenant not found with id: " + tenantId);
+            throw new TransactionNotFoundException("Tenant not found with id: " + tenantId);
         }
 
         return accounts.stream()
@@ -269,7 +271,7 @@ public class TransactionService {
         validateTenantAccess(tagId, tenantId, "Tag id is required");
 
         tagRepository.findByIdAndTenantId(tagId, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Tag not found with id: " + tagId));
+                .orElseThrow(() -> new TransactionNotFoundException("Tag not found with id: " + tagId));
 
         return transactionRepository.findDistinctByTenantIdAndTags_IdOrderByBookingDateDescIdDesc(tenantId, tagId)
                 .stream()
@@ -279,27 +281,27 @@ public class TransactionService {
 
     private void validateCreateRequest(TransactionDTO transactionDTO, Long tenantId) {
         if (transactionDTO == null) {
-            throw new IllegalArgumentException("Transaction payload is required");
+            throw new TransactionValidationException("Transaction payload is required");
         }
 
         if (tenantId == null) {
-            throw new IllegalArgumentException("Tenant id is required");
+            throw new TransactionValidationException("Tenant id is required");
         }
 
         if (transactionDTO.getSourceAccountId() == null) {
-            throw new IllegalArgumentException("Source account id is required");
+            throw new TransactionValidationException("Source account id is required");
         }
 
         if (transactionDTO.getBookingDate() == null) {
-            throw new IllegalArgumentException("Booking date is required");
+            throw new TransactionValidationException("Booking date is required");
         }
 
         if (transactionDTO.getAmount() == null) {
-            throw new IllegalArgumentException("Amount must be provided");
+            throw new TransactionValidationException("Amount must be provided");
         }
 
         if (transactionDTO.getAmount().doubleValue() == 0.0) {
-            throw new IllegalArgumentException("Amount must be non-zero");
+            throw new TransactionValidationException("Amount must be non-zero");
         }
 
         normalizeCurrency(transactionDTO.getCurrency());
@@ -307,7 +309,7 @@ public class TransactionService {
 
     private Account getRequiredAccount(Long accountId, String role) {
         return accountsRepository.findById(accountId)
-                .orElseThrow(() -> new IllegalArgumentException(role + " account not found with id: " + accountId));
+                .orElseThrow(() -> new TransactionNotFoundException(role + " account not found with id: " + accountId));
     }
 
     private Category resolveCategory(Long categoryId) {
@@ -316,7 +318,7 @@ public class TransactionService {
         }
 
         return categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new IllegalArgumentException("Category not found with id: " + categoryId));
+                .orElseThrow(() -> new TransactionNotFoundException("Category not found with id: " + categoryId));
     }
 
     private Merchant resolveMerchant(Long merchantId) {
@@ -325,7 +327,7 @@ public class TransactionService {
         }
 
         return merchantRepository.findById(merchantId)
-                .orElseThrow(() -> new IllegalArgumentException("Merchant not found with id: " + merchantId));
+                .orElseThrow(() -> new TransactionNotFoundException("Merchant not found with id: " + merchantId));
     }
 
     private Set<Tag> resolveTags(List<Long> tagIds, Long tenantId) {
@@ -336,11 +338,11 @@ public class TransactionService {
         Set<Tag> tags = new LinkedHashSet<>();
         for (Long tagId : tagIds) {
             if (tagId == null) {
-                throw new IllegalArgumentException("Tag id is required");
+                throw new TransactionValidationException("Tag id is required");
             }
 
             Tag tag = tagRepository.findByIdAndTenantId(tagId, tenantId)
-                    .orElseThrow(() -> new IllegalArgumentException("Tag not found with id: " + tagId));
+                    .orElseThrow(() -> new TransactionNotFoundException("Tag not found with id: " + tagId));
             tags.add(tag);
         }
 
@@ -351,7 +353,7 @@ public class TransactionService {
         Long resolvedStatusId = statusId != null ? statusId : 1L;
 
         return transactionStatusRepository.findById(resolvedStatusId)
-                .orElseThrow(() -> new IllegalArgumentException("Status not found with id: " + resolvedStatusId));
+                .orElseThrow(() -> new TransactionNotFoundException("Status not found with id: " + resolvedStatusId));
     }
 
     private TransactionType resolveTransactionType(Long typeId) {
@@ -360,19 +362,19 @@ public class TransactionService {
         }
 
         return transactionTypeRepository.findById(typeId)
-                .orElseThrow(() -> new IllegalArgumentException("Transaction type not found with id: " + typeId));
+                .orElseThrow(() -> new TransactionNotFoundException("Transaction type not found with id: " + typeId));
     }
 
     private void validateAccountBelongsToTenant(Account account, Long tenantId, Long accountId, String role) {
         if (!tenantId.equals(account.getTenantId())) {
-            throw new IllegalArgumentException(role + " account not found with id: " + accountId);
+            throw new TransactionNotFoundException(role + " account not found with id: " + accountId);
         }
     }
 
     private void validateExternalIdUniqueness(String externalId, Long tenantId) {
         String normalizedExternalId = transactionMapper.normalizeExternalId(externalId);
         if (normalizedExternalId != null && transactionRepository.existsByTenantIdAndExternalTxId(tenantId, normalizedExternalId)) {
-            throw new IllegalArgumentException("Transaction with external id '" + normalizedExternalId + "' already exists for tenant " + tenantId);
+            throw new TransactionConflictException("Transaction with external id '" + normalizedExternalId + "' already exists for tenant " + tenantId);
         }
     }
 
@@ -380,25 +382,25 @@ public class TransactionService {
         String normalizedExternalId = transactionMapper.normalizeExternalId(externalId);
         if (normalizedExternalId != null
                 && transactionRepository.existsByTenantIdAndExternalTxIdAndIdNot(tenantId, normalizedExternalId, transactionId)) {
-            throw new IllegalArgumentException("Transaction with external id '" + normalizedExternalId + "' already exists for tenant " + tenantId);
+            throw new TransactionConflictException("Transaction with external id '" + normalizedExternalId + "' already exists for tenant " + tenantId);
         }
     }
 
     private String normalizeCurrency(String currency) {
         String normalizedCurrency = currency == null ? null : currency.trim().toUpperCase();
         if (normalizedCurrency == null || !normalizedCurrency.matches("^[A-Z]{3}$")) {
-            throw new IllegalArgumentException("Currency must be a 3-letter uppercase ISO code");
+            throw new TransactionValidationException("Currency must be a 3-letter uppercase ISO code");
         }
         return normalizedCurrency;
     }
 
     private void validateTenantAccess(Long resourceId, Long tenantId, String resourceErrorMessage) {
         if (tenantId == null) {
-            throw new IllegalArgumentException("Tenant id is required");
+            throw new TransactionValidationException("Tenant id is required");
         }
 
         if (resourceId == null) {
-            throw new IllegalArgumentException(resourceErrorMessage);
+            throw new TransactionValidationException(resourceErrorMessage);
         }
     }
 
