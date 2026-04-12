@@ -22,12 +22,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import es.triana.company.banking.model.api.ApiResponse;
+import es.triana.company.banking.model.api.CsvImportRequest;
+import es.triana.company.banking.model.api.CsvImportResult;
 import es.triana.company.banking.model.api.PagedResponse;
 import es.triana.company.banking.model.api.TransactionDTO;
 import es.triana.company.banking.model.api.TransactionFilterRequest;
 import es.triana.company.banking.service.CSVExporterService;
+import es.triana.company.banking.service.CSVImporterService;
 import es.triana.company.banking.service.TransactionService;
 import es.triana.company.banking.security.TenantContext;
 
@@ -37,14 +41,17 @@ public class TransactionsController {
 
     private final TransactionService transactionService;
     private final CSVExporterService csvExporterService;
+    private final CSVImporterService csvImporterService;
     private final TenantContext tenantContext;
 
     public TransactionsController(
             TransactionService transactionService,
             CSVExporterService csvExporterService,
+            CSVImporterService csvImporterService,
             TenantContext tenantContext) {
         this.transactionService = transactionService;
         this.csvExporterService = csvExporterService;
+        this.csvImporterService = csvImporterService;
         this.tenantContext = tenantContext;
     }
 
@@ -71,6 +78,24 @@ public class TransactionsController {
                 .contentType(MediaType.parseMediaType("text/csv"))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .body(new ByteArrayResource(csvContent));
+    }
+
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<CsvImportResult>> importTransactions(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("accountId") Long accountId,
+            @RequestParam(defaultValue = "false") boolean skipDuplicates) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+
+        CsvImportRequest request = CsvImportRequest.builder()
+                .file(file)
+                .accountId(accountId)
+                .skipDuplicates(skipDuplicates)
+                .build();
+
+        CsvImportResult importResult = csvImporterService.importFile(request, tenantId);
+        ApiResponse<CsvImportResult> response = new ApiResponse<>(200, "Transactions imported successfully", importResult);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping
