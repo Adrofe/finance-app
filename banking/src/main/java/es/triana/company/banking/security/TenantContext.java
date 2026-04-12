@@ -9,47 +9,47 @@ import org.springframework.stereotype.Component;
 public class TenantContext {
 
     /**
-     * Extrae el tenant_id del JWT autenticado.
+     * Extracts the tenant_id from the authenticated JWT.
      * 
-     * @return El tenant_id del usuario autenticado
-     * @throws IllegalStateException si no hay autenticacion o no hay tenant_id en el token
+     * @return The tenant_id of the authenticated user
+     * @throws IllegalStateException if there is no authentication or no tenant_id in the token
      */
     public Long getCurrentTenantId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         
         if (authentication == null || !authentication.isAuthenticated()) {
-            throw new IllegalStateException("No hay usuario autenticado");
+            throw new IllegalStateException("No authenticated user found");
         }
 
         if (!(authentication.getPrincipal() instanceof Jwt)) {
-            throw new IllegalStateException("El principal no es un JWT valido");
+            throw new IllegalStateException("Authenticated principal is not a valid JWT");
         }
 
         Jwt jwt = (Jwt) authentication.getPrincipal();
         Object tenantIdClaim = jwt.getClaim("tenant_id");
 
         if (tenantIdClaim == null) {
-            throw new IllegalStateException("El token no contiene claim 'tenant_id'");
+            throw new IllegalStateException("Token does not contain 'tenant_id' claim");
         }
 
-        // El claim puede venir como String o como Number
+        // The claim can come as String or Number
         if (tenantIdClaim instanceof Number) {
             return ((Number) tenantIdClaim).longValue();
         } else if (tenantIdClaim instanceof String) {
             try {
                 return Long.parseLong((String) tenantIdClaim);
             } catch (NumberFormatException e) {
-                throw new IllegalStateException("El tenant_id no es un numero valido: " + tenantIdClaim);
+                throw new IllegalStateException("tenant_id is not a valid number: " + tenantIdClaim);
             }
         } else {
-            throw new IllegalStateException("El tenant_id tiene un formato inesperado: " + tenantIdClaim.getClass());
+            throw new IllegalStateException("tenant_id has an unexpected format: " + tenantIdClaim.getClass());
         }
     }
 
     /**
-     * Obtiene el username del usuario autenticado.
+     * Gets the username of the authenticated user.
      * 
-     * @return El preferred_username del token
+     * @return The preferred_username from the token
      */
     public String getCurrentUsername() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
