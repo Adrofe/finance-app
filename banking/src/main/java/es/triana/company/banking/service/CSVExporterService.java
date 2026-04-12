@@ -129,8 +129,8 @@ public class CSVExporterService {
         // currency
         record.add(dto.getCurrency() != null ? dto.getCurrency() : "");
 
-        // merchant (name - retrieved from DTO if available)
-        record.add(extractMerchantName(dto));
+        // merchant (name - merchant_name field in CSV)
+        record.add(dto.getMerchantName() != null ? dto.getMerchantName() : "");
 
         // merchant_id
         record.add(dto.getMerchantId() != null ? dto.getMerchantId().toString() : "");
@@ -171,13 +171,6 @@ public class CSVExporterService {
         }
 
         return dateTime.toString();
-    }
-
-    private String extractMerchantName(TransactionDTO dto) {
-        // The DTO should include merchant name if available
-        // If it only has ID, we attempt to extract the name if included
-        // For now returns empty - can be improved with join in mapper
-        return "";
     }
 
     private String formatTagIds(List<Long> tagIds) {

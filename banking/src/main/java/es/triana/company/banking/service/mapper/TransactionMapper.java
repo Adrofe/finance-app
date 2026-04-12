@@ -79,6 +79,7 @@ public class TransactionMapper {
 				.currency(transaction.getCurrency())
 				.description(transaction.getDescriptionRaw())
 				.merchantId(transaction.getMerchant() != null ? transaction.getMerchant().getId() : null)
+				.merchantName(transaction.getMerchant() != null ? transaction.getMerchant().getName() : null)
 				.categoryId(transaction.getCategory() != null ? transaction.getCategory().getId() : null)
 				.tagIds(mapTagIds(transaction.getTags()))
 				.externalId(transaction.getExternalTxId())
