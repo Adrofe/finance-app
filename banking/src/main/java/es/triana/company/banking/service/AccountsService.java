@@ -1,6 +1,7 @@
 package es.triana.company.banking.service;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -199,7 +200,7 @@ public class AccountsService {
         BigDecimal newBalance = currentBalance.add(amountDelta);
 
         account.setLastBalanceReal(newBalance);
-        account.setLastBalanceRealDate(LocalDateTime.now());
+        account.setLastBalanceRealDate(LocalDate.now());
         account.setUpdatedAt(LocalDateTime.now());
         accountsRepository.save(account);
     }
