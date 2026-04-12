@@ -1,6 +1,5 @@
 package es.triana.company.banking.controller;
 
-import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
@@ -11,6 +10,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import es.triana.company.banking.model.api.ApiResponse;
+import es.triana.company.banking.service.exception.TransactionConflictException;
+import es.triana.company.banking.service.exception.TransactionNotFoundException;
+import es.triana.company.banking.service.exception.TransactionValidationException;
 
 @RestControllerAdvice(assignableTypes = TransactionsController.class)
 public class TransactionExceptionHandler {
@@ -27,18 +29,28 @@ public class TransactionExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException exception) {
-        String message = exception.getMessage();
-        HttpStatus status = resolveStatus(message);
-        ApiResponse<Void> response = new ApiResponse<>(status.value(), message, null);
-        return ResponseEntity.status(status).body(response);
+    @ExceptionHandler(TransactionValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTransactionValidationException(TransactionValidationException exception) {
+        ApiResponse<Void> response = new ApiResponse<>(400, exception.getMessage(), null);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    @ExceptionHandler(NoSuchElementException.class)
-    public ResponseEntity<ApiResponse<Void>> handleNoSuchElementException(NoSuchElementException exception) {
+    @ExceptionHandler(TransactionNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTransactionNotFoundException(TransactionNotFoundException exception) {
         ApiResponse<Void> response = new ApiResponse<>(404, exception.getMessage(), null);
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    }
+
+    @ExceptionHandler(TransactionConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTransactionConflictException(TransactionConflictException exception) {
+        ApiResponse<Void> response = new ApiResponse<>(409, exception.getMessage(), null);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException exception) {
+        ApiResponse<Void> response = new ApiResponse<>(400, exception.getMessage(), null);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
     @ExceptionHandler(IllegalStateException.class)
@@ -57,22 +69,5 @@ public class TransactionExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleUnhandledException(Exception exception) {
         ApiResponse<Void> response = new ApiResponse<>(500, "Internal server error", null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-    }
-
-    private HttpStatus resolveStatus(String message) {
-        if (message == null) {
-            return HttpStatus.BAD_REQUEST;
-        }
-
-        String normalizedMessage = message.toLowerCase();
-        if (normalizedMessage.contains("not found")) {
-            return HttpStatus.NOT_FOUND;
-        }
-
-        if (normalizedMessage.contains("already exists")) {
-            return HttpStatus.CONFLICT;
-        }
-
-        return HttpStatus.BAD_REQUEST;
     }
 }
