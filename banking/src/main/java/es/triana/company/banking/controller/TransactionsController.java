@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import es.triana.company.banking.model.api.ApiResponse;
+import es.triana.company.banking.model.api.PagedResponse;
 import es.triana.company.banking.model.api.TransactionDTO;
+import es.triana.company.banking.model.api.TransactionFilterRequest;
 import es.triana.company.banking.service.TransactionService;
 import es.triana.company.banking.security.TenantContext;
 
@@ -31,6 +33,15 @@ public class TransactionsController {
     public TransactionsController(TransactionService transactionService, TenantContext tenantContext) {
         this.transactionService = transactionService;
         this.tenantContext = tenantContext;
+    }
+
+    @PostMapping("/search")
+    public ResponseEntity<ApiResponse<PagedResponse<TransactionDTO>>> searchTransactions(
+            @RequestBody TransactionFilterRequest filter) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        PagedResponse<TransactionDTO> result = transactionService.searchTransactions(filter, tenantId);
+        ApiResponse<PagedResponse<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", result);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping

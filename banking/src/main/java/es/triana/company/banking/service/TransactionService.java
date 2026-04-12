@@ -6,7 +6,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+
+import es.triana.company.banking.model.api.PagedResponse;
+import es.triana.company.banking.model.api.TransactionFilterRequest;
+import es.triana.company.banking.repository.TransactionSpecification;
 
 import es.triana.company.banking.model.api.TransactionDTO;
 import es.triana.company.banking.model.db.Account;
@@ -30,6 +37,9 @@ import es.triana.company.banking.service.mapper.TransactionMapper;
 
 @Service
 public class TransactionService {
+
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "bookingDate", "valueDate", "amount", "createdAt", "id");
 
     private final TransactionRepository transactionRepository;
     private final AccountsRepository accountsRepository;
@@ -256,6 +266,35 @@ public class TransactionService {
         return accounts.stream()
                 .mapToDouble(this::resolveCurrentBalance)
                 .sum();
+    }
+
+    public PagedResponse<TransactionDTO> searchTransactions(TransactionFilterRequest filter, Long tenantId) {
+        if (tenantId == null) {
+            throw new TransactionValidationException("Tenant id is required");
+        }
+
+        if (filter == null) {
+            filter = new TransactionFilterRequest();
+        }
+
+        int page = Math.max(0, filter.getPage());
+        int size = Math.min(Math.max(1, filter.getSize()), 100);
+        String sortField = ALLOWED_SORT_FIELDS.contains(filter.getSortBy()) ? filter.getSortBy() : "bookingDate";
+        Sort.Direction direction = "ASC".equalsIgnoreCase(filter.getSortDirection())
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+
+        Sort sort = Sort.by(direction, sortField);
+        if (!"id".equals(sortField)) {
+            sort = sort.and(Sort.by(Sort.Direction.DESC, "id"));
+        }
+
+        PageRequest pageRequest = PageRequest.of(page, size, sort);
+        TransactionSpecification spec = new TransactionSpecification(filter, tenantId);
+        Page<TransactionDTO> resultPage = transactionRepository.findAll(spec, pageRequest)
+                .map(transactionMapper::toDto);
+
+        return PagedResponse.from(resultPage);
     }
 
     public List<TransactionDTO> getTransactionsByCategory(Long categoryId, Long tenantId) {
