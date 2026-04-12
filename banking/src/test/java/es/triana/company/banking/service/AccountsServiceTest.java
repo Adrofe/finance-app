@@ -20,6 +20,7 @@ import es.triana.company.banking.repository.AccountTypeRepository;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
+import es.triana.company.banking.service.exception.AccountValidationException;
 import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
 import es.triana.company.banking.service.exception.TenantMismatchException;
 import es.triana.company.banking.service.mapper.AccountMapper;
@@ -266,7 +267,7 @@ class AccountsServiceTest {
 
     @Test
     void testUpdateAccountBalanceNullAccountId() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, 
+        AccountValidationException exception = assertThrows(AccountValidationException.class, 
             () -> accountsService.updateAccountBalance(null, 1L, new BigDecimal("50.00")));
         
         assertEquals("Account id is required", exception.getMessage());
@@ -274,7 +275,7 @@ class AccountsServiceTest {
 
     @Test
     void testUpdateAccountBalanceNullTenantId() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, 
+        AccountValidationException exception = assertThrows(AccountValidationException.class, 
             () -> accountsService.updateAccountBalance(1L, null, new BigDecimal("50.00")));
         
         assertEquals("Tenant id is required", exception.getMessage());
@@ -282,7 +283,7 @@ class AccountsServiceTest {
 
     @Test
     void testUpdateAccountBalanceNullAmountDelta() {
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, 
+        AccountValidationException exception = assertThrows(AccountValidationException.class, 
             () -> accountsService.updateAccountBalance(1L, 1L, null));
         
         assertEquals("Amount delta is required", exception.getMessage());

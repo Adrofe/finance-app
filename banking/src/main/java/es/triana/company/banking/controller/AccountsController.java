@@ -9,6 +9,7 @@ import es.triana.company.banking.model.api.AccountDTO;
 import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.service.AccountsService;
 import es.triana.company.banking.security.TenantContext;
+import es.triana.company.banking.service.exception.AccountValidationException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -75,7 +76,7 @@ public class AccountsController {
         if (updatedAccount.getId() == null) {
             updatedAccount.setId(id);
         } else if (!updatedAccount.getId().equals(id)) {
-            throw new IllegalArgumentException("Path id does not match body id");
+            throw new AccountValidationException("Path id does not match body id");
         }
 
         AccountDTO account = accountsService.updateAccount(updatedAccount, tenantId);

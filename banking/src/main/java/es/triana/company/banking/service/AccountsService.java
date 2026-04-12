@@ -19,6 +19,7 @@ import es.triana.company.banking.repository.InstitutionRepository;
 import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
 import es.triana.company.banking.service.exception.InstitutionNotFoundException;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
+import es.triana.company.banking.service.exception.AccountValidationException;
 import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
 import es.triana.company.banking.service.exception.TenantMismatchException;
 import es.triana.company.banking.service.mapper.AccountMapper;
@@ -175,15 +176,15 @@ public class AccountsService {
      */
     public void updateAccountBalance(Long accountId, Long tenantId, BigDecimal amountDelta) {
         if (accountId == null) {
-            throw new IllegalArgumentException("Account id is required");
+            throw new AccountValidationException("Account id is required");
         }
 
         if (tenantId == null) {
-            throw new IllegalArgumentException("Tenant id is required");
+            throw new AccountValidationException("Tenant id is required");
         }
 
         if (amountDelta == null) {
-            throw new IllegalArgumentException("Amount delta is required");
+            throw new AccountValidationException("Amount delta is required");
         }
 
         Account account = accountsRepository.findById(accountId)

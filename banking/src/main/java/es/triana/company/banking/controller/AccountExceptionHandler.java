@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
 import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
+import es.triana.company.banking.service.exception.AccountValidationException;
 import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
 import es.triana.company.banking.service.exception.InstitutionNotFoundException;
 import es.triana.company.banking.service.exception.TenantMismatchException;
@@ -31,8 +32,8 @@ public class AccountExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException exception) {
+    @ExceptionHandler(AccountValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountValidationException(AccountValidationException exception) {
         ApiResponse<Void> response = new ApiResponse<>(400, exception.getMessage(), null);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }

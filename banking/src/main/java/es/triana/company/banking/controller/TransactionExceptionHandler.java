@@ -47,12 +47,6 @@ public class TransactionExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException exception) {
-        ApiResponse<Void> response = new ApiResponse<>(400, exception.getMessage(), null);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-    }
-
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalStateException(IllegalStateException exception) {
         ApiResponse<Void> response = new ApiResponse<>(403, exception.getMessage(), null);
