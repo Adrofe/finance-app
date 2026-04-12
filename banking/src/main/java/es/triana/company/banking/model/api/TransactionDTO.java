@@ -22,6 +22,7 @@ public class TransactionDTO {
     private String currency;
     private String description;
     private Long merchantId;
+    private String merchantName;
     private Long categoryId;
     private List<Long> tagIds;
     private String externalId;

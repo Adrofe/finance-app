@@ -30,4 +30,18 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 
 	@Query("select t from Transaction t where t.tenantId = :tenantId and (t.sourceAccount.id = :accountId or t.destinationAccount.id = :accountId) order by t.bookingDate desc, t.id desc")
 	List<Transaction> findAllByTenantIdAndAccountId(@Param("tenantId") Long tenantId, @Param("accountId") Long accountId);
+
+	@Query("""
+			select t from Transaction t
+			where t.tenantId = :tenantId
+			  and (:accountId is null or t.sourceAccount.id = :accountId or t.destinationAccount.id = :accountId)
+			  and (:startDate is null or t.bookingDate >= :startDate)
+			  and (:endDate is null or t.bookingDate <= :endDate)
+			order by t.bookingDate desc, t.id desc
+			""")
+	List<Transaction> findAllForExport(
+			@Param("tenantId") Long tenantId,
+			@Param("accountId") Long accountId,
+			@Param("startDate") LocalDate startDate,
+			@Param("endDate") LocalDate endDate);
 }
