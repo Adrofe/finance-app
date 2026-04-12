@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import es.triana.company.banking.model.api.ApiResponse;
+import es.triana.company.banking.model.api.PagedResponse;
 import es.triana.company.banking.model.api.TransactionDTO;
+import es.triana.company.banking.model.api.TransactionFilterRequest;
 import es.triana.company.banking.service.TransactionService;
 import es.triana.company.banking.security.TenantContext;
 
@@ -33,6 +35,15 @@ public class TransactionsController {
         this.tenantContext = tenantContext;
     }
 
+    @PostMapping("/search")
+    public ResponseEntity<ApiResponse<PagedResponse<TransactionDTO>>> searchTransactions(
+            @RequestBody TransactionFilterRequest filter) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        PagedResponse<TransactionDTO> result = transactionService.searchTransactions(filter, tenantId);
+        ApiResponse<PagedResponse<TransactionDTO>> response = new ApiResponse<>(200, "Transactions retrieved successfully", result);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<TransactionDTO>> createTransaction(@Valid @RequestBody TransactionDTO transactionDTO) {
         Long tenantId = tenantContext.getCurrentTenantId();
@@ -41,7 +52,7 @@ public class TransactionsController {
         return ResponseEntity.status(201).body(response);
     }
 
-    @GetMapping("/{transactionId}")
+    @GetMapping("/{transactionId:\\d+}")
     public ResponseEntity<ApiResponse<TransactionDTO>> getTransactionById(@PathVariable("transactionId") Long transactionId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         TransactionDTO transaction = transactionService.getTransactionById(transactionId, tenantId);
@@ -49,7 +60,7 @@ public class TransactionsController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/account/{accountId}")
+    @GetMapping("/account/{accountId:\\d+}")
     public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByAccount(@PathVariable("accountId") Long accountId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         List<TransactionDTO> transactions = transactionService.getTransactionsByAccount(accountId, tenantId);
@@ -75,7 +86,7 @@ public class TransactionsController {
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/{transactionId}")
+    @PutMapping("/{transactionId:\\d+}")
     public ResponseEntity<ApiResponse<TransactionDTO>> updateTransaction(@PathVariable("transactionId") Long transactionId,
             @Valid @RequestBody TransactionDTO transactionDTO) {
         Long tenantId = tenantContext.getCurrentTenantId();
@@ -84,7 +95,7 @@ public class TransactionsController {
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/{transactionId}")
+    @DeleteMapping("/{transactionId:\\d+}")
     public ResponseEntity<ApiResponse<Void>> deleteTransaction(@PathVariable("transactionId") Long transactionId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         transactionService.deleteTransaction(transactionId, tenantId);
@@ -92,7 +103,7 @@ public class TransactionsController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/account/{accountId}/balance")
+    @GetMapping("/account/{accountId:\\d+}/balance")
     public ResponseEntity<ApiResponse<Double>> getAccountBalance(@PathVariable("accountId") Long accountId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         Double balance = transactionService.getAccountBalance(accountId, tenantId);
@@ -108,7 +119,7 @@ public class TransactionsController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/category/{categoryId}")
+    @GetMapping("/category/{categoryId:\\d+}")
     public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByCategory(@PathVariable("categoryId") Long categoryId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         List<TransactionDTO> transactions = transactionService.getTransactionsByCategory(categoryId, tenantId);
@@ -116,7 +127,7 @@ public class TransactionsController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/tag/{tagId}")
+    @GetMapping("/tag/{tagId:\\d+}")
     public ResponseEntity<ApiResponse<List<TransactionDTO>>> getTransactionsByTag(@PathVariable("tagId") Long tagId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         List<TransactionDTO> transactions = transactionService.getTransactionsByTag(tagId, tenantId);
