@@ -83,7 +83,7 @@ public class TransactionsController {
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<CsvImportResult>> importTransactions(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("accountId") Long accountId,
+            @RequestParam(required = false) Long accountId,
             @RequestParam(defaultValue = "false") boolean skipDuplicates) {
         Long tenantId = tenantContext.getCurrentTenantId();
 

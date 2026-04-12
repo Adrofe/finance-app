@@ -167,4 +167,61 @@ class CSVImporterServiceTest {
         assertEquals(1, result.getSkippedCount());
         verify(transactionService, never()).createTransaction(any(TransactionDTO.class), eq(TENANT_ID));
     }
+
+    @Test
+    void shouldImportUsingSourceAccountIdWhenAccountIdNotProvided() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "transactions.csv",
+                "text/csv",
+                ("source_account_id,booking_date,amount,currency,merchant,description,external_id\n"
+                        + "99,2025-01-10,99.50,EUR,Amazon,Prime subscription,EXT-200\n")
+                                .getBytes());
+
+        CsvImportRequest request = CsvImportRequest.builder()
+                .file(file)
+                .skipDuplicates(false)
+                .build();
+
+        when(accountsRepository.findById(99L)).thenReturn(Optional.of(Account.builder()
+                .id(99L)
+                .tenantId(TENANT_ID)
+                .name("CSV account")
+                .build()));
+        when(transactionRepository.existsByTenantIdAndExternalTxId(TENANT_ID, "EXT-200")).thenReturn(false);
+        when(transactionService.createTransaction(any(TransactionDTO.class), eq(TENANT_ID)))
+                .thenReturn(TransactionDTO.builder().build());
+
+        CsvImportResult result = csvImporterService.importFile(request, TENANT_ID);
+        ArgumentCaptor<TransactionDTO> transactionCaptor = ArgumentCaptor.forClass(TransactionDTO.class);
+
+        assertEquals(1, result.getTotalRows());
+        assertEquals(1, result.getSuccessCount());
+        assertEquals(0, result.getFailedCount());
+        verify(transactionService, times(1)).createTransaction(transactionCaptor.capture(), eq(TENANT_ID));
+        assertEquals(99L, transactionCaptor.getValue().getSourceAccountId());
+    }
+
+    @Test
+    void shouldRejectRowWithoutSourceAccountIdWhenAccountIdNotProvided() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "transactions.csv",
+                "text/csv",
+                ("booking_date,amount,currency,merchant,description\n"
+                        + "2025-01-10,99.50,EUR,Amazon,Prime subscription\n")
+                                .getBytes());
+
+        CsvImportRequest request = CsvImportRequest.builder()
+                .file(file)
+                .skipDuplicates(false)
+                .build();
+
+        CsvImportResult result = csvImporterService.importFile(request, TENANT_ID);
+
+        assertEquals(1, result.getTotalRows());
+        assertEquals(0, result.getSuccessCount());
+        assertEquals(1, result.getFailedCount());
+        verify(transactionService, never()).createTransaction(any(TransactionDTO.class), eq(TENANT_ID));
+    }
 }

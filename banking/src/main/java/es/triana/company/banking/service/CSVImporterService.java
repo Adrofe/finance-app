@@ -55,15 +55,17 @@ public class CSVImporterService {
 
     public CsvImportResult importFile(CsvImportRequest request, Long tenantId) {
         validateImportRequest(request, tenantId);
-        Account account = getAndValidateAccount(request.getAccountId(), tenantId);
         List<CsvTransactionRow> rows = parseTransactions(request.getFile());
+        Account defaultAccount = request.getAccountId() != null
+            ? getAndValidateAccount(request.getAccountId(), tenantId)
+            : null;
 
         CsvImportResult result = new CsvImportResult();
         result.setTotalRows(rows.size());
 
         Set<String> seenExternalIds = new HashSet<>();
         for (CsvTransactionRow row : rows) {
-            List<ImportError> rowErrors = validateRow(row);
+            List<ImportError> rowErrors = validateRow(row, defaultAccount != null);
             if (!rowErrors.isEmpty()) {
                 rowErrors.forEach(result::addError);
                 continue;
@@ -91,7 +93,7 @@ public class CSVImporterService {
             }
 
             try {
-                TransactionDTO transactionDTO = toTransactionDto(row, account);
+                TransactionDTO transactionDTO = toTransactionDto(row, defaultAccount, tenantId);
                 transactionService.createTransaction(transactionDTO, tenantId);
                 result.incrementSuccess();
             } catch (RuntimeException ex) {
@@ -109,10 +111,6 @@ public class CSVImporterService {
 
         if (request == null) {
             throw new TransactionValidationException("Import request is required");
-        }
-
-        if (request.getAccountId() == null) {
-            throw new TransactionValidationException("Account id is required");
         }
 
         validateCsvFile(request.getFile());
@@ -190,10 +188,14 @@ public class CSVImporterService {
         }
     }
 
-    private List<ImportError> validateRow(CsvTransactionRow row) {
+    private List<ImportError> validateRow(CsvTransactionRow row, boolean hasDefaultAccount) {
         List<ImportError> errors = new ArrayList<>();
 
         validateOptionalLong(row.sourceAccountId(), "source_account_id", row.rowNumber(), errors);
+        if (!hasDefaultAccount && normalizeText(row.sourceAccountId()) == null) {
+            errors.add(buildError(row.rowNumber(), "source_account_id",
+                    "source_account_id is required when accountId is not provided", row.sourceAccountId()));
+        }
 
         if (normalizeText(row.bookingDate()) == null) {
             errors.add(buildError(row.rowNumber(), "booking_date", "booking_date is required", row.bookingDate()));
@@ -235,24 +237,16 @@ public class CSVImporterService {
         return errors;
     }
 
-    private TransactionDTO toTransactionDto(CsvTransactionRow row, Account account) {
+    private TransactionDTO toTransactionDto(CsvTransactionRow row, Account defaultAccount, Long tenantId) {
         Long merchantId = resolveMerchantId(row.merchantId(), row.merchant());
         LocalDate bookingDate = LocalDate.parse(row.bookingDate());
         LocalDate valueDate = normalizeText(row.valueDate()) != null ? LocalDate.parse(row.valueDate()) : bookingDate;
         BigDecimal amount = new BigDecimal(row.amount());
 
-        Long sourceAccountId = parseLongOrNull(row.sourceAccountId());
-        if (sourceAccountId != null && !sourceAccountId.equals(account.getId())) {
-            Account csvAccount = accountsRepository.findById(sourceAccountId)
-                    .orElseThrow(() -> new TransactionValidationException("Source account not found with id: " + sourceAccountId));
-            if (!account.getTenantId().equals(csvAccount.getTenantId())) {
-                throw new TransactionValidationException("Source account does not belong to the same tenant");
-            }
-            account = csvAccount;
-        }
+        Account sourceAccount = resolveSourceAccount(row, defaultAccount, tenantId);
 
         return TransactionDTO.builder()
-                .sourceAccountId(account.getId())
+                .sourceAccountId(sourceAccount.getId())
                 .destinationAccountId(parseLongOrNull(row.destinationAccountId()))
                 .bookingDate(bookingDate.atStartOfDay())
                 .valueDate(valueDate.atStartOfDay())
@@ -266,6 +260,24 @@ public class CSVImporterService {
                 .statusId(parseLongOrNull(row.statusId()))
                 .typeId(parseLongOrNull(row.typeId()))
                 .build();
+    }
+
+    private Account resolveSourceAccount(CsvTransactionRow row, Account defaultAccount, Long tenantId) {
+        Long sourceAccountId = parseLongOrNull(row.sourceAccountId());
+        if (sourceAccountId == null) {
+            if (defaultAccount == null) {
+                throw new TransactionValidationException(
+                        "source_account_id is required when accountId is not provided");
+            }
+            return defaultAccount;
+        }
+
+        Account csvAccount = accountsRepository.findById(sourceAccountId)
+                .orElseThrow(() -> new TransactionValidationException("Source account not found with id: " + sourceAccountId));
+        if (!tenantId.equals(csvAccount.getTenantId())) {
+            throw new TransactionValidationException("Source account does not belong to tenant " + tenantId);
+        }
+        return csvAccount;
     }
 
     private Long resolveMerchantId(String merchantIdValue, String merchantName) {
