@@ -8,6 +8,9 @@ import org.springframework.stereotype.Service;
 import es.triana.company.banking.model.api.TagDTO;
 import es.triana.company.banking.model.db.Tag;
 import es.triana.company.banking.repository.TagRepository;
+import es.triana.company.banking.service.exception.TagConflictException;
+import es.triana.company.banking.service.exception.TagNotFoundException;
+import es.triana.company.banking.service.exception.TagValidationException;
 
 @Service
 public class TagService {
@@ -29,14 +32,14 @@ public class TagService {
 
     public TagDTO createTag(TagDTO tagDTO, Long tenantId) {
         if (tagDTO == null) {
-            throw new IllegalArgumentException("Tag payload is required");
+            throw new TagValidationException("Tag payload is required");
         }
 
         validateTenantId(tenantId);
 
         String normalizedName = normalizeName(tagDTO.getName());
         if (tagRepository.existsByTenantIdAndNameIgnoreCase(tenantId, normalizedName)) {
-            throw new IllegalArgumentException("Tag with name '" + normalizedName + "' already exists for tenant " + tenantId);
+            throw new TagConflictException("Tag with name '" + normalizedName + "' already exists for tenant " + tenantId);
         }
 
         OffsetDateTime now = OffsetDateTime.now();
@@ -53,11 +56,11 @@ public class TagService {
     public void deleteTag(Long tagId, Long tenantId) {
         validateTenantId(tenantId);
         if (tagId == null) {
-            throw new IllegalArgumentException("Tag id is required");
+            throw new TagValidationException("Tag id is required");
         }
 
         Tag tag = tagRepository.findByIdAndTenantId(tagId, tenantId)
-                .orElseThrow(() -> new IllegalArgumentException("Tag not found with id: " + tagId));
+                .orElseThrow(() -> new TagNotFoundException("Tag not found with id: " + tagId));
 
         tagRepository.delete(tag);
     }
@@ -71,22 +74,22 @@ public class TagService {
 
     private void validateTenantId(Long tenantId) {
         if (tenantId == null) {
-            throw new IllegalArgumentException("Tenant id is required");
+            throw new TagValidationException("Tenant id is required");
         }
     }
 
     private String normalizeName(String name) {
         if (name == null) {
-            throw new IllegalArgumentException("Tag name is required");
+            throw new TagValidationException("Tag name is required");
         }
 
         String normalizedName = name.trim();
         if (normalizedName.isEmpty()) {
-            throw new IllegalArgumentException("Tag name is required");
+            throw new TagValidationException("Tag name is required");
         }
 
         if (normalizedName.length() > 64) {
-            throw new IllegalArgumentException("Tag name must be at most 64 characters");
+            throw new TagValidationException("Tag name must be at most 64 characters");
         }
 
         return normalizedName;

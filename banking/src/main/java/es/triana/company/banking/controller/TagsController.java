@@ -4,7 +4,6 @@ import java.util.List;
 
 import jakarta.validation.Valid;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,40 +32,25 @@ public class TagsController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<TagDTO>>> getTags() {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            List<TagDTO> tags = tagService.getTagsByTenant(tenantId);
-            ApiResponse<List<TagDTO>> response = new ApiResponse<>(200, "Tags retrieved successfully", tags);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<List<TagDTO>> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+        Long tenantId = tenantContext.getCurrentTenantId();
+        List<TagDTO> tags = tagService.getTagsByTenant(tenantId);
+        ApiResponse<List<TagDTO>> response = new ApiResponse<>(200, "Tags retrieved successfully", tags);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<TagDTO>> createTag(@Valid @RequestBody TagDTO tagDTO) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            TagDTO createdTag = tagService.createTag(tagDTO, tenantId);
-            ApiResponse<TagDTO> response = new ApiResponse<>(201, "Tag created successfully", createdTag);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<TagDTO> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+        Long tenantId = tenantContext.getCurrentTenantId();
+        TagDTO createdTag = tagService.createTag(tagDTO, tenantId);
+        ApiResponse<TagDTO> response = new ApiResponse<>(201, "Tag created successfully", createdTag);
+        return ResponseEntity.status(201).body(response);
     }
 
     @DeleteMapping("/{tagId}")
-    public ResponseEntity<ApiResponse<Void>> deleteTag(@PathVariable Long tagId) {
-        try {
-            Long tenantId = tenantContext.getCurrentTenantId();
-            tagService.deleteTag(tagId, tenantId);
-            ApiResponse<Void> response = new ApiResponse<>(204, "Tag deleted successfully", null);
-            return ResponseEntity.status(HttpStatus.NO_CONTENT).body(response);
-        } catch (IllegalArgumentException e) {
-            ApiResponse<Void> response = new ApiResponse<>(400, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
+    public ResponseEntity<ApiResponse<Void>> deleteTag(@PathVariable("tagId") Long tagId) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        tagService.deleteTag(tagId, tenantId);
+        ApiResponse<Void> response = new ApiResponse<>(204, "Tag deleted successfully", null);
+        return ResponseEntity.status(204).body(response);
     }
 }

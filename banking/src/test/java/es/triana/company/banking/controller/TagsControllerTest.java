@@ -1,6 +1,8 @@
 package es.triana.company.banking.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +22,7 @@ import es.triana.company.banking.model.api.ApiResponse;
 import es.triana.company.banking.model.api.TagDTO;
 import es.triana.company.banking.security.TenantContext;
 import es.triana.company.banking.service.TagService;
+import es.triana.company.banking.service.exception.TagNotFoundException;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -73,5 +76,18 @@ public class TagsControllerTest {
 
         verify(tagService).deleteTag(7L, 1L);
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+    }
+
+    @Test
+    public void deleteTagNotFound() {
+        Long tagId = 999L;
+        when(tenantContext.getCurrentTenantId()).thenReturn(1L);
+        doThrow(new TagNotFoundException("Tag not found with id: " + tagId)).when(tagService).deleteTag(tagId, 1L);
+
+        TagNotFoundException exception = assertThrows(TagNotFoundException.class,
+                () -> tagsController.deleteTag(tagId));
+
+        verify(tagService).deleteTag(tagId, 1L);
+        assertEquals("Tag not found with id: " + tagId, exception.getMessage());
     }
 }
