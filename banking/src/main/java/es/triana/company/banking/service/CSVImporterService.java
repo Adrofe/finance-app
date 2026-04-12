@@ -155,6 +155,7 @@ public class CSVImporterService {
             for (CSVRecord record : parser) {
                 rows.add(new CsvTransactionRow(
                         record.getRecordNumber() + 1,
+                        getValue(record, "source_account_id"),
                         getValue(record, "booking_date"),
                         getValue(record, "value_date"),
                         getValue(record, "amount"),
@@ -191,6 +192,8 @@ public class CSVImporterService {
 
     private List<ImportError> validateRow(CsvTransactionRow row) {
         List<ImportError> errors = new ArrayList<>();
+
+        validateOptionalLong(row.sourceAccountId(), "source_account_id", row.rowNumber(), errors);
 
         if (normalizeText(row.bookingDate()) == null) {
             errors.add(buildError(row.rowNumber(), "booking_date", "booking_date is required", row.bookingDate()));
@@ -237,6 +240,16 @@ public class CSVImporterService {
         LocalDate bookingDate = LocalDate.parse(row.bookingDate());
         LocalDate valueDate = normalizeText(row.valueDate()) != null ? LocalDate.parse(row.valueDate()) : bookingDate;
         BigDecimal amount = new BigDecimal(row.amount());
+
+        Long sourceAccountId = parseLongOrNull(row.sourceAccountId());
+        if (sourceAccountId != null && !sourceAccountId.equals(account.getId())) {
+            Account csvAccount = accountsRepository.findById(sourceAccountId)
+                    .orElseThrow(() -> new TransactionValidationException("Source account not found with id: " + sourceAccountId));
+            if (!account.getTenantId().equals(csvAccount.getTenantId())) {
+                throw new TransactionValidationException("Source account does not belong to the same tenant");
+            }
+            account = csvAccount;
+        }
 
         return TransactionDTO.builder()
                 .sourceAccountId(account.getId())
@@ -365,6 +378,7 @@ public class CSVImporterService {
 
     private record CsvTransactionRow(
             long rowNumber,
+            String sourceAccountId,
             String bookingDate,
             String valueDate,
             String amount,
