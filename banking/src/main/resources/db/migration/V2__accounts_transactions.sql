@@ -88,7 +88,8 @@ CREATE TABLE IF NOT EXISTS banking.transactions (
   external_tx_id       VARCHAR(128),
   status_id            BIGINT REFERENCES banking.transaction_statuses(id) DEFAULT 1,
   transaction_type     BIGINT REFERENCES banking.transaction_types(id),
-  created_at           TIMESTAMPTZ DEFAULT NOW()
+  created_at           TIMESTAMPTZ DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS banking.transaction_tags (
