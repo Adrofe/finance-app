@@ -30,4 +30,24 @@ public class MerchantService {
                 .map(merchantMapper::toDto)
                 .orElse(null);
     }
+
+    public MerchantDTO createMerchant(MerchantDTO merchantDTO) {
+        var merchant = merchantMapper.toEntity(merchantDTO);
+        var saved = merchantRepository.save(merchant);
+        return merchantMapper.toDto(saved);
+    }
+
+    public MerchantDTO updateMerchant(Long id, MerchantDTO merchantDTO) {
+        if (!merchantRepository.existsById(id)) {
+            return null;
+        }
+        merchantDTO.setId(id);
+        var merchant = merchantMapper.toEntity(merchantDTO);
+        var saved = merchantRepository.save(merchant);
+        return merchantMapper.toDto(saved);
+    }
+
+    public void deleteMerchant(Long id) {
+        merchantRepository.deleteById(id);
+    }
 }

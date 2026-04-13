@@ -30,4 +30,24 @@ public class InstitutionService {
                 .map(institutionMapper::toDto)
                 .orElse(null);
     }
+
+    public InstitutionDTO createInstitution(InstitutionDTO institutionDTO) {
+        var institution = institutionMapper.toEntity(institutionDTO);
+        var saved = institutionRepository.save(institution);
+        return institutionMapper.toDto(saved);
+    }
+
+    public InstitutionDTO updateInstitution(Long id, InstitutionDTO institutionDTO) {
+        if (!institutionRepository.existsById(id)) {
+            return null;
+        }
+        institutionDTO.setId(id);
+        var institution = institutionMapper.toEntity(institutionDTO);
+        var saved = institutionRepository.save(institution);
+        return institutionMapper.toDto(saved);
+    }
+
+    public void deleteInstitution(Long id) {
+        institutionRepository.deleteById(id);
+    }
 }

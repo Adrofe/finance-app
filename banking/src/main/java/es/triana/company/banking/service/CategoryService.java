@@ -44,4 +44,24 @@ public class CategoryService {
                 .map(categoryMapper::toDto)
                 .orElse(null);
     }
+
+    public CategoryDTO createCategory(CategoryDTO categoryDTO) {
+        var category = categoryMapper.toEntity(categoryDTO);
+        var saved = categoryRepository.save(category);
+        return categoryMapper.toDto(saved);
+    }
+
+    public CategoryDTO updateCategory(Long id, CategoryDTO categoryDTO) {
+        if (!categoryRepository.existsById(id)) {
+            return null;
+        }
+        categoryDTO.setId(id);
+        var category = categoryMapper.toEntity(categoryDTO);
+        var saved = categoryRepository.save(category);
+        return categoryMapper.toDto(saved);
+    }
+
+    public void deleteCategory(Long id) {
+        categoryRepository.deleteById(id);
+    }
 }
