@@ -75,6 +75,39 @@ body {
   color: #4a6277;
 }
 
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  border: 1px solid #c9d9e7;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #2f4557;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: #1e6eb8;
+  border-color: #1e6eb8;
+  color: #ffffff;
+}
+
+.panel {
+  display: grid;
+  gap: 10px;
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
 .state {
   background: #ffffff;
   border-radius: 10px;
