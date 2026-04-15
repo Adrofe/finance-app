@@ -30,6 +30,8 @@ type KeycloakErrorResponse = {
   error_description?: string;
 };
 
+type AppTab = 'banking' | 'transactions';
+
 function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -40,6 +42,7 @@ function App() {
   const [items, setItems] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<AppTab>('banking');
 
   useEffect(() => {
     if (!accessToken) {
@@ -167,38 +170,67 @@ function App() {
     <div className="page">
       <header className="header">
         <h1>Finance App</h1>
-        <p>Banking transactions preview</p>
+        <p>Your personal finance workspace</p>
         <button className="btn secondary" onClick={handleLogout} type="button">
           Logout
         </button>
       </header>
 
-      {loading && <p className="state">Loading transactions...</p>}
-      {!loading && error && <p className="state error">{error}</p>}
+      <nav className="tabs" aria-label="Main sections">
+        <button
+          type="button"
+          className={`tab ${activeTab === 'banking' ? 'active' : ''}`}
+          onClick={() => setActiveTab('banking')}
+        >
+          Banking
+        </button>
+        <button
+          type="button"
+          className={`tab ${activeTab === 'transactions' ? 'active' : ''}`}
+          onClick={() => setActiveTab('transactions')}
+        >
+          Transactions
+        </button>
+      </nav>
 
-      {!loading && !error && (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Date</th>
-              <th>Merchant</th>
-              <th>Description</th>
-              <th>Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((t) => (
-              <tr key={t.id}>
-                <td>{t.id}</td>
-                <td>{t.bookingDate || '-'}</td>
-                <td>{t.merchantName || '-'}</td>
-                <td>{t.description || '-'}</td>
-                <td>{t.amount ?? '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {activeTab === 'banking' && (
+        <section className="panel" aria-label="Banking tab">
+          <h2>Banking</h2>
+          <p className="state">Dashboard.</p>
+        </section>
+      )}
+
+      {activeTab === 'transactions' && (
+        <section className="panel" aria-label="Transactions tab">
+          <h2>Transactions</h2>
+          {loading && <p className="state">Loading transactions...</p>}
+          {!loading && error && <p className="state error">{error}</p>}
+
+          {!loading && !error && (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Date</th>
+                  <th>Merchant</th>
+                  <th>Description</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((t) => (
+                  <tr key={t.id}>
+                    <td>{t.id}</td>
+                    <td>{t.bookingDate || '-'}</td>
+                    <td>{t.merchantName || '-'}</td>
+                    <td>{t.description || '-'}</td>
+                    <td>{t.amount ?? '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
       )}
     </div>
   );
