@@ -18,6 +18,53 @@ body {
   padding: 24px;
 }
 
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border: 1px solid #d9e4ef;
+  border-radius: 14px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.auth-card p {
+  margin: 0 0 6px;
+  color: #4a6277;
+}
+
+.auth-card label {
+  font-size: 0.92rem;
+  color: #2f4557;
+  font-weight: 600;
+}
+
+.auth-card input {
+  width: 100%;
+  border: 1px solid #c9d9e7;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.auth-card small {
+  color: #5f7488;
+}
+
 .header h1 {
   margin: 0;
   font-size: 2rem;
@@ -65,4 +112,32 @@ body {
 
 .table tbody tr:hover {
   background: #f8fbff;
+}
+
+.btn {
+  border: 0;
+  border-radius: 10px;
+  background: #1e6eb8;
+  color: #ffffff;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #155894;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn.secondary {
+  background: #41576a;
+}
+
+.btn.secondary:hover {
+  background: #324654;
 }
