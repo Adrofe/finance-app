@@ -7,4 +7,5 @@ export type Transaction = {
   merchantName?: string;
 };
 
-export type AppTab = 'banking' | 'transactions';
+export type AppTab = 'banking' | 'insights';
+export type BankingSubTab = 'dashboard' | 'accounts' | 'transactions' | 'tags' | 'budgets';

@@ -10,17 +10,17 @@ export function TabsNav({ activeTab, onSelectTab }: TabsNavProps) {
     <nav className="tabs" aria-label="Main sections">
       <button
         type="button"
-        className={`tab ${activeTab === 'banking' ? 'active' : ''}`}
+        className={`tab main-tab ${activeTab === 'banking' ? 'active' : ''}`}
         onClick={() => onSelectTab('banking')}
       >
         Banking
       </button>
       <button
         type="button"
-        className={`tab ${activeTab === 'transactions' ? 'active' : ''}`}
-        onClick={() => onSelectTab('transactions')}
+        className={`tab main-tab ${activeTab === 'insights' ? 'active' : ''}`}
+        onClick={() => onSelectTab('insights')}
       >
-        Transactions
+        Insights
       </button>
     </nav>
   );
