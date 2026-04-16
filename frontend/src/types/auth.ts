@@ -6,3 +6,9 @@ export type KeycloakErrorResponse = {
   error?: string;
   error_description?: string;
 };
+
+export type PkceCallbackResult = {
+  completed: boolean;
+  accessToken: string | null;
+  error: string | null;
+};

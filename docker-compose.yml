@@ -10,6 +10,21 @@ services:
     networks:
       - finance-net
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_KEYCLOAK_BASE_URL: ${VITE_KEYCLOAK_BASE_URL}
+        VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM}
+        VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID}
+    depends_on:
+      - banking
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    networks:
+      - finance-net
+
 networks:
   finance-net:
     external: true
