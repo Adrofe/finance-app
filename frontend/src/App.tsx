@@ -72,7 +72,7 @@ function App() {
       <header className="header">
         <h1>Finance App</h1>
         <p>Control center for your personal finances</p>
-        <button className="btn secondary" onClick={() => logout()} type="button">
+        <button className="btn secondary" onClick={() => logout('Logged out successfully.')} type="button">
           Logout
         </button>
       </header>

@@ -28,6 +28,7 @@ infra/db/.env
 infra/keycloak/.env
 infra/rabbitmq/.env
 banking/.env
+.env
 
 target/
 .mvn/wrapper/maven-wrapper.jar
