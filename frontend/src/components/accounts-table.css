@@ -1,0 +1,65 @@
+.accounts-table-wrapper {
+  overflow-x: auto;
+  padding: 24px;
+  background: #f8fafd;
+  border-radius: 16px;
+  margin-top: 16px;
+}
+
+.accounts-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px #0001;
+  font-family: 'Inter', Arial, sans-serif;
+}
+
+.accounts-table th {
+  background: #f5f6fa;
+  padding: 14px 10px;
+  text-align: left;
+  font-weight: 600;
+  color: #222;
+  border-bottom: 2px solid #eaeaea;
+}
+
+.accounts-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+  font-size: 15px;
+}
+
+.accounts-table tr:nth-child(even) {
+  background: #fafbfc;
+}
+
+.accounts-table img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #f5f6fa;
+  border: 1px solid #eee;
+  display: block;
+}
+
+.bank-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.balance-real {
+  color: #2d8f5a;
+  font-weight: 700;
+  text-align: right;
+}
+
+.balance-available {
+  color: #3b3b8f;
+  font-weight: 700;
+  text-align: right;
+}

@@ -8,6 +8,7 @@ import { KEYCLOAK_REALM } from './config/env';
 import { useAuth } from './hooks/useAuth';
 import { useTransactions } from './hooks/useTransactions';
 import type { AppTab, BankingSubTab, Transaction } from './types/banking';
+import { AccountsTable } from './components/AccountsTable';
 
 function toTimestamp(input?: string): number {
   if (!input) {
@@ -138,7 +139,7 @@ function App() {
           {bankingSubTab === 'accounts' && (
             <article className="sheet">
               <h3>Accounts</h3>
-              <p className="state">Accounts view will be added in the next commit.</p>
+              <AccountsTable token={accessToken} />
             </article>
           )}
 
