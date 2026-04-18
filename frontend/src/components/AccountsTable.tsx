@@ -35,14 +35,100 @@ const bankIcon = (bankName?: string) => {
 };
 
 export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
-  const { accounts, loading, error } = useAccounts(token);
+  const { accounts, loading, error, createAccount } = useAccounts(token);
+  const [showForm, setShowForm] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [formError, setFormError] = React.useState<string | null>(null);
+
+  const [form, setForm] = React.useState({
+    name: '',
+    iban: '',
+    institutionId: '',
+    accountTypeId: '',
+    currency: 'EUR',
+    lastBalanceReal: ''
+  });
+
+  const onChange = (k: string, v: string) => setForm((s) => ({ ...s, [k]: v }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setSubmitting(true);
+    try {
+      const payload: any = {
+        name: form.name,
+        iban: form.iban || null,
+        institutionId: form.institutionId ? Number(form.institutionId) : null,
+        accountTypeId: form.accountTypeId ? Number(form.accountTypeId) : null,
+        currency: form.currency,
+        lastBalanceReal: form.lastBalanceReal ? Number(form.lastBalanceReal) : undefined
+      };
+      await createAccount(payload);
+      setShowForm(false);
+      setForm({ name: '', iban: '', institutionId: '', accountTypeId: '', currency: 'EUR', lastBalanceReal: '' });
+    } catch (err: any) {
+      setFormError(err?.message || 'Error creando cuenta');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) return <div className="accounts-loading">Cargando cuentas...</div>;
   if (error) return <div className="accounts-error">Error: {error}</div>;
-  if (!accounts.length) return <div className="accounts-empty">No hay cuentas registradas.</div>;
+  // render even if empty so button is visible
 
   return (
     <div className="accounts-table-wrapper">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <h3 style={{ margin: 0 }}>Cuentas</h3>
+        <div>
+          <button className="btn primary" onClick={() => setShowForm((s) => !s)} type="button">{showForm ? 'Cancelar' : 'Añadir cuenta'}</button>
+        </div>
+      </div>
+
+      {showForm && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <h4>Añadir cuenta</h4>
+              <button className="modal-close" onClick={() => setShowForm(false)} type="button">✕</button>
+            </div>
+            <form onSubmit={submit} className="modal-body">
+              <div className="modal-row">
+                <label>Nombre</label>
+                <input required placeholder="Nombre" value={form.name} onChange={(e) => onChange('name', e.target.value)} />
+              </div>
+              <div className="modal-row">
+                <label>IBAN</label>
+                <input placeholder="IBAN" value={form.iban} onChange={(e) => onChange('iban', e.target.value)} />
+              </div>
+              <div className="modal-row">
+                <label>InstitutionId</label>
+                <input placeholder="InstitutionId (num)" value={form.institutionId} onChange={(e) => onChange('institutionId', e.target.value)} />
+              </div>
+              <div className="modal-row">
+                <label>AccountTypeId</label>
+                <input placeholder="AccountTypeId (num)" value={form.accountTypeId} onChange={(e) => onChange('accountTypeId', e.target.value)} />
+              </div>
+              <div className="modal-row">
+                <label>Currency</label>
+                <input placeholder="Currency (EUR)" value={form.currency} onChange={(e) => onChange('currency', e.target.value)} />
+              </div>
+              <div className="modal-row">
+                <label>Balance inicial</label>
+                <input placeholder="Balance inicial" value={form.lastBalanceReal} onChange={(e) => onChange('lastBalanceReal', e.target.value)} />
+              </div>
+              {formError && <div className="modal-error">{formError}</div>}
+              <div className="modal-actions">
+                <button className="btn primary" type="submit" disabled={submitting}>{submitting ? 'Guardando...' : 'Crear'}</button>
+                <button className="btn" type="button" onClick={() => setShowForm(false)}>Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <table className="accounts-table">
         <thead>
           <tr>
