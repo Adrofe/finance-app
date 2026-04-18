@@ -81,7 +81,7 @@
   width: 720px;
   max-width: 100%;
   box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-  overflow: hidden;
+  overflow: visible;
 }
 .modal-header {
   display: flex;
@@ -98,3 +98,11 @@
 .modal-row input { padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; }
 .modal-actions { grid-column: 1 / -1; display:flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
 .modal-error { grid-column: 1 / -1; color: #b00020; }
+
+/* Institution dropdown styles */
+.inst-dropdown { position: relative; display: inline-block; width: 100%; }
+.inst-toggle { width: 100%; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border:1px solid #ddd; border-radius:6px; background:#fff; cursor:pointer; }
+.inst-list { position: absolute; left: 0; right: 0; max-height: 360px; overflow: auto; background: #fff; border: 1px solid #e6e6e6; box-shadow: 0 6px 20px rgba(0,0,0,0.08); border-radius: 8px; margin-top: 6px; z-index: 1100; padding: 6px 0; list-style: none; }
+.inst-item { display:flex; align-items:center; gap:8px; padding: 8px 12px; cursor: pointer; }
+.inst-item:hover { background: #f5f7fb; }
+

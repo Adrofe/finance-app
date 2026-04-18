@@ -1,7 +1,98 @@
 import React from 'react';
 import { useAccounts } from '../hooks/useAccounts';
 import type { Account } from '../types/account';
+import type { Institution } from '../types/institution';
+import type { AccountType } from '../types/accountType';
 import './accounts-table.css';
+
+// --- Small custom dropdown component to display logos inside the option list ---
+interface InstitutionDropdownProps {
+  institutions: Institution[];
+  value: string | number;
+  onChange: (id: number | '') => void;
+  renderIcon?: (name?: string) => React.ReactNode;
+}
+
+const InstitutionDropdown: React.FC<InstitutionDropdownProps> = ({ institutions, value, onChange, renderIcon }) => {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
+
+  const selected = institutions.find(i => String(i.id) === String(value));
+
+  return (
+    <div className="inst-dropdown" ref={ref}>
+      <button type="button" className="inst-toggle" onClick={() => setOpen(o => !o)} aria-haspopup="listbox">
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 28, height: 28 }}>{renderIcon?.(selected?.name)}</span>
+          <span>{selected ? `${selected.name} (${selected.id})` : '-- Seleccionar institución --'}</span>
+        </span>
+        <span style={{ marginLeft: 8 }}>{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <ul className="inst-list" role="listbox">
+          {institutions.map(inst => (
+            <li key={inst.id} role="option" tabIndex={0} className="inst-item" onClick={() => { onChange(inst.id); setOpen(false); }}>
+              <span style={{ width: 28, height: 28, display: 'inline-block', marginRight: 8 }}>{renderIcon?.(inst.name)}</span>
+              <span>{inst.name}</span>
+              <span style={{ marginLeft: 'auto', color: '#666', fontSize: 12 }}>{inst.id}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+// --- Account type dropdown: similar UI but no logo; show description on hover ---
+interface AccountTypeDropdownProps {
+  types: AccountType[];
+  value: string | number;
+  onChange: (id: number | '') => void;
+}
+
+const AccountTypeDropdown: React.FC<AccountTypeDropdownProps> = ({ types, value, onChange }) => {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
+
+  const selected = types.find(t => String(t.id) === String(value));
+
+  return (
+    <div className="inst-dropdown" ref={ref}>
+      <button type="button" className="inst-toggle" onClick={() => setOpen(o => !o)} aria-haspopup="listbox">
+        <span>{selected ? `${selected.name} (${selected.id})` : '-- Seleccionar tipo --'}</span>
+        <span style={{ marginLeft: 8 }}>{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <ul className="inst-list" role="listbox">
+          {types.map(t => (
+            <li key={t.id} role="option" tabIndex={0} className="inst-item" title={t.description || ''} onClick={() => { onChange(t.id); setOpen(false); }}>
+              <span>{t.name}</span>
+              <span style={{ marginLeft: 'auto', color: '#666', fontSize: 12 }}>{t.id}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
 
 interface AccountsTableProps {
   token: string;
@@ -35,7 +126,7 @@ const bankIcon = (bankName?: string) => {
 };
 
 export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
-  const { accounts, loading, error, createAccount } = useAccounts(token);
+  const { accounts, institutions, accountTypes, loading, error, createAccount } = useAccounts(token);
   const [showForm, setShowForm] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
@@ -104,12 +195,26 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
                 <input placeholder="IBAN" value={form.iban} onChange={(e) => onChange('iban', e.target.value)} />
               </div>
               <div className="modal-row">
-                <label>InstitutionId</label>
-                <input placeholder="InstitutionId (num)" value={form.institutionId} onChange={(e) => onChange('institutionId', e.target.value)} />
+                <label>Institución</label>
+                {institutions && institutions.length > 0 ? (
+                  <InstitutionDropdown
+                    institutions={institutions}
+                    value={form.institutionId}
+                    onChange={(val) => onChange('institutionId', String(val))}
+                    renderIcon={(name) => bankIcon(name)}
+                  />
+                ) : (
+                  <select disabled><option>Cargando instituciones...</option></select>
+                )}
               </div>
+
               <div className="modal-row">
-                <label>AccountTypeId</label>
-                <input placeholder="AccountTypeId (num)" value={form.accountTypeId} onChange={(e) => onChange('accountTypeId', e.target.value)} />
+                <label>Tipo de cuenta</label>
+                {accountTypes && accountTypes.length > 0 ? (
+                  <AccountTypeDropdown types={accountTypes} value={form.accountTypeId} onChange={(val) => onChange('accountTypeId', String(val))} />
+                ) : (
+                  <select disabled><option>Cargando tipos...</option></select>
+                )}
               </div>
               <div className="modal-row">
                 <label>Currency</label>
