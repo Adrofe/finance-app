@@ -70,5 +70,7 @@ export function useAccounts(token: string) {
     }
   }, [token]);
 
-  return { accounts, institutions, accountTypes, loading, error, reload: load, createAccount: create, updateAccount: update };
+  const clearError = useCallback(() => setError(null), []);
+
+  return { accounts, institutions, accountTypes, loading, error, reload: load, createAccount: create, updateAccount: update, clearError };
 }

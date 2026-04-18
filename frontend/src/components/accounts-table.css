@@ -99,6 +99,30 @@
 .modal-actions { grid-column: 1 / -1; display:flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
 .modal-error { grid-column: 1 / -1; color: #b00020; }
 
+.toast-error {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: #fff3f2;
+  color: #8a1f11;
+  border: 1px solid #f5c6cb;
+  padding: 10px 12px;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  z-index: 1200;
+}
+
+.toast-error button {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.06);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 /* Institution dropdown styles */
 .inst-dropdown { position: relative; display: inline-block; width: 100%; }
 .inst-toggle { width: 100%; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border:1px solid #ddd; border-radius:6px; background:#fff; cursor:pointer; }

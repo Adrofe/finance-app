@@ -126,7 +126,7 @@ const bankIcon = (bankName?: string) => {
 };
 
 export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
-  const { accounts, institutions, accountTypes, loading, error, createAccount, updateAccount } = useAccounts(token);
+  const { accounts, institutions, accountTypes, loading, error, createAccount, updateAccount, clearError } = useAccounts(token);
   const [showForm, setShowForm] = React.useState(false);
   const [editingId, setEditingId] = React.useState<number | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
@@ -172,7 +172,6 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
   };
 
   if (loading) return <div className="accounts-loading">Cargando cuentas...</div>;
-  if (error) return <div className="accounts-error">Error: {error}</div>;
   // render even if empty so button is visible
 
   return (
@@ -183,6 +182,13 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
           <button className="btn primary" onClick={() => setShowForm((s) => !s)} type="button">{showForm ? 'Cancelar' : 'Añadir cuenta'}</button>
         </div>
       </div>
+
+      {error && (
+        <div className="toast-error" role="alert">
+          <span>Error: {error}</span>
+          <button className="btn" onClick={() => clearError()}>Cerrar</button>
+        </div>
+      )}
 
       {showForm && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
