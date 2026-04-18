@@ -5,6 +5,7 @@ import type { KeycloakTokenResponse, PkceCallbackResult } from '../types/auth';
 
 const PKCE_CODE_VERIFIER_KEY = 'finance_app_pkce_code_verifier';
 const PKCE_STATE_KEY = 'finance_app_pkce_state';
+const REFRESH_TOKEN_KEY = 'finance_app_refresh_token';
 
 function toBase64Url(bytes: Uint8Array): string {
   let binary = '';
@@ -113,12 +114,55 @@ export async function handlePkceCallback(): Promise<PkceCallbackResult> {
     }
   });
 
+  // store refresh token if provided temporarily in session storage
+  if (response.data.refresh_token) {
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, response.data.refresh_token);
+  }
+
   clearAuthQueryParams();
   clearPkceSessionState();
 
   return {
     completed: true,
     accessToken: response.data.access_token,
+    refreshToken: response.data.refresh_token || null,
     error: null
   };
+}
+
+export async function refreshAccessToken(refreshToken: string): Promise<KeycloakTokenResponse> {
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: KEYCLOAK_CLIENT_ID,
+    refresh_token: refreshToken
+  });
+
+  const tokenUrl = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`;
+  const response = await axios.post<KeycloakTokenResponse>(tokenUrl, body.toString(), {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
+
+  // update stored refresh token if server returned a new one
+  if (response.data.refresh_token) {
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, response.data.refresh_token);
+  }
+
+  return response.data;
+}
+
+export async function revokeToken(token: string): Promise<void> {
+  try {
+    const body = new URLSearchParams({
+      token,
+      token_type_hint: 'refresh_token',
+      client_id: KEYCLOAK_CLIENT_ID
+    });
+    const revokeUrl = `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/revoke`;
+    await axios.post(revokeUrl, body.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+  } catch (err) {
+    // best-effort revoke; ignore errors
+    // console.debug('revokeToken failed', err);
+  }
 }
