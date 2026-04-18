@@ -63,8 +63,19 @@ public class AccountsService {
         validateUniqueIbanForCreate(accountEntity);
         accountEntity.setAccountType(resolveAccountType(account.getAccountTypeId()));
         accountEntity.setInstitution(resolveInstitution(account.getInstitutionId()));
+        // If a real balance is provided from the frontend, initialize available balance
+        // to the same value and set both balance dates to now.
+        if (accountEntity.getLastBalanceReal() != null) {
+            accountEntity.setLastBalanceAvailable(accountEntity.getLastBalanceReal());
+        }
+
+        LocalDate now = LocalDate.now();
+        accountEntity.setLastBalanceRealDate(now);
+        accountEntity.setLastBalanceAvailableDate(now);
+
         accountEntity.setCreatedAt(LocalDateTime.now());
         accountEntity.setUpdatedAt(LocalDateTime.now());
+        accountEntity.setIsActive(true);
         return accountMapper.toDto(accountsRepository.save(accountEntity));
     }
 
