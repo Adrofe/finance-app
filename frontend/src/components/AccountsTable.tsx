@@ -126,8 +126,9 @@ const bankIcon = (bankName?: string) => {
 };
 
 export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
-  const { accounts, institutions, accountTypes, loading, error, createAccount } = useAccounts(token);
+  const { accounts, institutions, accountTypes, loading, error, createAccount, updateAccount } = useAccounts(token);
   const [showForm, setShowForm] = React.useState(false);
+  const [editingId, setEditingId] = React.useState<number | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
 
@@ -155,8 +156,13 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
         currency: form.currency,
         lastBalanceReal: form.lastBalanceReal ? Number(form.lastBalanceReal) : undefined
       };
-      await createAccount(payload);
+      if (editingId) {
+        await updateAccount(editingId, payload);
+      } else {
+        await createAccount(payload);
+      }
       setShowForm(false);
+      setEditingId(null);
       setForm({ name: '', iban: '', institutionId: '', accountTypeId: '', currency: 'EUR', lastBalanceReal: '' });
     } catch (err: any) {
       setFormError(err?.message || 'Error creando cuenta');
@@ -182,8 +188,8 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal">
             <div className="modal-header">
-              <h4>Añadir cuenta</h4>
-              <button className="modal-close" onClick={() => setShowForm(false)} type="button">✕</button>
+              <h4>{editingId ? 'Editar cuenta' : 'Añadir cuenta'}</h4>
+              <button className="modal-close" onClick={() => { setShowForm(false); setEditingId(null); }} type="button">✕</button>
             </div>
             <form onSubmit={submit} className="modal-body">
               <div className="modal-row">
@@ -220,14 +226,16 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
                 <label>Currency</label>
                 <input placeholder="Currency (EUR)" value={form.currency} onChange={(e) => onChange('currency', e.target.value)} />
               </div>
-              <div className="modal-row">
-                <label>Balance inicial</label>
-                <input placeholder="Balance inicial" value={form.lastBalanceReal} onChange={(e) => onChange('lastBalanceReal', e.target.value)} />
-              </div>
+              {!editingId && (
+                <div className="modal-row">
+                  <label>Balance inicial</label>
+                  <input placeholder="Balance inicial" value={form.lastBalanceReal} onChange={(e) => onChange('lastBalanceReal', e.target.value)} />
+                </div>
+              )}
               {formError && <div className="modal-error">{formError}</div>}
               <div className="modal-actions">
-                <button className="btn primary" type="submit" disabled={submitting}>{submitting ? 'Guardando...' : 'Crear'}</button>
-                <button className="btn" type="button" onClick={() => setShowForm(false)}>Cancelar</button>
+                <button className="btn primary" type="submit" disabled={submitting}>{submitting ? 'Guardando...' : (editingId ? 'Guardar' : 'Crear')}</button>
+                <button className="btn" type="button" onClick={() => { setShowForm(false); setEditingId(null); }}>Cancelar</button>
               </div>
             </form>
           </div>
@@ -243,6 +251,7 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
             <th>Tipo</th>
             <th>Balance real</th>
             <th>Balance disponible</th>
+            <th aria-label="Acciones"></th>
           </tr>
         </thead>
         <tbody>
@@ -264,6 +273,26 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
                 {typeof acc.lastBalanceAvailable === 'number'
                   ? `${acc.lastBalanceAvailable.toLocaleString('es-ES', { minimumFractionDigits: 2 })} ${currencySymbol(acc.currency)}`
                   : '-'}
+              </td>
+              <td>
+                <button className="btn icon-btn" type="button" title="Editar" aria-label="Editar cuenta" onClick={() => {
+                  // open modal in edit mode
+                  setEditingId(acc.id ?? null);
+                  setForm({
+                    name: acc.name || '',
+                    iban: acc.iban || '',
+                    institutionId: acc.institutionId ? String(acc.institutionId) : '',
+                    accountTypeId: acc.accountTypeId ? String(acc.accountTypeId) : '',
+                    currency: acc.currency || 'EUR',
+                    lastBalanceReal: acc.lastBalanceReal ? String(acc.lastBalanceReal) : ''
+                  });
+                  setShowForm(true);
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor" />
+                    <path d="M20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" fill="currentColor" />
+                  </svg>
+                </button>
               </td>
             </tr>
           ))}
