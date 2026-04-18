@@ -55,24 +55,24 @@ public class AccountsController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable Long id) {
+    @DeleteMapping("/{id:\\d+}")
+    public ResponseEntity<ApiResponse<Void>> deleteAccount(@PathVariable("id") Long id) {
         Long tenantId = tenantContext.getCurrentTenantId();
         accountsService.deleteAccount(id, tenantId);
         ApiResponse<Void> response = new ApiResponse<>(200, "Account deleted successfully", null);
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<AccountDTO>> getAccountById(@PathVariable Long id) {
+    @GetMapping("/{id:\\d+}")
+    public ResponseEntity<ApiResponse<AccountDTO>> getAccountById(@PathVariable("id") Long id) {
         Long tenantId = tenantContext.getCurrentTenantId();
         AccountDTO account = accountsService.getAccountById(id, tenantId);
         ApiResponse<AccountDTO> response = new ApiResponse<>(200, "Account retrieved successfully", account);
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<AccountDTO>> updateAccount(@PathVariable Long id, @Valid @RequestBody AccountDTO updatedAccount) {
+    @PutMapping("/{id:\\d+}")
+    public ResponseEntity<ApiResponse<AccountDTO>> updateAccount(@PathVariable("id") Long id, @Valid @RequestBody AccountDTO updatedAccount) {
         Long tenantId = tenantContext.getCurrentTenantId();
 
         if (updatedAccount.getId() == null) {

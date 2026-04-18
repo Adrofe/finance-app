@@ -259,7 +259,7 @@ class AccountsServiceTest {
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
         when(accountsRepository.save(account)).thenReturn(account);
 
-        accountsService.updateAccountBalance(1L, 1L, new BigDecimal("50.00"));
+        accountsService.updateAccountBalances(1L, 1L, new BigDecimal("50.00"), true);
 
         assertEquals(new BigDecimal("150.00"), account.getLastBalanceReal());
         assertNotNull(account.getLastBalanceRealDate());
@@ -277,7 +277,7 @@ class AccountsServiceTest {
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
         when(accountsRepository.save(account)).thenReturn(account);
 
-        accountsService.updateAccountBalance(1L, 1L, new BigDecimal("-30.00"));
+        accountsService.updateAccountBalances(1L, 1L, new BigDecimal("-30.00"), true);
 
         assertEquals(new BigDecimal("70.00"), account.getLastBalanceReal());
         assertNotNull(account.getLastBalanceRealDate());
@@ -295,7 +295,7 @@ class AccountsServiceTest {
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
         when(accountsRepository.save(account)).thenReturn(account);
 
-        accountsService.updateAccountBalance(1L, 1L, new BigDecimal("25.00"));
+        accountsService.updateAccountBalances(1L, 1L, new BigDecimal("25.00"), true);
 
         assertEquals(new BigDecimal("25.00"), account.getLastBalanceReal());
         assertNotNull(account.getLastBalanceRealDate());
@@ -308,7 +308,7 @@ class AccountsServiceTest {
         when(accountsRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThrows(AccountNotFoundException.class, 
-            () -> accountsService.updateAccountBalance(99L, 1L, new BigDecimal("50.00")));
+            () -> accountsService.updateAccountBalances(99L, 1L, new BigDecimal("50.00"), true));
     }
 
     @Test
@@ -321,13 +321,13 @@ class AccountsServiceTest {
         when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
 
         assertThrows(AccountNotFoundException.class, 
-            () -> accountsService.updateAccountBalance(1L, 2L, new BigDecimal("50.00")));
+            () -> accountsService.updateAccountBalances(1L, 2L, new BigDecimal("50.00"), true));
     }
 
     @Test
     void testUpdateAccountBalanceNullAccountId() {
         AccountValidationException exception = assertThrows(AccountValidationException.class, 
-            () -> accountsService.updateAccountBalance(null, 1L, new BigDecimal("50.00")));
+            () -> accountsService.updateAccountBalances(null, 1L, new BigDecimal("50.00"), true));
         
         assertEquals("Account id is required", exception.getMessage());
     }
@@ -335,7 +335,7 @@ class AccountsServiceTest {
     @Test
     void testUpdateAccountBalanceNullTenantId() {
         AccountValidationException exception = assertThrows(AccountValidationException.class, 
-            () -> accountsService.updateAccountBalance(1L, null, new BigDecimal("50.00")));
+            () -> accountsService.updateAccountBalances(1L, null, new BigDecimal("50.00"), true));
         
         assertEquals("Tenant id is required", exception.getMessage());
     }
@@ -343,7 +343,7 @@ class AccountsServiceTest {
     @Test
     void testUpdateAccountBalanceNullAmountDelta() {
         AccountValidationException exception = assertThrows(AccountValidationException.class, 
-            () -> accountsService.updateAccountBalance(1L, 1L, null));
+            () -> accountsService.updateAccountBalances(1L, 1L, null, true));
         
         assertEquals("Amount delta is required", exception.getMessage());
     }
