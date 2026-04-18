@@ -63,11 +63,10 @@ public class AccountsService {
         validateUniqueIbanForCreate(accountEntity);
         accountEntity.setAccountType(resolveAccountType(account.getAccountTypeId()));
         accountEntity.setInstitution(resolveInstitution(account.getInstitutionId()));
-        // If a real balance is provided from the frontend, initialize available balance
-        // to the same value and set both balance dates to now.
-        if (accountEntity.getLastBalanceReal() != null) {
-            accountEntity.setLastBalanceAvailable(accountEntity.getLastBalanceReal());
-        }
+        // If a real balance is provided from the frontend, set the real balance date.
+        BigDecimal initialBalance = account.getLastBalanceReal() != null ? toBigDecimal(account.getLastBalanceReal()) : BigDecimal.ZERO;
+        accountEntity.setLastBalanceReal(initialBalance);
+        accountEntity.setLastBalanceAvailable(initialBalance);
 
         LocalDate now = LocalDate.now();
         accountEntity.setLastBalanceRealDate(now);
@@ -76,7 +75,9 @@ public class AccountsService {
         accountEntity.setCreatedAt(LocalDateTime.now());
         accountEntity.setUpdatedAt(LocalDateTime.now());
         accountEntity.setIsActive(true);
-        return accountMapper.toDto(accountsRepository.save(accountEntity));
+
+        Account saved = accountsRepository.save(accountEntity);
+        return accountMapper.toDto(saved);
     }
 
     public void deleteAccount(Long id, Long tenantId) {
@@ -113,15 +114,17 @@ public class AccountsService {
 
     public AccountDTO updateAccount(AccountDTO updatedAccount, Long tenantId) {
         Account existingAccount = accountsRepository.findById(updatedAccount.getId())
-                .orElseThrow(() -> new AccountNotFoundException(updatedAccount.getId()));
+            .orElseThrow(() -> new AccountNotFoundException(updatedAccount.getId()));
 
         validateTenantOwnership(existingAccount, tenantId);
 
+        // update fields except available balance (server computes it)
         updateEntityFromDto(existingAccount, updatedAccount);
         validateUniqueIbanForUpdate(existingAccount);
         existingAccount.setUpdatedAt(LocalDateTime.now());
 
-        return accountMapper.toDto(accountsRepository.save(existingAccount));
+        Account saved = accountsRepository.save(existingAccount);
+        return accountMapper.toDto(saved);
     }
 
     private void updateEntityFromDto(Account existingAccount, AccountDTO updatedAccount) {
@@ -130,10 +133,9 @@ public class AccountsService {
         existingAccount.setAccountType(resolveAccountType(updatedAccount.getAccountTypeId()));
         existingAccount.setInstitution(resolveInstitution(updatedAccount.getInstitutionId()));
         existingAccount.setCurrency(normalizeCurrency(updatedAccount.getCurrency()));
-        existingAccount.setLastBalanceReal(toBigDecimal(updatedAccount.getLastBalanceReal()));
-        existingAccount.setLastBalanceRealDate(updatedAccount.getLastBalanceRealDate());
-        existingAccount.setLastBalanceAvailable(toBigDecimal(updatedAccount.getLastBalanceAvailable()));
-        existingAccount.setLastBalanceAvailableDate(updatedAccount.getLastBalanceAvailableDate());
+        // Do not allow clients to set balances on update. Balances are computed
+        // and maintained server-side via transactions. Ignore any balance fields
+        // present in the incoming DTO to avoid inconsistencies.
         existingAccount.setIsActive(updatedAccount.getIsActive());
     }
 
@@ -197,14 +199,11 @@ public class AccountsService {
     }
 
     /**
-     * Updates account balance incrementally by adding a delta amount.
-     * This method is designed to be called when transactions are created, updated, or deleted.
-     * 
-     * @param accountId The ID of the account to update
-     * @param tenantId The tenant ID for security validation
-     * @param amountDelta The amount to add to the current balance (can be negative)
+     * Unified balance update method. If {@code updateBoth} is true, both real and available
+     * balances are updated by {@code amountDelta}. Otherwise only the available balance
+     * is updated. This is the single entry point intended for transaction-driven updates.
      */
-    public void updateAccountBalance(Long accountId, Long tenantId, BigDecimal amountDelta) {
+    public void updateAccountBalances(Long accountId, Long tenantId, BigDecimal amountDelta, boolean updateBoth) {
         if (accountId == null) {
             throw new AccountValidationException("Account id is required");
         }
@@ -224,14 +223,18 @@ public class AccountsService {
             throw new AccountNotFoundException(accountId);
         }
 
-        BigDecimal currentBalance = account.getLastBalanceReal() != null
-                ? account.getLastBalanceReal()
-                : BigDecimal.ZERO;
+        BigDecimal currentAvailable = account.getLastBalanceAvailable() != null ? account.getLastBalanceAvailable() : BigDecimal.ZERO;
+        BigDecimal newAvailable = currentAvailable.add(amountDelta);
+        account.setLastBalanceAvailable(newAvailable);
+        account.setLastBalanceAvailableDate(LocalDate.now());
 
-        BigDecimal newBalance = currentBalance.add(amountDelta);
+        if (updateBoth) {
+            BigDecimal currentReal = account.getLastBalanceReal() != null ? account.getLastBalanceReal() : BigDecimal.ZERO;
+            BigDecimal newReal = currentReal.add(amountDelta);
+            account.setLastBalanceReal(newReal);
+            account.setLastBalanceRealDate(LocalDate.now());
+        }
 
-        account.setLastBalanceReal(newBalance);
-        account.setLastBalanceRealDate(LocalDate.now());
         account.setUpdatedAt(LocalDateTime.now());
         accountsRepository.save(account);
     }

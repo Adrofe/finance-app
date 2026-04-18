@@ -176,6 +176,7 @@ public class TransactionService {
         Long oldSourceAccountId = existingTransaction.getSourceAccount().getId();
         Long oldDestinationAccountId = existingTransaction.getDestinationAccount() != null ? existingTransaction.getDestinationAccount().getId() : null;
         java.math.BigDecimal oldAmount = existingTransaction.getAmount();
+        TransactionStatus oldStatus = existingTransaction.getStatus();
 
         Account sourceAccount = getRequiredAccount(transactionDTO.getSourceAccountId(), "Source");
         validateAccountBelongsToTenant(sourceAccount, tenantId, transactionDTO.getSourceAccountId(), "Source");
@@ -212,7 +213,7 @@ public class TransactionService {
 
         Transaction savedTransaction = transactionRepository.save(existingTransaction);
 
-        revertBalanceForUpdate(oldSourceAccountId, oldDestinationAccountId, oldAmount, tenantId);
+        revertBalanceForUpdate(oldSourceAccountId, oldDestinationAccountId, oldAmount, oldStatus, tenantId);
         applyBalanceForUpdate(savedTransaction, tenantId);
 
         return transactionMapper.toDto(savedTransaction);
@@ -224,12 +225,13 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
             .orElseThrow(() -> new TransactionNotFoundException("Transaction not found with id: " + transactionId));
 
+        TransactionStatus status = transaction.getStatus();
         Long sourceAccountId = transaction.getSourceAccount().getId();
         Long destinationAccountId = transaction.getDestinationAccount() != null ? transaction.getDestinationAccount().getId() : null;
         java.math.BigDecimal amount = transaction.getAmount();
 
         transactionRepository.delete(transaction);
-        revertBalanceForDelete(sourceAccountId, destinationAccountId, amount, tenantId);
+        revertBalanceForDelete(sourceAccountId, destinationAccountId, amount, status, tenantId);
     }
 
     public Double getAccountBalance(Long accountId, Long tenantId) {
@@ -456,58 +458,131 @@ public class TransactionService {
     }
 
     private void applyBalanceForCreate(Transaction transaction, Long tenantId) {
-        if (transaction.getDestinationAccount() == null) {
-            accountsService.updateAccountBalance(
-                    transaction.getSourceAccount().getId(),
-                    tenantId,
-                    transaction.getAmount());
-        } else {
-            accountsService.updateAccountBalance(
-                    transaction.getSourceAccount().getId(),
-                    tenantId,
-                    transaction.getAmount().negate());
-            accountsService.updateAccountBalance(
-                    transaction.getDestinationAccount().getId(),
-                    tenantId,
-                    transaction.getAmount());
-        }
+        BalanceDeltas deltas = computeBalanceDeltas(
+            transaction.getSourceAccount().getId(),
+            transaction.getDestinationAccount() != null ? transaction.getDestinationAccount().getId() : null,
+            transaction.getAmount(),
+            transaction.getStatus(),
+            false,
+            false);
+
+        adjustAccountsForTransaction(
+            deltas.sourceId,
+            deltas.destId,
+            tenantId,
+            deltas.sourceDelta,
+            deltas.destDelta,
+            deltas.updateBoth);
     }
 
     private void revertBalanceForUpdate(Long oldSourceAccountId, Long oldDestinationAccountId,
-            java.math.BigDecimal oldAmount, Long tenantId) {
-        if (oldDestinationAccountId == null) {
-            accountsService.updateAccountBalance(oldSourceAccountId, tenantId, oldAmount.negate());
-        } else {
-            accountsService.updateAccountBalance(oldSourceAccountId, tenantId, oldAmount);
-            accountsService.updateAccountBalance(oldDestinationAccountId, tenantId, oldAmount.negate());
-        }
+            java.math.BigDecimal oldAmount, TransactionStatus oldStatus, Long tenantId) {
+        BalanceDeltas deltas = computeBalanceDeltas(
+            oldSourceAccountId,
+            oldDestinationAccountId,
+            oldAmount,
+            oldStatus,
+            true,
+            false);
+
+        adjustAccountsForTransaction(
+            deltas.sourceId,
+            deltas.destId,
+            tenantId,
+            deltas.sourceDelta,
+            deltas.destDelta,
+            deltas.updateBoth);
     }
 
     private void applyBalanceForUpdate(Transaction transaction, Long tenantId) {
-        if (transaction.getDestinationAccount() == null) {
-            accountsService.updateAccountBalance(
-                    transaction.getSourceAccount().getId(),
-                    tenantId,
-                    transaction.getAmount());
-        } else {
-            accountsService.updateAccountBalance(
-                    transaction.getSourceAccount().getId(),
-                    tenantId,
-                    transaction.getAmount().negate());
-            accountsService.updateAccountBalance(
-                    transaction.getDestinationAccount().getId(),
-                    tenantId,
-                    transaction.getAmount());
-        }
+        // Same logic as applyBalanceForCreate but using the saved transaction status
+        applyBalanceForCreate(transaction, tenantId);
     }
 
     private void revertBalanceForDelete(Long sourceAccountId, Long destinationAccountId,
-            java.math.BigDecimal amount, Long tenantId) {
+            java.math.BigDecimal amount, TransactionStatus status, Long tenantId) {
+        // Per requirement: deletes always update both balances (real and available)
+        BalanceDeltas deltas = computeBalanceDeltas(
+                sourceAccountId,
+                destinationAccountId,
+                amount,
+                status,
+                true,
+                true);
+
+        adjustAccountsForTransaction(
+                deltas.sourceId,
+                deltas.destId,
+                tenantId,
+                deltas.sourceDelta,
+                deltas.destDelta,
+                deltas.updateBoth);
+    }
+    private void adjustAccountsForTransaction(Long sourceAccountId, Long destinationAccountId, Long tenantId,
+            java.math.BigDecimal sourceDelta, java.math.BigDecimal destinationDelta, boolean updateBoth) {
         if (destinationAccountId == null) {
-            accountsService.updateAccountBalance(sourceAccountId, tenantId, amount.negate());
+            accountsService.updateAccountBalances(sourceAccountId, tenantId, sourceDelta, updateBoth);
         } else {
-            accountsService.updateAccountBalance(sourceAccountId, tenantId, amount);
-            accountsService.updateAccountBalance(destinationAccountId, tenantId, amount.negate());
+            accountsService.updateAccountBalances(sourceAccountId, tenantId, sourceDelta, updateBoth);
+            accountsService.updateAccountBalances(destinationAccountId, tenantId, destinationDelta, updateBoth);
         }
+    }
+
+    private static class BalanceDeltas {
+        Long sourceId;
+        Long destId;
+        java.math.BigDecimal sourceDelta;
+        java.math.BigDecimal destDelta;
+        boolean updateBoth;
+
+        BalanceDeltas(Long sourceId, Long destId, java.math.BigDecimal sourceDelta, java.math.BigDecimal destDelta, boolean updateBoth) {
+            this.sourceId = sourceId;
+            this.destId = destId;
+            this.sourceDelta = sourceDelta;
+            this.destDelta = destDelta;
+            this.updateBoth = updateBoth;
+        }
+    }
+
+    private BalanceDeltas computeBalanceDeltas(Long sourceId, Long destId, java.math.BigDecimal amount, TransactionStatus status, boolean invert, boolean forceBoth) {
+        boolean pending = status != null && "PENDING".equalsIgnoreCase(status.getCode());
+
+        java.math.BigDecimal sourceDelta;
+        java.math.BigDecimal destDelta = null;
+        boolean updateBoth;
+
+        if (destId == null) {
+            if (pending) {
+                sourceDelta = amount.negate();
+                updateBoth = false;
+            } else {
+                sourceDelta = amount;
+                updateBoth = true;
+            }
+        } else {
+            if (pending) {
+                sourceDelta = amount.negate();
+                destDelta = amount;
+                updateBoth = false;
+            } else {
+                sourceDelta = amount.negate();
+                destDelta = amount;
+                updateBoth = true;
+            }
+        }
+
+        if (invert) {
+            sourceDelta = sourceDelta.negate();
+            if (destDelta != null) {
+                destDelta = destDelta.negate();
+            }
+        }
+
+        // forceBoth overrides updateBoth
+        if (forceBoth) {
+            updateBoth = true;
+        }
+
+        return new BalanceDeltas(sourceId, destId, sourceDelta, destDelta, updateBoth);
     }
 }

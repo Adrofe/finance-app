@@ -567,13 +567,14 @@ class TransactionServiceTest {
 
             transactionService.createTransaction(dto, TENANT_ID);
 
-            // Should call updateAccountBalance once for source account with the amount directly
-            verify(accountsService).updateAccountBalance(
+            // Should call updateAccountBalances once for source account with the amount directly
+            verify(accountsService).updateAccountBalances(
                 eq(SOURCE_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(100.0))
+                eq(BigDecimal.valueOf(100.0)),
+                eq(true)
             );
-            verify(accountsService, times(1)).updateAccountBalance(anyLong(), anyLong(), any(BigDecimal.class));
+            verify(accountsService, times(1)).updateAccountBalances(anyLong(), anyLong(), any(BigDecimal.class), eq(true));
         }
 
         @Test
@@ -596,10 +597,11 @@ class TransactionServiceTest {
             transactionService.createTransaction(dto, TENANT_ID);
 
             // Should subtract from balance (negative amount)
-            verify(accountsService).updateAccountBalance(
+            verify(accountsService).updateAccountBalances(
                 eq(SOURCE_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(-50.0))
+                eq(BigDecimal.valueOf(-50.0)),
+                eq(true)
             );
         }
 
@@ -621,19 +623,21 @@ class TransactionServiceTest {
             transactionService.createTransaction(dto, TENANT_ID);
 
             // Should subtract from source account
-            verify(accountsService).updateAccountBalance(
+            verify(accountsService).updateAccountBalances(
                 eq(SOURCE_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(-200.0))
+                eq(BigDecimal.valueOf(-200.0)),
+                eq(true)
             );
             // Should add to destination account
-            verify(accountsService).updateAccountBalance(
+            verify(accountsService).updateAccountBalances(
                 eq(DESTINATION_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(200.0))
+                eq(BigDecimal.valueOf(200.0)),
+                eq(true)
             );
             // Should be called exactly twice
-            verify(accountsService, times(2)).updateAccountBalance(anyLong(), anyLong(), any(BigDecimal.class));
+            verify(accountsService, times(2)).updateAccountBalances(anyLong(), anyLong(), any(BigDecimal.class), eq(true));
         }
     }
 
@@ -923,18 +927,20 @@ class TransactionServiceTest {
             transactionService.updateTransaction(TRANSACTION_ID, dto, TENANT_ID);
 
             // Should revert old balance: -100
-            verify(accountsService).updateAccountBalance(
+            verify(accountsService).updateAccountBalances(
                 eq(SOURCE_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(-100.0))
+                eq(BigDecimal.valueOf(-100.0)),
+                eq(true)
             );
             // Should apply new balance: +300
-            verify(accountsService).updateAccountBalance(
+            verify(accountsService).updateAccountBalances(
                 eq(SOURCE_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(300.0))
+                eq(BigDecimal.valueOf(300.0)),
+                eq(true)
             );
-            verify(accountsService, times(2)).updateAccountBalance(anyLong(), anyLong(), any(BigDecimal.class));
+            verify(accountsService, times(2)).updateAccountBalances(anyLong(), anyLong(), any(BigDecimal.class), eq(true));
         }
 
         @Test
@@ -966,17 +972,19 @@ class TransactionServiceTest {
 
                 // The source account receives the same delta twice:
                 // once to revert the original simple transaction, and once to apply the new transfer.
-                verify(accountsService, times(2)).updateAccountBalance(
+                verify(accountsService, times(2)).updateAccountBalances(
                 eq(SOURCE_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(-150.0))
+                eq(BigDecimal.valueOf(-150.0)),
+                eq(true)
             );
-            verify(accountsService).updateAccountBalance(
+            verify(accountsService).updateAccountBalances(
                 eq(DESTINATION_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(150.0))
+                eq(BigDecimal.valueOf(150.0)),
+                eq(true)
             );
-            verify(accountsService, times(3)).updateAccountBalance(anyLong(), anyLong(), any(BigDecimal.class));
+            verify(accountsService, times(3)).updateAccountBalances(anyLong(), anyLong(), any(BigDecimal.class), eq(true));
         }
 
         @Test
@@ -1043,10 +1051,11 @@ class TransactionServiceTest {
             transactionService.deleteTransaction(TRANSACTION_ID, TENANT_ID);
 
             // Should revert: subtract the amount
-            verify(accountsService).updateAccountBalance(
+            verify(accountsService).updateAccountBalances(
                 eq(SOURCE_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(-75.0))
+                eq(BigDecimal.valueOf(-75.0)),
+                eq(true)
             );
             verify(transactionRepository).delete(tx);
         }
@@ -1063,18 +1072,20 @@ class TransactionServiceTest {
             transactionService.deleteTransaction(TRANSACTION_ID, TENANT_ID);
 
             // Should revert: add back to source (was subtracted)
-            verify(accountsService).updateAccountBalance(
+            verify(accountsService).updateAccountBalances(
                 eq(SOURCE_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(500.0))
+                eq(BigDecimal.valueOf(500.0)),
+                eq(true)
             );
             // Should revert: subtract from destination (was added)
-            verify(accountsService).updateAccountBalance(
+            verify(accountsService).updateAccountBalances(
                 eq(DESTINATION_ACCOUNT_ID), 
                 eq(TENANT_ID), 
-                eq(BigDecimal.valueOf(-500.0))
+                eq(BigDecimal.valueOf(-500.0)),
+                eq(true)
             );
-            verify(accountsService, times(2)).updateAccountBalance(anyLong(), anyLong(), any(BigDecimal.class));
+            verify(accountsService, times(2)).updateAccountBalances(anyLong(), anyLong(), any(BigDecimal.class), eq(true));
             verify(transactionRepository).delete(tx);
         }
 
