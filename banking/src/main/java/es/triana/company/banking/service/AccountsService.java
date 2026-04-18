@@ -157,13 +157,13 @@ public class AccountsService {
 
     private void validateUniqueIbanForCreate(Account account) {
         if (account.getIban() != null && accountsRepository.existsByTenantIdAndIban(account.getTenantId(), account.getIban())) {
-            throw new DuplicateAccountIbanException(account.getIban(), account.getTenantId());
+            throw new DuplicateAccountIbanException(account.getIban());
         }
     }
 
     private void validateUniqueIbanForUpdate(Account account) {
         if (account.getIban() != null && accountsRepository.existsByTenantIdAndIbanAndIdNot(account.getTenantId(), account.getIban(), account.getId())) {
-            throw new DuplicateAccountIbanException(account.getIban(), account.getTenantId());
+            throw new DuplicateAccountIbanException(account.getIban());
         }
     }
 
