@@ -50,7 +50,7 @@ function buildRecentTransactions(items: Transaction[]): Transaction[] {
 }
 
 function App() {
-  const { accessToken, authLoading, authError, login, logout } = useAuth();
+  const { accessToken, authLoading, authError, login, logout, showSessionWarning, secondsLeft, keepSession } = useAuth();
   const handleUnauthorized = useCallback((message: string) => {
     logout(message);
   }, [logout]);
@@ -70,6 +70,22 @@ function App() {
 
   return (
     <div className="page">
+      {showSessionWarning && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal" style={{ width: 420 }}>
+            <div className="modal-header">
+              <h4>Tu sesión caduca pronto</h4>
+            </div>
+            <div className="modal-body" style={{ display: 'block' }}>
+              <p>Tu sesión expira en <strong>{secondsLeft}</strong> segundos.</p>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button className="btn" type="button" onClick={() => logout('Sesión cerrada manualmente')}>Cerrar sesión</button>
+                <button className="btn primary" type="button" onClick={() => keepSession()}>Mantener sesión</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <header className="header">
         <h1>Finance App</h1>
         <p>Control center for your personal finances</p>
