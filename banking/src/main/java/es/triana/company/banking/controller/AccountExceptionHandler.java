@@ -2,6 +2,8 @@ package es.triana.company.banking.controller;
 
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -19,6 +21,8 @@ import es.triana.company.banking.service.exception.TenantMismatchException;
 
 @RestControllerAdvice(assignableTypes = AccountsController.class)
 public class AccountExceptionHandler {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AccountExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException exception) {
@@ -76,6 +80,7 @@ public class AccountExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnhandledException(Exception exception) {
+        LOG.error("Unhandled exception in AccountsController", exception);
         ApiResponse<Void> response = new ApiResponse<>(500, "Internal server error", null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
