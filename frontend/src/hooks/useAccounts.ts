@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { fetchAccounts, createAccount } from '../services/accountsService';
+import { fetchAccounts, createAccount, updateAccount } from '../services/accountsService';
 import { fetchInstitutions } from '../services/institutionsService';
 import { fetchAccountTypes } from '../services/accountTypesService';
 import { Account } from '../types/account';
@@ -54,5 +54,21 @@ export function useAccounts(token: string) {
     }
   }, [token]);
 
-  return { accounts, institutions, accountTypes, loading, error, reload: load, createAccount: create };
+  const update = useCallback(async (id: number, account: Partial<Account>) => {
+    if (!token) throw new Error('No token');
+    setLoading(true);
+    try {
+      const updated = await updateAccount(token, id, account);
+      // reload list
+      await fetchAccounts(token).then(setAccounts);
+      return updated;
+    } catch (err: any) {
+      setError(err?.message || 'Error updating account');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  return { accounts, institutions, accountTypes, loading, error, reload: load, createAccount: create, updateAccount: update };
 }
