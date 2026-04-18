@@ -40,7 +40,6 @@ export function useAccounts(token: string) {
 
   const create = useCallback(async (account: Partial<Account>) => {
     if (!token) throw new Error('No token');
-    setLoading(true);
     try {
       const created = await createAccount(token, account);
       // reload list
@@ -50,13 +49,14 @@ export function useAccounts(token: string) {
       setError(err?.message || 'Error creating account');
       throw err;
     } finally {
-      setLoading(false);
+      // do not toggle the global `loading` here — that state is used for
+      // the initial/full refresh. Mutations are handled by caller UI (modal)
+      // which has its own submitting state.
     }
   }, [token]);
 
   const update = useCallback(async (id: number, account: Partial<Account>) => {
     if (!token) throw new Error('No token');
-    setLoading(true);
     try {
       const updated = await updateAccount(token, id, account);
       // reload list
@@ -66,7 +66,7 @@ export function useAccounts(token: string) {
       setError(err?.message || 'Error updating account');
       throw err;
     } finally {
-      setLoading(false);
+      // same as create: avoid toggling the main `loading` flag here
     }
   }, [token]);
 
