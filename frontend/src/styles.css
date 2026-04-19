@@ -29,7 +29,7 @@ body {
 }
 
 .page {
-  max-width: 1160px;
+  max-width: 1800px;
   margin: 0 auto;
   padding: 28px 24px 42px;
 }
@@ -203,7 +203,12 @@ body {
   padding: 16px;
   display: grid;
   gap: 12px;
-  box-shadow: 0 10px 24px rgba(17, 48, 76, 0.08);
+  box-shadow: 0 10px 32px 0 rgba(17, 48, 76, 0.10);
+  width: 100%;
+  min-width: 0;
+  max-width: 1700px;
+  margin: 32px auto 0 auto;
+  overflow-x: visible;
 }
 
 .sheet h3 {
