@@ -167,7 +167,7 @@ function App() {
               </div>
               {loading && <p className="state">Loading transactions...</p>}
               {!loading && error && <p className="state error">{error}</p>}
-              {!loading && !error && <TransactionsTable items={items} />}
+              {!loading && !error && <TransactionsTable items={items} accessToken={accessToken} />}
             </article>
           )}
 
