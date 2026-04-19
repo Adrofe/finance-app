@@ -53,3 +53,22 @@ export async function updateAccount(token: string, id: number, account: Partial<
     throw e;
   }
 }
+
+export async function deleteAccount(token: string, id: number): Promise<void> {
+  try {
+    await axios.delete(`${API_BASE}/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return;
+  } catch (err: any) {
+    const resp = err?.response;
+    const backendMessage = resp?.data?.message || resp?.data?.error || resp?.data?.details;
+    const status = resp?.status;
+    const msg = backendMessage || err.message || `Request failed with status ${status}`;
+    const e = new Error(msg);
+    (e as any).status = status;
+    throw e;
+  }
+}

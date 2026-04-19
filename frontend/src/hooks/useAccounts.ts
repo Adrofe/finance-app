@@ -70,7 +70,21 @@ export function useAccounts(token: string) {
     }
   }, [token]);
 
+  const remove = useCallback(async (id: number) => {
+    if (!token) throw new Error('No token');
+    try {
+      // call delete API and reload list
+      // import is dynamic to avoid circular issues in some setups
+      const mod = await import('../services/accountsService');
+      await mod.deleteAccount(token, id);
+      await fetchAccounts(token).then(setAccounts);
+    } catch (err: any) {
+      setError(err?.message || 'Error deleting account');
+      throw err;
+    }
+  }, [token]);
+
   const clearError = useCallback(() => setError(null), []);
 
-  return { accounts, institutions, accountTypes, loading, error, reload: load, createAccount: create, updateAccount: update, clearError };
+  return { accounts, institutions, accountTypes, loading, error, reload: load, createAccount: create, updateAccount: update, deleteAccount: remove, clearError };
 }

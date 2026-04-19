@@ -126,11 +126,14 @@ const bankIcon = (bankName?: string) => {
 };
 
 export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
-  const { accounts, institutions, accountTypes, loading, error, createAccount, updateAccount, clearError } = useAccounts(token);
+  const { accounts, institutions, accountTypes, loading, error, createAccount, updateAccount, deleteAccount, clearError } = useAccounts(token);
   const [showForm, setShowForm] = React.useState(false);
   const [editingId, setEditingId] = React.useState<number | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = React.useState<number | null>(null);
+  const [confirmDeleteName, setConfirmDeleteName] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState(false);
 
   const [form, setForm] = React.useState({
     name: '',
@@ -280,7 +283,7 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
                   ? `${acc.lastBalanceAvailable.toLocaleString('es-ES', { minimumFractionDigits: 2 })} ${currencySymbol(acc.currency)}`
                   : '-'}
               </td>
-              <td>
+              <td className="actions-cell">
                 <button className="btn icon-btn" type="button" title="Editar" aria-label="Editar cuenta" onClick={() => {
                   // open modal in edit mode
                   setEditingId(acc.id ?? null);
@@ -299,11 +302,54 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
                     <path d="M20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" fill="currentColor" />
                   </svg>
                 </button>
+                <button className="btn icon-btn" type="button" title="Eliminar" aria-label="Eliminar cuenta" onClick={() => {
+                  setConfirmDeleteId(acc.id ?? null);
+                  setConfirmDeleteName(acc.name || null);
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                    <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M8 6V4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M19 6l-1 14c0 .6-.4 1-1 1H7c-.6 0-1-.4-1-1L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {confirmDeleteId !== null && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <h4>Confirmar borrado</h4>
+              <button className="modal-close" onClick={() => { setConfirmDeleteId(null); setConfirmDeleteName(null); }} type="button">✕</button>
+            </div>
+            <div className="modal-body" style={{ display: 'block' }}>
+              <p>Vas a borrar la cuenta <strong>{confirmDeleteName || confirmDeleteId}</strong> y todas sus transacciones. Esta acción no se puede deshacer.</p>
+              {formError && <div className="modal-error">{formError}</div>}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+                <button className="btn" type="button" onClick={() => { setConfirmDeleteId(null); setConfirmDeleteName(null); setFormError(null); }}>Cancelar</button>
+                <button className="btn primary" type="button" disabled={deleting} onClick={async () => {
+                  setFormError(null);
+                  setDeleting(true);
+                  try {
+                    await deleteAccount(confirmDeleteId as number);
+                    setConfirmDeleteId(null);
+                    setConfirmDeleteName(null);
+                  } catch (err: any) {
+                    setFormError(err?.message || 'Error borrando cuenta');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}>{deleting ? 'Borrando...' : 'Borrar cuenta'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -138,3 +138,9 @@
 .btn.icon-btn svg, button.btn.icon-btn svg { width: 20px; height: 20px; color: #334155; }
 .btn.icon-btn:hover, button.btn.icon-btn:hover { background: #eef2f7; border-color: #e0e7ef; }
 
+/* Actions column: keep buttons inline and prevent wrapping */
+.actions-cell { display: flex; gap: 8px; align-items: center; justify-content: flex-end; min-width: 160px; white-space: nowrap; }
+
+/* Ensure last header aligns with actions column width */
+.accounts-table th:last-child { width: 160px; }
+
