@@ -23,6 +23,8 @@ import es.triana.company.banking.service.exception.AccountValidationException;
 import es.triana.company.banking.service.exception.DuplicateAccountIbanException;
 import es.triana.company.banking.service.exception.TenantMismatchException;
 import es.triana.company.banking.service.mapper.AccountMapper;
+import es.triana.company.banking.repository.TransactionRepository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AccountsService {
@@ -35,6 +37,8 @@ public class AccountsService {
     private InstitutionRepository institutionRepository;
     @Autowired
     private AccountMapper accountMapper;
+    @Autowired
+    private TransactionRepository transactionRepository;
 
     public List<AccountDTO> getAccountsByTenant(String tenantId) {
         if (tenantId == null) {
@@ -80,6 +84,7 @@ public class AccountsService {
         return accountMapper.toDto(saved);
     }
 
+    @Transactional
     public void deleteAccount(Long id, Long tenantId) {
         if (id == null) {
             throw new AccountValidationException("Account id is required");
@@ -93,6 +98,11 @@ public class AccountsService {
                 .orElseThrow(() -> new AccountNotFoundException(id));
 
         validateTenantOwnership(account, tenantId);
+        // delete related transactions first to avoid FK constraint violations
+        var txs = transactionRepository.findAllByTenantIdAndAccountId(tenantId, id);
+        if (txs != null && !txs.isEmpty()) {
+            transactionRepository.deleteAll(txs);
+        }
         accountsRepository.deleteById(id);
     }
 
