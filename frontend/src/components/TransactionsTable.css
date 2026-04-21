@@ -331,6 +331,18 @@
 .tt-type-TRANSFER   { background: #eff6ff; color: #1e40af; }
 .tt-type-ADJUSTMENT { background: #faf5ff; color: #6b21a8; }
 
+.tt-type-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tt-linked-badge {
+  font-size: 12px;
+  opacity: 0.75;
+  cursor: default;
+}
+
 /* ─── Tags cell ──────────────────────────────────────────────────────────── */
 
 .tt-td-tags {

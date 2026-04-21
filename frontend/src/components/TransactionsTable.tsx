@@ -369,9 +369,14 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
 
                   {/* Type */}
                   <td className="tt-td tt-td-type">
-                    {typeName ? (
-                      <span className={typeClass}>{typeName}</span>
-                    ) : <span className="tt-empty-cell">—</span>}
+                    <div className="tt-type-wrap">
+                      {typeName ? (
+                        <span className={typeClass}>{typeName}</span>
+                      ) : <span className="tt-empty-cell">—</span>}
+                      {tx.linkedTransactionId != null && (
+                        <span className="tt-linked-badge" title="Transferencia enlazada">⛓️</span>
+                      )}
+                    </div>
                   </td>
 
                   {/* Tags */}
