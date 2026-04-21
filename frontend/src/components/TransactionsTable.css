@@ -1,0 +1,368 @@
+/* ─── Wrapper & Summary Bar ─────────────────────────────────────────────── */
+
+.tt-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tt-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  flex-wrap: wrap;
+}
+
+.tt-summary-stats {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.tt-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tt-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.tt-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.tt-stat--income .tt-stat-value  { color: #16a34a; }
+.tt-stat--expense .tt-stat-value { color: #dc2626; }
+.tt-stat--net.positive .tt-stat-value { color: #2563eb; }
+.tt-stat--net.negative .tt-stat-value { color: #dc2626; }
+
+/* ─── Table container ────────────────────────────────────────────────────── */
+
+.tt-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+  background: #fff;
+}
+
+/* ─── Table base ─────────────────────────────────────────────────────────── */
+
+.tt-table {
+  width: 100%;
+  min-width: 1200px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  table-layout: fixed;
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+
+.tt-table thead {
+  background: #f8fafc;
+  border-bottom: 2px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.tt-th {
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+  white-space: nowrap;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+/* Column widths (table-layout: fixed) */
+.tt-th-date   { width: 88px; }
+.tt-th-desc   { width: auto; min-width: 180px; }
+.tt-th-amount { width: 120px; text-align: right; }
+.tt-th-cat    { width: 160px; }
+.tt-th-acc    { width: 170px; }
+.tt-th-status { width: 96px; }
+.tt-th-type   { width: 110px; }
+.tt-th-tags   { width: 140px; }
+
+/* ─── Rows ───────────────────────────────────────────────────────────────── */
+
+.tt-row {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s;
+}
+
+.tt-row:last-child {
+  border-bottom: none;
+}
+
+.tt-row:hover {
+  background: #f8fafc;
+}
+
+.tt-td {
+  padding: 10px 14px;
+  vertical-align: middle;
+  color: #1f2937;
+}
+
+/* ─── Date cell ──────────────────────────────────────────────────────────── */
+
+.tt-td-date {
+  white-space: nowrap;
+}
+
+.tt-date-day {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #111827;
+}
+
+.tt-date-rest {
+  display: block;
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 500;
+  margin-top: 1px;
+  text-transform: capitalize;
+}
+
+/* ─── Description cell ──────────────────────────────────────────────────── */
+
+.tt-td-desc {
+  max-width: 0; /* forces truncation with table-layout:fixed */
+}
+
+.tt-desc-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.tt-desc-primary {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tt-desc-merchant {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tt-desc-empty {
+  color: #d1d5db;
+}
+
+/* ─── Amount cell ────────────────────────────────────────────────────────── */
+
+.tt-td-amount {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tt-amount {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.tt-amount--neg { color: #dc2626; }
+.tt-amount--pos { color: #16a34a; }
+
+/* ─── Category badge ─────────────────────────────────────────────────────── */
+
+.tt-td-cat {
+  white-space: nowrap;
+}
+
+.tt-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 6px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+  max-width: 145px;
+  overflow: hidden;
+}
+
+.tt-cat-emoji {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.tt-cat-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Account cell ───────────────────────────────────────────────────────── */
+
+.tt-td-acc {
+  overflow: hidden;
+}
+
+.tt-account-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.tt-bank-logo {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: #f1f5f9;
+}
+
+.tt-bank-emoji {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.tt-account-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 1px;
+}
+
+.tt-account-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tt-account-bank {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Status badge ───────────────────────────────────────────────────────── */
+
+.tt-td-status {
+  white-space: nowrap;
+}
+
+.tt-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tt-status-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* ─── Type badge ─────────────────────────────────────────────────────────── */
+
+.tt-td-type {
+  white-space: nowrap;
+}
+
+.tt-type-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #374151;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.tt-type-EXPENSE    { background: #fff1f2; color: #9f1239; }
+.tt-type-INCOME     { background: #f0fdf4; color: #166534; }
+.tt-type-TRANSFER   { background: #eff6ff; color: #1e40af; }
+.tt-type-ADJUSTMENT { background: #faf5ff; color: #6b21a8; }
+
+/* ─── Tags cell ──────────────────────────────────────────────────────────── */
+
+.tt-td-tags {
+  overflow: hidden;
+}
+
+.tt-tags-wrap {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 130px;
+}
+
+.tt-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ─── Empty state ────────────────────────────────────────────────────────── */
+
+.tt-empty-cell {
+  color: #d1d5db;
+}
+
+.tt-empty-row td {
+  padding: 48px 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
