@@ -1,18 +1,42 @@
 
+import { useState } from 'react';
 import type { Transaction } from '../types/banking';
 import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
+import { CreateTransactionModal } from './CreateTransactionModal';
 
 type TransactionsTableProps = {
   items: Transaction[];
   accessToken: string;
+  onRefresh?: () => void;
 };
 
-export function TransactionsTable({ items, accessToken }: TransactionsTableProps) {
+export function TransactionsTable({ items, accessToken, onRefresh }: TransactionsTableProps) {
   const { statusMap, typeMap, categoryMap, accountMap, loading } = useTransactionCatalogs(accessToken);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const handleSuccess = () => {
+    if (onRefresh) onRefresh();
+  };
 
   return (
-    <div style={{ width: '100%', overflowX: 'auto' }}>
-      <table className="table" style={{ width: '100%', minWidth: 900 }}>
+    <>
+      {showCreateModal && (
+        <CreateTransactionModal
+          accessToken={accessToken}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={handleSuccess}
+        />
+      )}
+      <div style={{ marginBottom: 16 }}>
+        <button
+          className="btn primary"
+          onClick={() => setShowCreateModal(true)}
+        >
+          + Nueva Transacción
+        </button>
+      </div>
+      <div style={{ width: '100%', overflowX: 'auto' }}>
+        <table className="table" style={{ width: '100%', minWidth: 900 }}>
         <thead>
           <tr>
             <th>Reference</th>
@@ -71,5 +95,6 @@ export function TransactionsTable({ items, accessToken }: TransactionsTableProps
         </tbody>
       </table>
     </div>
+    </>
   );
 }

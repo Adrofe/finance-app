@@ -3,6 +3,7 @@ import { useAccounts } from '../hooks/useAccounts';
 import type { Account } from '../types/account';
 import type { Institution } from '../types/institution';
 import type { AccountType } from '../types/accountType';
+import { getInstitutionLogo } from '../constants/visualConfig';
 import './accounts-table.css';
 
 // --- Small custom dropdown component to display logos inside the option list ---
@@ -107,22 +108,12 @@ const currencySymbol = (currency: string) => {
   }
 };
 
-const bankIcon = (bankName?: string) => {
+const bankIcon = (bankName?: string): React.ReactNode => {
   if (!bankName) return <span role="img" aria-label="bank">🏦</span>;
-  const map: Record<string, string> = {
-    'Santander': '/bank-logos/santanderbank-com-logo.png',
-    'BBVA': '/bank-logos/bbva-es-logo.png',
-    'ING': '/bank-logos/ing-com-logo.png',
-    'MyInvestor': '/bank-logos/myinvestor-es-logo.png',
-    'Binance': '/bank-logos/binance-com-logo.png',
-    'Revolut': '/bank-logos/revolut-com-logo.png',
-    'Interactive Brokers': '/bank-logos/interactivebrokers-com-logo.png',
-    'Imagin': '/bank-logos/imagin-com-logo.png',
-  };
-  const url = map[bankName] || undefined;
-  return url
-    ? <img src={url} alt={bankName} style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4, background: '#f5f6fa', border: '1px solid #eee', display: 'block' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-    : <span role="img" aria-label="bank">🏦</span>;
+  const logo = getInstitutionLogo(bankName);
+  return logo.startsWith('/')
+    ? <img src={logo} alt={bankName} style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 4, background: '#f5f6fa', border: '1px solid #eee', display: 'block' }} />
+    : <span role="img" aria-label="bank">{logo}</span>;
 };
 
 export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {

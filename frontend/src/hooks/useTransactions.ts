@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 
 import { fetchTransactions } from '../services/transactionsService';
@@ -8,12 +8,18 @@ type UseTransactionsResult = {
   items: Transaction[];
   loading: boolean;
   error: string;
+  refresh: () => void;
 };
 
 export function useTransactions(accessToken: string, onUnauthorized: (message: string) => void): UseTransactionsResult {
   const [items, setItems] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const refresh = useCallback(() => {
+    setRefreshTrigger(prev => prev + 1);
+  }, []);
 
   useEffect(() => {
     if (!accessToken) {
@@ -37,11 +43,12 @@ export function useTransactions(accessToken: string, onUnauthorized: (message: s
         setError('Could not load transactions. Check that backend is running on 8081.');
       })
       .finally(() => setLoading(false));
-  }, [accessToken, onUnauthorized]);
+  }, [accessToken, onUnauthorized, refreshTrigger]);
 
   return {
     items,
     loading,
-    error
+    error,
+    refresh
   };
 }

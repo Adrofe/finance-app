@@ -55,7 +55,7 @@ function App() {
     logout(message);
   }, [logout]);
 
-  const { items, loading, error } = useTransactions(accessToken, handleUnauthorized);
+  const { items, loading, error, refresh } = useTransactions(accessToken, handleUnauthorized);
   const [activeTab, setActiveTab] = useState<AppTab>('banking');
   const [bankingSubTab, setBankingSubTab] = useState<BankingSubTab>('dashboard');
 
@@ -167,7 +167,7 @@ function App() {
               </div>
               {loading && <p className="state">Loading transactions...</p>}
               {!loading && error && <p className="state error">{error}</p>}
-              {!loading && !error && <TransactionsTable items={items} accessToken={accessToken} />}
+              {!loading && !error && <TransactionsTable items={items} accessToken={accessToken} onRefresh={refresh} />}
             </article>
           )}
 
