@@ -22,3 +22,11 @@ export async function createTransaction(accessToken: string, transaction: Create
 
   return response.data.data;
 }
+
+export async function deleteTransaction(accessToken: string, id: number): Promise<void> {
+  await axios.delete(`/v1/api/transactions/${id}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`
+    }
+  });
+}
