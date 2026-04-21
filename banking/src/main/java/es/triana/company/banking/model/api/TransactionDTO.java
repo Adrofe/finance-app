@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 public class TransactionDTO {
+    private Long id;
     private Long sourceAccountId;
     private Long destinationAccountId;
     private LocalDateTime bookingDate;
@@ -28,6 +29,7 @@ public class TransactionDTO {
     private String externalId;
     private Long statusId;
     private Long typeId;
+    private Long linkedTransactionId;
     private LocalDate createdAt;
     private LocalDate updatedAt;
 }
