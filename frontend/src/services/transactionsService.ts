@@ -30,3 +30,16 @@ export async function deleteTransaction(accessToken: string, id: number): Promis
     }
   });
 }
+
+export async function updateTransaction(
+  accessToken: string,
+  id: number,
+  payload: Partial<CreateTransactionRequest>
+): Promise<Transaction> {
+  const response = await axios.put<ApiResponse<Transaction>>(
+    `/v1/api/transactions/${id}`,
+    payload,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return response.data.data;
+}

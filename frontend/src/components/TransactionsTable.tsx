@@ -5,6 +5,7 @@ import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
 import { CreateTransactionModal } from './CreateTransactionModal';
 import { getCategoryVisual, getInstitutionLogo, getMerchantLogo } from '../constants/visualConfig';
 import { deleteTransaction } from '../services/transactionsService';
+import { TransactionEditableRow } from './TransactionEditableRow';
 import {
   TransactionsFiltersPanel,
   type TransactionFilters,
@@ -79,6 +80,7 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
   const [deleting,        setDeleting]          = useState(false);
   const [showFilters,     setShowFilters]       = useState(false);
   const [filters,         setFilters]           = useState<TransactionFilters>(EMPTY_FILTERS);
+  const [editingId,       setEditingId]         = useState<number | null>(null);
 
   const filteredItems  = applyFilters(items, filters, categories);
   const activeFilters  = countActiveFilters(filters);
@@ -288,6 +290,38 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
                 </td>
               </tr>
             ) : filteredItems.map((tx, index) => {
+              const txId       = tx.id;
+              const isSelected = txId != null && selected.has(txId);
+
+              // ── Editable row ────────────────────────────────────────────
+              if (txId != null && editingId === txId) {
+                return (
+                  <TransactionEditableRow
+                    key={txId}
+                    tx={tx}
+                    accessToken={accessToken}
+                    categories={categories}
+                    statuses={statuses}
+                    types={types}
+                    accounts={accounts}
+                    tags={tags}
+                    categoryCodeMap={categoryCodeMap}
+                    categoryMap={categoryMap}
+                    statusMap={statusMap}
+                    typeMap={typeMap}
+                    accountDetailMap={accountDetailMap}
+                    tagMap={tagMap}
+                    selectMode={selectMode}
+                    isSelected={isSelected}
+                    onToggleSelect={toggleSelect}
+                    onDelete={() => setConfirm({ mode: 'single', tx })}
+                    onRefresh={() => { if (onRefresh) onRefresh(); }}
+                    onExitEdit={() => setEditingId(null)}
+                  />
+                );
+              }
+
+              // ── Normal row ───────────────────────────────────────────────
               const { day, rest } = formatDate(tx.bookingDate);
               const amount = tx.amount ?? 0;
               const isNeg  = amount < 0;
@@ -306,9 +340,6 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
 
               const typeName = tx.typeId != null ? typeMap[tx.typeId] : undefined;
               const typeClass = typeName ? `tt-type-badge tt-type-${typeName.toUpperCase()}` : 'tt-type-badge';
-
-              const txId      = tx.id;
-              const isSelected = txId != null && selected.has(txId);
 
               return (
                 <tr
@@ -442,17 +473,28 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
                     ) : <span className="tt-empty-cell">—</span>}
                   </td>
 
-                  {/* Delete action */}
+                  {/* Actions: edit + delete */}
                   <td className="tt-td tt-td-actions">
-                    {txId != null && (
-                      <button
-                        className="tt-btn-delete"
-                        title="Eliminar transacción"
-                        onClick={() => setConfirm({ mode: 'single', tx })}
-                      >
-                        🗑️
-                      </button>
-                    )}
+                    <div className="tt-action-btns">
+                      {txId != null && (
+                        <button
+                          className="tt-btn-edit"
+                          title="Editar transacción"
+                          onClick={() => setEditingId(txId)}
+                        >
+                          ✏️
+                        </button>
+                      )}
+                      {txId != null && (
+                        <button
+                          className="tt-btn-delete"
+                          title="Eliminar transacción"
+                          onClick={() => setConfirm({ mode: 'single', tx })}
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   </td>
 
                 </tr>
