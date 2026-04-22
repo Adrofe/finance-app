@@ -410,6 +410,75 @@
   color: #1d4ed8;
 }
 
+/* Filter toggle button */
+.btn-filter-toggle {
+  position: relative;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.btn-filter-toggle:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.btn-filter-toggle.active {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #4338ca;
+}
+
+.btn-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6366f1;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.btn-filter-toggle.active .btn-filter-badge {
+  background: #fff;
+  color: #6366f1;
+}
+
+/* Clear filters button */
+.btn-filter-clear {
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid #fca5a5;
+  background: #fff1f2;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.btn-filter-clear:hover {
+  background: #ffe4e6;
+}
+
+/* Filtered count sub-label */
+.tt-stat-total {
+  font-size: 12px;
+  font-weight: 400;
+  color: #9ca3af;
+}
+
 .btn-delete-selected {
   padding: 7px 14px;
   border-radius: 8px;

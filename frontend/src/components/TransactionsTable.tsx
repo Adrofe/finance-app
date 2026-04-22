@@ -5,6 +5,13 @@ import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
 import { CreateTransactionModal } from './CreateTransactionModal';
 import { getCategoryVisual, getInstitutionLogo, getMerchantLogo } from '../constants/visualConfig';
 import { deleteTransaction } from '../services/transactionsService';
+import {
+  TransactionsFiltersPanel,
+  type TransactionFilters,
+  EMPTY_FILTERS,
+  applyFilters,
+  countActiveFilters,
+} from './TransactionsFiltersPanel';
 import './TransactionsTable.css';
 
 type TransactionsTableProps = {
@@ -58,6 +65,11 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
     categoryCodeMap,
     accountDetailMap,
     tagMap,
+    categories,
+    statuses,
+    types,
+    accounts,
+    tags,
   } = useTransactionCatalogs(accessToken);
 
   const [showCreateModal, setShowCreateModal]   = useState(false);
@@ -65,6 +77,11 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
   const [selected,        setSelected]          = useState<Set<number>>(new Set());
   const [confirm,         setConfirm]           = useState<ConfirmState | null>(null);
   const [deleting,        setDeleting]          = useState(false);
+  const [showFilters,     setShowFilters]       = useState(false);
+  const [filters,         setFilters]           = useState<TransactionFilters>(EMPTY_FILTERS);
+
+  const filteredItems  = applyFilters(items, filters, categories);
+  const activeFilters  = countActiveFilters(filters);
 
   const handleSuccess = () => { if (onRefresh) onRefresh(); };
 
@@ -78,7 +95,7 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
   };
 
   // Select-all / deselect-all
-  const allIds      = items.map(t => t.id).filter((id): id is number => id != null);
+  const allIds      = filteredItems.map(t => t.id).filter((id): id is number => id != null);
   const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id));
 
   const toggleSelectAll = () => {
@@ -109,8 +126,8 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
     }
   };
 
-  const totalIncome   = items.filter(t => (t.amount ?? 0) > 0).reduce((s, t) => s + (t.amount ?? 0), 0);
-  const totalExpenses = items.filter(t => (t.amount ?? 0) < 0).reduce((s, t) => s + (t.amount ?? 0), 0);
+  const totalIncome   = filteredItems.filter(t => (t.amount ?? 0) > 0).reduce((s, t) => s + (t.amount ?? 0), 0);
+  const totalExpenses = filteredItems.filter(t => (t.amount ?? 0) < 0).reduce((s, t) => s + (t.amount ?? 0), 0);
   const net           = totalIncome + totalExpenses;
 
   const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
@@ -168,7 +185,11 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
         <div className="tt-summary-stats">
           <div className="tt-stat">
             <span className="tt-stat-label">Transacciones</span>
-            <span className="tt-stat-value">{items.length}</span>
+            <span className="tt-stat-value">
+              {activeFilters > 0
+                ? <>{filteredItems.length} <span className="tt-stat-total">/ {items.length}</span></>
+                : items.length}
+            </span>
           </div>
           <div className="tt-stat tt-stat--income">
             <span className="tt-stat-label">Ingresos</span>
@@ -198,11 +219,36 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
           >
             {selectMode ? '✕ Cancelar selección' : '☑ Seleccionar'}
           </button>
+          <button
+            className={`btn-filter-toggle ${showFilters ? 'active' : ''}`}
+            onClick={() => setShowFilters(v => !v)}
+          >
+            {showFilters ? '▲' : '▼'} Filtros
+            {activeFilters > 0 && <span className="btn-filter-badge">{activeFilters}</span>}
+          </button>
+          {activeFilters > 0 && (
+            <button className="btn-filter-clear" onClick={() => setFilters(EMPTY_FILTERS)}>
+              ✕ Limpiar filtros
+            </button>
+          )}
           <button className="btn primary" onClick={() => setShowCreateModal(true)}>
             + Nueva Transacción
           </button>
         </div>
       </div>
+
+      {/* ── Filter panel ── */}
+      {showFilters && (
+        <TransactionsFiltersPanel
+          filters={filters}
+          onChange={setFilters}
+          categories={categories}
+          accounts={accounts}
+          statuses={statuses}
+          types={types}
+          tags={tags}
+        />
+      )}
 
       {/* ── Table ── */}
       <div className="tt-container">
@@ -233,11 +279,15 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 ? (
+            {filteredItems.length === 0 ? (
               <tr className="tt-empty-row">
-                <td colSpan={totalCols}>No hay transacciones</td>
+                <td colSpan={totalCols}>
+                  {activeFilters > 0
+                    ? 'No hay transacciones que coincidan con los filtros'
+                    : 'No hay transacciones'}
+                </td>
               </tr>
-            ) : items.map((tx, index) => {
+            ) : filteredItems.map((tx, index) => {
               const { day, rest } = formatDate(tx.bookingDate);
               const amount = tx.amount ?? 0;
               const isNeg  = amount < 0;

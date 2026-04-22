@@ -14,6 +14,7 @@ export type Transaction = {
   externalId?: string;
   statusId?: number;
   typeId?: number;
+  linkedTransactionId?: number;
 };
 
 export type CreateTransactionRequest = {
