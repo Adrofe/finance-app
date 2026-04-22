@@ -127,6 +127,7 @@ export const INSTITUTION_LOGOS: Record<string, string> = {
   'REVOLUT':             '/bank-logos/revolut-com-logo.png',
   'MYINVESTOR':          '/bank-logos/myinvestor-es-logo.png',
   'BINANCE':             '/bank-logos/binance-com-logo.png',
+  'PLUXEE':              '/bank-logos/pluxeegroup-com-logo.png',
   'DEFAULT': '🏦',
 };
 
@@ -196,6 +197,7 @@ export function getInstitutionLogo(name: string): string {
   if (upperName.includes('MYINVESTOR')) return asAssetPath(INSTITUTION_LOGOS.MYINVESTOR);
   if (upperName.includes('REVOLUT')) return asAssetPath(INSTITUTION_LOGOS.REVOLUT);
   if (upperName.includes('BINANCE')) return asAssetPath(INSTITUTION_LOGOS.BINANCE);
+  if (upperName.includes('PLUXEE')) return asAssetPath(INSTITUTION_LOGOS.PLUXEE);
   if (upperName === 'ING' || upperName.includes('ING ')) return asAssetPath(INSTITUTION_LOGOS.ING);
 
   return INSTITUTION_LOGOS.DEFAULT;
