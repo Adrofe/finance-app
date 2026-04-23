@@ -162,17 +162,34 @@ type DashboardProps = {
   onUnauthorized: (msg: string) => void;
 };
 
+type CategoryViewMode = 'parent' | 'child';
+
+type PieSlice = {
+  level: CategoryViewMode;
+  name: string;
+  code: string;
+  parentCode: string;
+  categoryId?: number;
+  value: number;
+  pct: number;
+  count: number;
+  color: string;
+  emoji: string;
+};
+
 type DetailsFilter =
   | { mode: 'all' }
   | { mode: 'income' }
   | { mode: 'expenses' }
-  | { mode: 'category'; categoryId: number; name: string };
+  | { mode: 'category'; categoryId: number; name: string }
+  | { mode: 'parentCategory'; parentCode: string; name: string };
 
 export function Dashboard({ token, transactions, onUnauthorized }: DashboardProps) {
   const [preset, setPreset]           = useState<DashboardPreset>('this-month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd]     = useState('');
   const [detailsFilter, setDetailsFilter] = useState<DetailsFilter>({ mode: 'all' });
+  const [categoryView, setCategoryView] = useState<CategoryViewMode>('parent');
 
   const { start, end } = useMemo(() => {
     if (preset === 'custom') return { start: customStart, end: customEnd };
@@ -185,7 +202,7 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
   const [loading,    setLoading]    = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const { categoryCodeMap, typeMap } = useTransactionCatalogs(token);
+  const { categoryCodeMap, typeMap, categories: catalogCategories } = useTransactionCatalogs(token);
 
   const isInternalTransfer = useCallback((tx: Transaction): boolean => {
     const typeName = tx.typeId != null ? (typeMap[tx.typeId] || '').toUpperCase() : '';
@@ -260,18 +277,25 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
         if (amount >= 0 || tx.categoryId == null) return false;
         return tx.categoryId === detailsFilter.categoryId;
       }
+      if (detailsFilter.mode === 'parentCategory') {
+        if (amount >= 0 || tx.categoryId == null) return false;
+        const code = (categoryCodeMap[tx.categoryId] || '').toUpperCase();
+        const parentCode = detailsFilter.parentCode.toUpperCase();
+        return code === parentCode || code.startsWith(`${parentCode}.`);
+      }
       return true;
     });
 
     return [...filtered]
       .sort((a, b) => toTimestamp(b.bookingDate) - toTimestamp(a.bookingDate))
       .slice(0, 15);
-  }, [detailsFilter, periodTransactions, toTimestamp]);
+  }, [categoryCodeMap, detailsFilter, periodTransactions, toTimestamp]);
 
   const detailsTitle = useMemo(() => {
     if (detailsFilter.mode === 'income') return 'Transacciones que componen los ingresos';
     if (detailsFilter.mode === 'expenses') return 'Transacciones que componen los gastos';
     if (detailsFilter.mode === 'category') return `Transacciones de ${detailsFilter.name}`;
+    if (detailsFilter.mode === 'parentCategory') return `Transacciones de ${detailsFilter.name} (padre)`;
     return 'Últimas transacciones del periodo';
   }, [detailsFilter]);
 
@@ -279,6 +303,7 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
     if (detailsFilter.mode === 'income') return 'Mostrando solo ingresos del periodo activo';
     if (detailsFilter.mode === 'expenses') return 'Mostrando solo gastos del periodo activo';
     if (detailsFilter.mode === 'category') return `Mostrando gastos de la categoría ${detailsFilter.name}`;
+    if (detailsFilter.mode === 'parentCategory') return `Mostrando gastos de la categoría padre ${detailsFilter.name} y sus hijas`;
     return 'Mostrando transacciones más recientes en el periodo activo';
   }, [detailsFilter]);
 
@@ -290,16 +315,75 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
     Gastos: Math.abs(p.expenses),
   }));
 
-  const pieData = categories.slice(0, 10).map(c => ({
-    categoryId: c.categoryId,
-    name: c.categoryName,
-    code: c.categoryCode,
-    value: Math.abs(c.total),
-    pct: c.percentage ?? 0,
-    count: c.transactionCount,
-    color: getCategoryVisual(c.categoryCode).color,
-    emoji: getCategoryVisual(c.categoryCode).emoji,
-  }));
+  const childPieData = useMemo<PieSlice[]>(() => {
+    const childRows = categories.filter(c => (c.categoryCode || '').includes('.'));
+    const total = childRows.reduce((sum, c) => sum + Math.abs(c.total ?? 0), 0);
+
+    return childRows
+      .slice()
+      .sort((a, b) => {
+        const aCode = (a.categoryCode || '').toUpperCase();
+        const bCode = (b.categoryCode || '').toUpperCase();
+        const aParent = aCode.split('.')[0] || aCode;
+        const bParent = bCode.split('.')[0] || bCode;
+        if (aParent !== bParent) return aParent.localeCompare(bParent);
+        return aCode.localeCompare(bCode);
+      })
+      .map((c) => ({
+        level: 'child',
+        categoryId: c.categoryId,
+        name: c.categoryName,
+        code: c.categoryCode,
+        parentCode: (c.categoryCode || '').split('.')[0] || c.categoryCode,
+        value: Math.abs(c.total),
+        pct: total > 0 ? (Math.abs(c.total) / total) * 100 : 0,
+        count: c.transactionCount,
+        color: getCategoryVisual(c.categoryCode).color,
+        emoji: getCategoryVisual(c.categoryCode).emoji,
+      }));
+  }, [categories]);
+
+  const parentPieData = useMemo<PieSlice[]>(() => {
+    const parentNameByCode = new Map<string, string>();
+    catalogCategories.forEach((c) => {
+      const code = (c.code || '').toUpperCase();
+      if (!code) {
+        return;
+      }
+      if (!code.includes('.')) {
+        parentNameByCode.set(code, c.name || code);
+      }
+    });
+
+    const grouped = new Map<string, { value: number; count: number }>();
+    categories.forEach((c) => {
+      const code = (c.categoryCode || '').toUpperCase();
+      const parentCode = code.split('.')[0] || code;
+      const prev = grouped.get(parentCode) || { value: 0, count: 0 };
+      grouped.set(parentCode, {
+        value: prev.value + Math.abs(c.total ?? 0),
+        count: prev.count + (c.transactionCount ?? 0),
+      });
+    });
+
+    const total = Array.from(grouped.values()).reduce((sum, v) => sum + v.value, 0);
+
+    return Array.from(grouped.entries())
+      .map(([parentCode, agg]) => ({
+        level: 'parent' as const,
+        name: parentNameByCode.get(parentCode) || parentCode,
+        code: parentCode,
+        parentCode,
+        value: agg.value,
+        pct: total > 0 ? (agg.value / total) * 100 : 0,
+        count: agg.count,
+        color: getCategoryVisual(parentCode).color,
+        emoji: getCategoryVisual(parentCode).emoji,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [catalogCategories, categories]);
+
+  const pieData = categoryView === 'parent' ? parentPieData : childPieData;
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -431,7 +515,30 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
 
             {/* Donut chart: spending by category */}
             <article className="db-chart-card">
-              <h3 className="db-chart-title">Gastos por categoría</h3>
+              <div className="db-chart-head">
+                <h3 className="db-chart-title">Gastos por categoría</h3>
+                <div className="db-view-toggle" role="group" aria-label="Vista de categorías">
+                  <button
+                    type="button"
+                    className={`db-view-btn${categoryView === 'parent' ? ' active' : ''}`}
+                    onClick={() => setCategoryView('parent')}
+                  >
+                    Padres
+                  </button>
+                  <button
+                    type="button"
+                    className={`db-view-btn${categoryView === 'child' ? ' active' : ''}`}
+                    onClick={() => setCategoryView('child')}
+                  >
+                    Hijas
+                  </button>
+                </div>
+              </div>
+              <span className="db-view-help">
+                {categoryView === 'parent'
+                  ? 'Vista agregada por categoría padre.'
+                  : 'Vista de categorías hijas agrupadas por relación, no por importe.'}
+              </span>
               {pieData.length === 0 ? (
                 <p className="db-empty">Sin datos para el periodo seleccionado.</p>
               ) : (
@@ -447,9 +554,19 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
                         paddingAngle={2}
                         dataKey="value"
                         labelLine={false}
-                        onClick={(entry: { categoryId?: number; name?: string }) => {
+                        onClick={(entry: { level?: CategoryViewMode; categoryId?: number; parentCode?: string; name?: string }) => {
+                          const level = entry?.level;
                           const categoryId = entry?.categoryId;
+                          const parentCode = entry?.parentCode;
                           const name = entry?.name || 'Categoría';
+                          if (level === 'parent' && parentCode) {
+                            setDetailsFilter(prev => (
+                              prev.mode === 'parentCategory' && prev.parentCode === parentCode
+                                ? { mode: 'all' }
+                                : { mode: 'parentCategory', parentCode, name }
+                            ));
+                            return;
+                          }
                           if (categoryId == null) return;
                           setDetailsFilter(prev => (
                             prev.mode === 'category' && prev.categoryId === categoryId
@@ -477,12 +594,29 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
                     {pieData.map((item, i) => (
                       <li
                         key={i}
-                        className={`db-pie-legend-item${detailsFilter.mode === 'category' && detailsFilter.categoryId === item.categoryId ? ' is-active' : ''}`}
+                        className={`db-pie-legend-item${
+                          (item.level === 'child' && detailsFilter.mode === 'category' && detailsFilter.categoryId === item.categoryId)
+                          || (item.level === 'parent' && detailsFilter.mode === 'parentCategory' && detailsFilter.parentCode === item.parentCode)
+                            ? ' is-active'
+                            : ''
+                        }`}
                         onClick={() => {
+                          if (item.level === 'parent') {
+                            setDetailsFilter(prev => (
+                              prev.mode === 'parentCategory' && prev.parentCode === item.parentCode
+                                ? { mode: 'all' }
+                                : { mode: 'parentCategory', parentCode: item.parentCode, name: item.name }
+                            ));
+                            return;
+                          }
+                          if (item.categoryId == null) {
+                            return;
+                          }
+                          const categoryId = item.categoryId;
                           setDetailsFilter(prev => (
-                            prev.mode === 'category' && prev.categoryId === item.categoryId
+                            prev.mode === 'category' && prev.categoryId === categoryId
                               ? { mode: 'all' }
-                              : { mode: 'category', categoryId: item.categoryId, name: item.name }
+                              : { mode: 'category', categoryId, name: item.name }
                           ));
                         }}
                         role="button"
@@ -490,10 +624,22 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
+                            if (item.level === 'parent') {
+                              setDetailsFilter(prev => (
+                                prev.mode === 'parentCategory' && prev.parentCode === item.parentCode
+                                  ? { mode: 'all' }
+                                  : { mode: 'parentCategory', parentCode: item.parentCode, name: item.name }
+                              ));
+                              return;
+                            }
+                            if (item.categoryId == null) {
+                              return;
+                            }
+                            const categoryId = item.categoryId;
                             setDetailsFilter(prev => (
-                              prev.mode === 'category' && prev.categoryId === item.categoryId
+                              prev.mode === 'category' && prev.categoryId === categoryId
                                 ? { mode: 'all' }
-                                : { mode: 'category', categoryId: item.categoryId, name: item.name }
+                                : { mode: 'category', categoryId, name: item.name }
                             ));
                           }
                         }}
