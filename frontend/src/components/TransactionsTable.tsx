@@ -128,8 +128,17 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
     }
   };
 
-  const totalIncome   = filteredItems.filter(t => (t.amount ?? 0) > 0).reduce((s, t) => s + (t.amount ?? 0), 0);
-  const totalExpenses = filteredItems.filter(t => (t.amount ?? 0) < 0).reduce((s, t) => s + (t.amount ?? 0), 0);
+  const isInternalTransfer = (t: Transaction): boolean => {
+    const typeName = t.typeId != null ? (typeMap[t.typeId] || '').toUpperCase() : '';
+    if (typeName === 'TRANSFER') return true;
+    if (t.linkedTransactionId != null) return true;
+    if (t.sourceAccountId != null && t.destinationAccountId != null) return true;
+    return false;
+  };
+
+  const summaryItems = filteredItems.filter(t => !isInternalTransfer(t));
+  const totalIncome   = summaryItems.filter(t => (t.amount ?? 0) > 0).reduce((s, t) => s + (t.amount ?? 0), 0);
+  const totalExpenses = summaryItems.filter(t => (t.amount ?? 0) < 0).reduce((s, t) => s + (t.amount ?? 0), 0);
   const net           = totalIncome + totalExpenses;
 
   const fmt = (n: number) => n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
