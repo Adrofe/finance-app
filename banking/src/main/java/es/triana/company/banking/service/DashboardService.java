@@ -18,18 +18,26 @@ import es.triana.company.banking.repository.TransactionRepository;
 @Service
 public class DashboardService {
 
+    private static final LocalDate MIN_DATE = LocalDate.of(1970, 1, 1);
+
     private final TransactionRepository transactionRepository;
 
     public DashboardService(TransactionRepository transactionRepository) {
         this.transactionRepository = transactionRepository;
     }
 
+    /** Converts a nullable date range to concrete dates safe for direct JPQL comparisons. */
+    private LocalDate resolveStart(LocalDate d) { return d != null ? d : MIN_DATE; }
+    private LocalDate resolveEnd(LocalDate d)   { return d != null ? d : LocalDate.now(); }
+
     // ── Summary ────────────────────────────────────────────────────────────────
 
     public DashboardSummaryDTO getSummary(Long tenantId, LocalDate startDate, LocalDate endDate) {
-        BigDecimal income   = nullSafe(transactionRepository.sumIncomeByPeriod(tenantId, startDate, endDate));
-        BigDecimal expenses = nullSafe(transactionRepository.sumExpensesByPeriod(tenantId, startDate, endDate));
-        Long count          = transactionRepository.countByPeriod(tenantId, startDate, endDate);
+        LocalDate start = resolveStart(startDate);
+        LocalDate end   = resolveEnd(endDate);
+        BigDecimal income   = nullSafe(transactionRepository.sumIncomeByPeriod(tenantId, start, end));
+        BigDecimal expenses = nullSafe(transactionRepository.sumExpensesByPeriod(tenantId, start, end));
+        Long count          = transactionRepository.countByPeriod(tenantId, start, end);
         BigDecimal net      = income.add(expenses);
 
         Double savingsRate = null;
@@ -55,7 +63,8 @@ public class DashboardService {
     public List<SpendingByCategoryDTO> getSpendingByCategory(
             Long tenantId, LocalDate startDate, LocalDate endDate) {
 
-        List<Object[]> rows = transactionRepository.findSpendingByCategory(tenantId, startDate, endDate);
+        List<Object[]> rows = transactionRepository.findSpendingByCategory(
+                tenantId, resolveStart(startDate), resolveEnd(endDate));
 
         // Total expenses (absolute value) to compute percentages
         BigDecimal totalExpenses = rows.stream()
@@ -100,7 +109,8 @@ public class DashboardService {
     public List<TimeSeriesPointDTO> getTimeSeries(
             Long tenantId, LocalDate startDate, LocalDate endDate, String groupBy) {
 
-        List<Object[]> rows = transactionRepository.findDateAmountSeries(tenantId, startDate, endDate);
+        List<Object[]> rows = transactionRepository.findDateAmountSeries(
+                tenantId, resolveStart(startDate), resolveEnd(endDate));
 
         boolean byDay = "DAY".equalsIgnoreCase(groupBy);
 

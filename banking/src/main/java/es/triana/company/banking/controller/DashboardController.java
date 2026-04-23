@@ -30,8 +30,8 @@ public class DashboardController {
 
     @GetMapping("/summary")
     public ResponseEntity<ApiResponse<DashboardSummaryDTO>> getSummary(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate",   required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
         Long tenantId = tenantContext.getCurrentTenantId();
         DashboardSummaryDTO summary = dashboardService.getSummary(tenantId, startDate, endDate);
@@ -40,8 +40,8 @@ public class DashboardController {
 
     @GetMapping("/spending-by-category")
     public ResponseEntity<ApiResponse<List<SpendingByCategoryDTO>>> getSpendingByCategory(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+            @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate",   required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
         Long tenantId = tenantContext.getCurrentTenantId();
         List<SpendingByCategoryDTO> data = dashboardService.getSpendingByCategory(tenantId, startDate, endDate);
@@ -50,9 +50,9 @@ public class DashboardController {
 
     @GetMapping("/time-series")
     public ResponseEntity<ApiResponse<List<TimeSeriesPointDTO>>> getTimeSeries(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(defaultValue = "MONTH") String groupBy) {
+            @RequestParam(name = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate",   required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(name = "groupBy",   defaultValue = "MONTH") String groupBy) {
 
         Long tenantId = tenantContext.getCurrentTenantId();
         List<TimeSeriesPointDTO> data = dashboardService.getTimeSeries(tenantId, startDate, endDate, groupBy);

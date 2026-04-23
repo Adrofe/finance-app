@@ -50,8 +50,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 	@Query("""
 			select sum(t.amount) from Transaction t
 			where t.tenantId = :tenantId
-			  and (:startDate is null or t.bookingDate >= :startDate)
-			  and (:endDate   is null or t.bookingDate <= :endDate)
+			  and t.bookingDate >= :startDate
+			  and t.bookingDate <= :endDate
 			  and t.amount > 0
 			""")
 	java.math.BigDecimal sumIncomeByPeriod(
@@ -62,8 +62,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 	@Query("""
 			select sum(t.amount) from Transaction t
 			where t.tenantId = :tenantId
-			  and (:startDate is null or t.bookingDate >= :startDate)
-			  and (:endDate   is null or t.bookingDate <= :endDate)
+			  and t.bookingDate >= :startDate
+			  and t.bookingDate <= :endDate
 			  and t.amount < 0
 			""")
 	java.math.BigDecimal sumExpensesByPeriod(
@@ -74,8 +74,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 	@Query("""
 			select count(t) from Transaction t
 			where t.tenantId = :tenantId
-			  and (:startDate is null or t.bookingDate >= :startDate)
-			  and (:endDate   is null or t.bookingDate <= :endDate)
+			  and t.bookingDate >= :startDate
+			  and t.bookingDate <= :endDate
 			""")
 	Long countByPeriod(
 			@Param("tenantId")  Long tenantId,
@@ -92,8 +92,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 			       sum(t.amount), count(t)
 			from Transaction t
 			where t.tenantId = :tenantId
-			  and (:startDate is null or t.bookingDate >= :startDate)
-			  and (:endDate   is null or t.bookingDate <= :endDate)
+			  and t.bookingDate >= :startDate
+			  and t.bookingDate <= :endDate
 			  and t.amount < 0
 			  and t.category is not null
 			group by t.category.id, t.category.code, t.category.name
