@@ -60,11 +60,26 @@ interface KpiCardProps {
   value: string;
   sub?: string;
   variant: 'income' | 'expenses' | 'net' | 'savings' | 'count';
+  onClick?: () => void;
+  active?: boolean;
 }
 
-function KpiCard({ icon, label, value, sub, variant }: KpiCardProps) {
+function KpiCard({ icon, label, value, sub, variant, onClick, active = false }: KpiCardProps) {
+  const className = `db-kpi-card db-kpi--${variant}${onClick ? ' db-kpi-clickable' : ''}${active ? ' is-active' : ''}`;
+
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick}>
+        <span className="db-kpi-icon">{icon}</span>
+        <span className="db-kpi-label">{label}</span>
+        <strong className="db-kpi-value">{value}</strong>
+        {sub && <span className="db-kpi-sub">{sub}</span>}
+      </button>
+    );
+  }
+
   return (
-    <article className={`db-kpi-card db-kpi--${variant}`}>
+    <article className={className}>
       <span className="db-kpi-icon">{icon}</span>
       <span className="db-kpi-label">{label}</span>
       <strong className="db-kpi-value">{value}</strong>
@@ -143,14 +158,21 @@ function BarTooltip({ active, payload, label }: any) {
 
 type DashboardProps = {
   token: string;
-  recentTransactions: Transaction[];
+  transactions: Transaction[];
   onUnauthorized: (msg: string) => void;
 };
 
-export function Dashboard({ token, recentTransactions, onUnauthorized }: DashboardProps) {
+type DetailsFilter =
+  | { mode: 'all' }
+  | { mode: 'income' }
+  | { mode: 'expenses' }
+  | { mode: 'category'; categoryId: number; name: string };
+
+export function Dashboard({ token, transactions, onUnauthorized }: DashboardProps) {
   const [preset, setPreset]           = useState<DashboardPreset>('this-month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd]     = useState('');
+  const [detailsFilter, setDetailsFilter] = useState<DetailsFilter>({ mode: 'all' });
 
   const { start, end } = useMemo(() => {
     if (preset === 'custom') return { start: customStart, end: customEnd };
@@ -163,7 +185,15 @@ export function Dashboard({ token, recentTransactions, onUnauthorized }: Dashboa
   const [loading,    setLoading]    = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const { categoryCodeMap } = useTransactionCatalogs(token);
+  const { categoryCodeMap, typeMap } = useTransactionCatalogs(token);
+
+  const isInternalTransfer = useCallback((tx: Transaction): boolean => {
+    const typeName = tx.typeId != null ? (typeMap[tx.typeId] || '').toUpperCase() : '';
+    if (typeName === 'TRANSFER') return true;
+    if (tx.linkedTransactionId != null) return true;
+    if (tx.sourceAccountId != null && tx.destinationAccountId != null) return true;
+    return false;
+  }, [typeMap]);
 
   const loadData = useCallback(async () => {
     if (!token) return;
@@ -195,6 +225,63 @@ export function Dashboard({ token, recentTransactions, onUnauthorized }: Dashboa
     loadData();
   }, [loadData]);
 
+  const toTimestamp = useCallback((input?: string): number => {
+    if (!input) return 0;
+    const date = new Date(input);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  }, []);
+
+  const isInSelectedRange = useCallback((input?: string): boolean => {
+    if (!input) return false;
+    const ts = toTimestamp(input);
+    if (ts <= 0) return false;
+
+    const startTs = start ? toTimestamp(start) : 0;
+    const endTs = end ? toTimestamp(end) : 0;
+
+    if (startTs && ts < startTs) return false;
+    if (endTs && ts > endTs + 86400000 - 1) return false;
+    return true;
+  }, [end, start, toTimestamp]);
+
+  const periodTransactions = useMemo(() => {
+    return transactions.filter((tx) => {
+      if (!isInSelectedRange(tx.bookingDate)) return false;
+      return !isInternalTransfer(tx);
+    });
+  }, [isInSelectedRange, isInternalTransfer, transactions]);
+
+  const visibleTransactions = useMemo(() => {
+    const filtered = periodTransactions.filter((tx) => {
+      const amount = tx.amount ?? 0;
+      if (detailsFilter.mode === 'income') return amount > 0;
+      if (detailsFilter.mode === 'expenses') return amount < 0;
+      if (detailsFilter.mode === 'category') {
+        if (amount >= 0 || tx.categoryId == null) return false;
+        return tx.categoryId === detailsFilter.categoryId;
+      }
+      return true;
+    });
+
+    return [...filtered]
+      .sort((a, b) => toTimestamp(b.bookingDate) - toTimestamp(a.bookingDate))
+      .slice(0, 15);
+  }, [detailsFilter, periodTransactions, toTimestamp]);
+
+  const detailsTitle = useMemo(() => {
+    if (detailsFilter.mode === 'income') return 'Transacciones que componen los ingresos';
+    if (detailsFilter.mode === 'expenses') return 'Transacciones que componen los gastos';
+    if (detailsFilter.mode === 'category') return `Transacciones de ${detailsFilter.name}`;
+    return 'Últimas transacciones del periodo';
+  }, [detailsFilter]);
+
+  const detailsSubtitle = useMemo(() => {
+    if (detailsFilter.mode === 'income') return 'Mostrando solo ingresos del periodo activo';
+    if (detailsFilter.mode === 'expenses') return 'Mostrando solo gastos del periodo activo';
+    if (detailsFilter.mode === 'category') return `Mostrando gastos de la categoría ${detailsFilter.name}`;
+    return 'Mostrando transacciones más recientes en el periodo activo';
+  }, [detailsFilter]);
+
   // ─── Chart data ─────────────────────────────────────────────────────────────
 
   const barData = timeSeries.map(p => ({
@@ -204,6 +291,7 @@ export function Dashboard({ token, recentTransactions, onUnauthorized }: Dashboa
   }));
 
   const pieData = categories.slice(0, 10).map(c => ({
+    categoryId: c.categoryId,
     name: c.categoryName,
     code: c.categoryCode,
     value: Math.abs(c.total),
@@ -279,12 +367,16 @@ export function Dashboard({ token, recentTransactions, onUnauthorized }: Dashboa
               variant="income"
               value={fmt(summary.totalIncome)}
               sub={`${summary.transactionCount} transacciones en el periodo`}
+              onClick={() => setDetailsFilter(prev => prev.mode === 'income' ? { mode: 'all' } : { mode: 'income' })}
+              active={detailsFilter.mode === 'income'}
             />
             <KpiCard
               icon="💸"
               label="Gastos"
               variant="expenses"
               value={fmt(Math.abs(summary.totalExpenses))}
+              onClick={() => setDetailsFilter(prev => prev.mode === 'expenses' ? { mode: 'all' } : { mode: 'expenses' })}
+              active={detailsFilter.mode === 'expenses'}
             />
             <KpiCard
               icon="📊"
@@ -355,6 +447,16 @@ export function Dashboard({ token, recentTransactions, onUnauthorized }: Dashboa
                         paddingAngle={2}
                         dataKey="value"
                         labelLine={false}
+                        onClick={(entry: { categoryId?: number; name?: string }) => {
+                          const categoryId = entry?.categoryId;
+                          const name = entry?.name || 'Categoría';
+                          if (categoryId == null) return;
+                          setDetailsFilter(prev => (
+                            prev.mode === 'category' && prev.categoryId === categoryId
+                              ? { mode: 'all' }
+                              : { mode: 'category', categoryId, name }
+                          ));
+                        }}
                       >
                         {pieData.map((entry, i) => (
                           <Cell key={i} fill={entry.color} stroke="none" />
@@ -373,7 +475,29 @@ export function Dashboard({ token, recentTransactions, onUnauthorized }: Dashboa
 
                   <ul className="db-pie-legend">
                     {pieData.map((item, i) => (
-                      <li key={i} className="db-pie-legend-item">
+                      <li
+                        key={i}
+                        className={`db-pie-legend-item${detailsFilter.mode === 'category' && detailsFilter.categoryId === item.categoryId ? ' is-active' : ''}`}
+                        onClick={() => {
+                          setDetailsFilter(prev => (
+                            prev.mode === 'category' && prev.categoryId === item.categoryId
+                              ? { mode: 'all' }
+                              : { mode: 'category', categoryId: item.categoryId, name: item.name }
+                          ));
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setDetailsFilter(prev => (
+                              prev.mode === 'category' && prev.categoryId === item.categoryId
+                                ? { mode: 'all' }
+                                : { mode: 'category', categoryId: item.categoryId, name: item.name }
+                            ));
+                          }
+                        }}
+                      >
                         <span className="db-pie-dot" style={{ background: item.color }} />
                         <span className="db-pie-name">{item.emoji} {item.name}</span>
                         <span className="db-pie-pct">{item.pct.toFixed(1)}%</span>
@@ -389,14 +513,26 @@ export function Dashboard({ token, recentTransactions, onUnauthorized }: Dashboa
           {/* ── Recent transactions ─────────────────────────────────────── */}
           <article className="db-chart-card">
             <div className="db-recent-header">
-              <h3 className="db-chart-title">Últimas transacciones</h3>
-              <span className="db-recent-count">{recentTransactions.length} mostradas</span>
+              <div className="db-recent-headline">
+                <h3 className="db-chart-title">{detailsTitle}</h3>
+                <span className="db-recent-subtitle">{detailsSubtitle}</span>
+              </div>
+              <span className="db-recent-count">{visibleTransactions.length} mostradas</span>
+              {detailsFilter.mode !== 'all' && (
+                <button
+                  type="button"
+                  className="db-clear-filter"
+                  onClick={() => setDetailsFilter({ mode: 'all' })}
+                >
+                  Limpiar filtro
+                </button>
+              )}
             </div>
-            {recentTransactions.length === 0 ? (
-              <p className="db-empty">Sin transacciones recientes.</p>
+            {visibleTransactions.length === 0 ? (
+              <p className="db-empty">No hay transacciones para este filtro en el periodo seleccionado.</p>
             ) : (
               <ul className="db-recent-list">
-                {recentTransactions.map((tx, i) => (
+                {visibleTransactions.map((tx, i) => (
                   <RecentRow
                     key={tx.id ?? tx.externalId ?? i}
                     tx={tx}

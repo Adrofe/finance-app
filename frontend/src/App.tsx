@@ -7,24 +7,9 @@ import { TransactionsTable } from './components/TransactionsTable';
 import { KEYCLOAK_REALM } from './config/env';
 import { useAuth } from './hooks/useAuth';
 import { useTransactions } from './hooks/useTransactions';
-import type { AppTab, BankingSubTab, Transaction } from './types/banking';
+import type { AppTab, BankingSubTab } from './types/banking';
 import { AccountsTable } from './components/AccountsTable';
 import { Dashboard } from './components/Dashboard';
-
-function toTimestamp(input?: string): number {
-  if (!input) {
-    return 0;
-  }
-
-  const date = new Date(input);
-  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
-
-function buildRecentTransactions(items: Transaction[]): Transaction[] {
-  return [...items]
-    .sort((a, b) => toTimestamp(b.bookingDate) - toTimestamp(a.bookingDate))
-    .slice(0, 5);
-}
 
 function App() {
   const { accessToken, authLoading, authError, login, logout, showSessionWarning, secondsLeft, keepSession } = useAuth();
@@ -35,8 +20,6 @@ function App() {
   const { items, loading, error, refresh } = useTransactions(accessToken, handleUnauthorized);
   const [activeTab, setActiveTab] = useState<AppTab>('banking');
   const [bankingSubTab, setBankingSubTab] = useState<BankingSubTab>('dashboard');
-
-  const recentTransactions = buildRecentTransactions(items);
 
   if (!accessToken) {
     return <LoginForm loading={authLoading} error={authError} realm={KEYCLOAK_REALM} onSubmit={login} />;
@@ -82,7 +65,7 @@ function App() {
           {bankingSubTab === 'dashboard' && (
             <Dashboard
               token={accessToken}
-              recentTransactions={recentTransactions}
+              transactions={items}
               onUnauthorized={handleUnauthorized}
             />
           )}

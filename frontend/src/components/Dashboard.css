@@ -98,6 +98,22 @@
   transition: box-shadow 0.2s ease;
 }
 
+.db-kpi-clickable {
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  width: 100%;
+}
+
+.db-kpi-clickable:hover {
+  box-shadow: 0 10px 26px rgba(17, 48, 76, 0.15);
+}
+
+.db-kpi-card.is-active {
+  outline: 2px solid rgba(15, 107, 180, 0.28);
+  box-shadow: 0 10px 28px rgba(15, 107, 180, 0.14);
+}
+
 .db-kpi-card:hover {
   box-shadow: 0 8px 24px rgba(17, 48, 76, 0.11);
 }
@@ -201,6 +217,20 @@
   padding: 3px 0;
 }
 
+.db-pie-legend-item[role="button"] {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 5px 6px;
+}
+
+.db-pie-legend-item[role="button"]:hover {
+  background: #eef6ff;
+}
+
+.db-pie-legend-item.is-active {
+  background: #e3f0ff;
+}
+
 .db-pie-dot {
   width: 10px;
   height: 10px;
@@ -239,11 +269,42 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.db-recent-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.db-recent-subtitle {
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .db-recent-count {
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+.db-clear-filter {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: #f3f8ff;
+  color: #2d4f69;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.db-clear-filter:hover {
+  background: #deedff;
+  border-color: #a6c6e9;
 }
 
 .db-recent-list {
