@@ -52,6 +52,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 			where t.tenantId = :tenantId
 			  and t.bookingDate >= :startDate
 			  and t.bookingDate <= :endDate
+			  and (t.transactionType is null or upper(t.transactionType.name) <> 'TRANSFER')
 			  and t.amount > 0
 			""")
 	java.math.BigDecimal sumIncomeByPeriod(
@@ -64,6 +65,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 			where t.tenantId = :tenantId
 			  and t.bookingDate >= :startDate
 			  and t.bookingDate <= :endDate
+			  and (t.transactionType is null or upper(t.transactionType.name) <> 'TRANSFER')
 			  and t.amount < 0
 			""")
 	java.math.BigDecimal sumExpensesByPeriod(
@@ -76,6 +78,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 			where t.tenantId = :tenantId
 			  and t.bookingDate >= :startDate
 			  and t.bookingDate <= :endDate
+			  and (t.transactionType is null or upper(t.transactionType.name) <> 'TRANSFER')
 			""")
 	Long countByPeriod(
 			@Param("tenantId")  Long tenantId,
@@ -94,6 +97,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 			where t.tenantId = :tenantId
 			  and t.bookingDate >= :startDate
 			  and t.bookingDate <= :endDate
+			  and (t.transactionType is null or upper(t.transactionType.name) <> 'TRANSFER')
 			  and t.amount < 0
 			  and t.category is not null
 			group by t.category.id, t.category.code, t.category.name
@@ -113,6 +117,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 			where t.tenantId = :tenantId
 			  and t.bookingDate >= :startDate
 			  and t.bookingDate <= :endDate
+			  and (t.transactionType is null or upper(t.transactionType.name) <> 'TRANSFER')
 			order by t.bookingDate asc
 			""")
 	List<Object[]> findDateAmountSeries(
