@@ -9,6 +9,7 @@ import { useAuth } from './hooks/useAuth';
 import { useTransactions } from './hooks/useTransactions';
 import type { AppTab, BankingSubTab, Transaction } from './types/banking';
 import { AccountsTable } from './components/AccountsTable';
+import { Dashboard } from './components/Dashboard';
 
 function toTimestamp(input?: string): number {
   if (!input) {
@@ -17,30 +18,6 @@ function toTimestamp(input?: string): number {
 
   const date = new Date(input);
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
-}
-
-function formatMoney(amount: number): string {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR'
-  }).format(amount);
-}
-
-function formatDate(input?: string): string {
-  if (!input) {
-    return '-';
-  }
-
-  const date = new Date(input);
-  if (Number.isNaN(date.getTime())) {
-    return input;
-  }
-
-  return new Intl.DateTimeFormat('es-ES', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).format(date);
 }
 
 function buildRecentTransactions(items: Transaction[]): Transaction[] {
@@ -59,9 +36,6 @@ function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('banking');
   const [bankingSubTab, setBankingSubTab] = useState<BankingSubTab>('dashboard');
 
-  const totalFlow = items.reduce((sum, transaction) => sum + (transaction.amount ?? 0), 0);
-  const income = items.reduce((sum, transaction) => sum + ((transaction.amount ?? 0) > 0 ? transaction.amount ?? 0 : 0), 0);
-  const expenses = items.reduce((sum, transaction) => sum + ((transaction.amount ?? 0) < 0 ? Math.abs(transaction.amount ?? 0) : 0), 0);
   const recentTransactions = buildRecentTransactions(items);
 
   if (!accessToken) {
@@ -106,50 +80,11 @@ function App() {
           <BankingSubTabs activeTab={bankingSubTab} onSelectTab={setBankingSubTab} />
 
           {bankingSubTab === 'dashboard' && (
-            <div className="dashboard-grid">
-              {loading && <p className="state">Loading dashboard...</p>}
-              {!loading && error && <p className="state error">{error}</p>}
-
-              {!loading && !error && (
-                <>
-                  <article className="metric-card">
-                    <h3>Total flow</h3>
-                    <strong>{formatMoney(totalFlow)}</strong>
-                    <span>Sum of all loaded transactions.</span>
-                  </article>
-
-                  <article className="metric-card">
-                    <h3>Income</h3>
-                    <strong>{formatMoney(income)}</strong>
-                    <span>Positive movements registered.</span>
-                  </article>
-
-                  <article className="metric-card">
-                    <h3>Expenses</h3>
-                    <strong>{formatMoney(expenses)}</strong>
-                    <span>Outgoing movements registered.</span>
-                  </article>
-
-                  <article className="sheet recent-card">
-                    <div className="sheet-header">
-                      <h3>Latest transactions</h3>
-                      <span>{recentTransactions.length} items</span>
-                    </div>
-                    <ul className="recent-list">
-                      {recentTransactions.map((transaction, index) => (
-                        <li key={transaction.id ?? transaction.externalId ?? index}>
-                          <div>
-                            <strong>{transaction.merchantName || 'Unknown merchant'}</strong>
-                            <small>{formatDate(transaction.bookingDate)}</small>
-                          </div>
-                          <strong>{formatMoney(transaction.amount ?? 0)}</strong>
-                        </li>
-                      ))}
-                    </ul>
-                  </article>
-                </>
-              )}
-            </div>
+            <Dashboard
+              token={accessToken}
+              recentTransactions={recentTransactions}
+              onUnauthorized={handleUnauthorized}
+            />
           )}
 
           {bankingSubTab === 'accounts' && (
