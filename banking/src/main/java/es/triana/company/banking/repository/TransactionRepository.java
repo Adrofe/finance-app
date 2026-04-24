@@ -32,6 +32,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 	List<Transaction> findAllByTenantIdAndAccountId(@Param("tenantId") Long tenantId, @Param("accountId") Long accountId);
 
 	@Query("""
+			select (count(t) > 0) from Transaction t
+			where t.tenantId = :tenantId
+			  and (t.sourceAccount.id = :accountId or t.destinationAccount.id = :accountId)
+			""")
+	boolean existsAnyByTenantIdAndAccountId(@Param("tenantId") Long tenantId, @Param("accountId") Long accountId);
+
+	@Query("""
 			select t from Transaction t
 			where t.tenantId = :tenantId
 			  and (:accountId is null or t.sourceAccount.id = :accountId or t.destinationAccount.id = :accountId)
