@@ -1,0 +1,514 @@
+/* ─── Panel wrapper ─────────────────────────────────────────────────────────── */
+
+.ttf-panel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: ttf-slide-in 0.15s ease-out;
+}
+
+@keyframes ttf-slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Rows ───────────────────────────────────────────────────────────────── */
+
+.ttf-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.ttf-row--multi {
+  display: grid;
+  grid-template-columns: 1fr minmax(190px, auto) minmax(150px, auto) minmax(150px, auto);
+  gap: 16px;
+  align-items: flex-start;
+}
+
+/* ─── Group (label + control) ─────────────────────────────────────────────── */
+
+.ttf-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ttf-group--wide {
+  flex: 1 1 200px;
+}
+
+.ttf-group--scroll {
+  flex: 0 0 auto;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.ttf-group--tags {
+  flex: 1 1 300px;
+}
+
+/* ─── Label ──────────────────────────────────────────────────────────────── */
+
+.ttf-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+/* ─── Inputs ─────────────────────────────────────────────────────────────── */
+
+.ttf-input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  font-size: 13px;
+  color: #111827;
+  background: #f9fafb;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  min-width: 0;
+}
+
+.ttf-input:focus {
+  border-color: #6366f1;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+}
+
+.ttf-input--wide {
+  width: 100%;
+  min-width: 180px;
+}
+
+.ttf-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ttf-range .ttf-input {
+  width: 130px;
+}
+
+.ttf-range-sep {
+  color: #9ca3af;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Date inputs narrower */
+input[type="date"].ttf-input {
+  width: 138px;
+  padding: 0 8px;
+}
+
+/* Number inputs narrower */
+input[type="number"].ttf-input {
+  width: 90px;
+}
+
+/* ─── Date filter ─────────────────────────────────────────────────────────── */
+
+.ttf-date-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Mode tabs */
+.ttf-date-tabs {
+  display: flex;
+  gap: 2px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 3px;
+  width: fit-content;
+}
+
+.ttf-date-tab {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.ttf-date-tab:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.ttf-date-tab.active {
+  background: #fff;
+  color: #4338ca;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+/* Month picker */
+.ttf-month-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ttf-month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ttf-month-nav-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+}
+
+.ttf-month-nav-btn:hover {
+  background: #f3f4f6;
+}
+
+.ttf-month-nav-year {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  min-width: 36px;
+  text-align: center;
+}
+
+.ttf-month-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.ttf-month-cell {
+  padding: 5px 6px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.1s;
+}
+
+.ttf-month-cell:hover {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.ttf-month-cell.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Year list */
+.ttf-year-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: 240px;
+}
+
+.ttf-year-pill {
+  padding: 4px 10px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 20px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+
+.ttf-year-pill:hover {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.ttf-year-pill.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ─── Checkbox base ───────────────────────────────────────────────────────── */
+
+.ttf-checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: #6366f1;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* ─── Category tree ───────────────────────────────────────────────────────── */
+
+.ttf-cat-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 260px;
+}
+
+.ttf-cat-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.ttf-cat-parent {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  user-select: none;
+}
+
+.ttf-cat-parent:hover {
+  background: #f3f4f6;
+}
+
+.ttf-cat-parent-name {
+  flex: 1;
+}
+
+.ttf-cat-count {
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 400;
+}
+
+.ttf-cat-children {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  padding-left: 16px;
+  gap: 0 4px;
+}
+
+.ttf-cat-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: #4b5563;
+  user-select: none;
+}
+
+.ttf-cat-child:hover {
+  background: #f3f4f6;
+}
+
+.ttf-cat-standalone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+  user-select: none;
+}
+
+.ttf-cat-standalone:hover {
+  background: #f3f4f6;
+}
+
+/* ─── Chip list ────────────────────────────────────────────────────────────── */
+
+.ttf-chip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.ttf-chip-list--wrap {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ─── Chip (toggle button style) ─────────────────────────────────────────── */
+
+.ttf-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1.5px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.ttf-chip:hover {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.ttf-chip--on {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+  font-weight: 600;
+}
+
+.ttf-chip--on:hover {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+}
+
+/* Category emoji */
+.ttf-cat-emoji {
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.ttf-cat-emoji--child {
+  font-size: 13px;
+}
+
+/* ─── Status chip (styled badge) ─────────────────────────────────────────── */
+
+.ttf-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  border: 1.5px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.ttf-status-chip:hover {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.ttf-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+
+/* ─── Type chip (colored badge) ──────────────────────────────────────────── */
+
+.ttf-type-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 7px;
+  border: 1.5px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.ttf-type-chip:hover {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.ttf-type-chip--on {
+  border-color: transparent;
+  font-weight: 700;
+}
+
+/* ─── Account chip with logo ─────────────────────────────────────────────── */
+
+.ttf-chip--acc {
+  gap: 6px;
+}
+
+.ttf-acc-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.ttf-acc-emoji {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* ─── Scrollbar styling for scroll groups ────────────────────────────────── */
+
+.ttf-group--scroll::-webkit-scrollbar { width: 4px; }
+.ttf-group--scroll::-webkit-scrollbar-track { background: transparent; }
+.ttf-group--scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }

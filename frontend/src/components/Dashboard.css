@@ -1,0 +1,453 @@
+/* ─── Dashboard wrapper ──────────────────────────────────────────────────── */
+
+.db-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ─── Filter bar ─────────────────────────────────────────────────────────── */
+
+.db-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
+  box-shadow: 0 2px 8px rgba(17, 48, 76, 0.05);
+}
+
+.db-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.db-preset-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--pill);
+  color: #30506a;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.87rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.db-preset-btn:hover {
+  background: #dceeff;
+  border-color: #aac8e8;
+}
+
+.db-preset-btn.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(15, 107, 180, 0.28);
+}
+
+.db-custom-dates {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.db-custom-dates label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #284257;
+}
+
+.db-custom-dates input[type="date"] {
+  border: 1px solid #c8d6e6;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 0.87rem;
+  background: #fcfeff;
+  color: var(--ink);
+}
+
+/* ─── KPI cards ──────────────────────────────────────────────────────────── */
+
+.db-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.db-kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  box-shadow: 0 4px 16px rgba(17, 48, 76, 0.06);
+  border-left: 4px solid transparent;
+  transition: box-shadow 0.2s ease;
+}
+
+.db-kpi-clickable {
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  width: 100%;
+}
+
+.db-kpi-clickable:hover {
+  box-shadow: 0 10px 26px rgba(17, 48, 76, 0.15);
+}
+
+.db-kpi-card.is-active {
+  outline: 2px solid rgba(15, 107, 180, 0.28);
+  box-shadow: 0 10px 28px rgba(15, 107, 180, 0.14);
+}
+
+.db-kpi-card:hover {
+  box-shadow: 0 8px 24px rgba(17, 48, 76, 0.11);
+}
+
+.db-kpi--income   { border-left-color: #22c55e; }
+.db-kpi--expenses { border-left-color: #ef4444; }
+.db-kpi--net      { border-left-color: var(--brand); }
+.db-kpi--savings  { border-left-color: #0d9488; }
+.db-kpi--count    { border-left-color: #8b5cf6; }
+
+.db-kpi-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.db-kpi-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.db-kpi-value {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.db-kpi--income   .db-kpi-value { color: #15803d; }
+.db-kpi--expenses .db-kpi-value { color: #b91c1c; }
+.db-kpi--net      .db-kpi-value { color: var(--brand-strong); }
+.db-kpi--savings  .db-kpi-value { color: #0f766e; }
+
+.db-kpi-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ─── Charts grid ────────────────────────────────────────────────────────── */
+
+.db-charts-grid {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 12px;
+}
+
+.db-chart-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  box-shadow: 0 4px 16px rgba(17, 48, 76, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.db-chart-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.db-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.db-view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.db-view-btn {
+  border: 0;
+  background: transparent;
+  color: #315571;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.db-view-btn.active {
+  background: var(--brand);
+  color: #fff;
+}
+
+.db-view-help {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.db-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 28px 0;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* ─── Pie legend ─────────────────────────────────────────────────────────── */
+
+.db-pie-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.db-pie-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.db-pie-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  padding: 3px 0;
+}
+
+.db-pie-legend-item[role="button"] {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 5px 6px;
+}
+
+.db-pie-legend-item[role="button"]:hover {
+  background: #eef6ff;
+}
+
+.db-pie-legend-item.is-active {
+  background: #e3f0ff;
+}
+
+.db-pie-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.db-pie-name {
+  flex: 1;
+  color: var(--ink);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-pie-pct {
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 42px;
+  text-align: right;
+  font-size: 0.8rem;
+}
+
+.db-pie-val {
+  font-weight: 600;
+  color: #b91c1c;
+  min-width: 80px;
+  text-align: right;
+  font-size: 0.82rem;
+}
+
+/* ─── Recent transactions section ────────────────────────────────────────── */
+
+.db-recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.db-recent-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.db-recent-subtitle {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.db-recent-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.db-clear-filter {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: #f3f8ff;
+  color: #2d4f69;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.db-clear-filter:hover {
+  background: #deedff;
+  border-color: #a6c6e9;
+}
+
+.db-recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.db-recent-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid #e5edf6;
+  border-radius: var(--radius-md);
+  background: #fbfdff;
+  transition: background 0.15s ease;
+}
+
+.db-recent-item:hover {
+  background: #f0f7ff;
+  border-color: #c8dff3;
+}
+
+.db-recent-cat-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.db-recent-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.db-recent-merchant {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-recent-date {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.db-recent-amount {
+  font-size: 0.97rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.db-recent-amount.positive { color: #15803d; }
+.db-recent-amount.negative { color: #b91c1c; }
+
+/* ─── Refresh button ─────────────────────────────────────────────────────── */
+
+.db-refresh-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+
+.db-refresh-btn:hover {
+  background: #dceeff;
+  color: var(--brand);
+  border-color: var(--brand);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  .db-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 840px) {
+  .db-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .db-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}

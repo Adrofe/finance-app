@@ -107,10 +107,40 @@ public class TransactionService {
                 normalizedCurrency,
                 timestamp);
 
-        Transaction savedTransaction = transactionRepository.save(transaction);
-        applyBalanceForCreate(savedTransaction, tenantId);
+        if (destinationAccount != null) {
+            // Double-entry: save source transaction, then create mirror for the destination
+            Transaction savedSource = transactionRepository.save(transaction);
+            applySingleAccountBalance(savedSource, tenantId);
 
-        return transactionMapper.toDto(savedTransaction);
+            Transaction mirror = Transaction.builder()
+                    .tenantId(tenantId)
+                    .sourceAccount(destinationAccount)
+                    .bookingDate(savedSource.getBookingDate())
+                    .valueDate(savedSource.getValueDate())
+                    .amount(savedSource.getAmount().negate())
+                    .currency(normalizedCurrency)
+                    .descriptionRaw(savedSource.getDescriptionRaw())
+                    .merchant(merchant)
+                    .category(category)
+                    .tags(new LinkedHashSet<>(tags))
+                    .status(status)
+                    .transactionType(transactionType)
+                    .linkedTransactionId(savedSource.getId())
+                    .createdAt(timestamp)
+                    .updatedAt(timestamp)
+                    .build();
+
+            Transaction savedMirror = transactionRepository.save(mirror);
+            applySingleAccountBalance(savedMirror, tenantId);
+
+            savedSource.setLinkedTransactionId(savedMirror.getId());
+            savedSource = transactionRepository.save(savedSource);
+            return transactionMapper.toDto(savedSource);
+        } else {
+            Transaction savedTransaction = transactionRepository.save(transaction);
+            applyBalanceForCreate(savedTransaction, tenantId);
+            return transactionMapper.toDto(savedTransaction);
+        }
     }
 
     public TransactionDTO getTransactionById(Long transactionId, Long tenantId) {
@@ -197,6 +227,11 @@ public class TransactionService {
         String normalizedCurrency = normalizeCurrency(transactionDTO.getCurrency());
         LocalDateTime timestamp = LocalDateTime.now();
 
+        Long existingLinkedId = existingTransaction.getLinkedTransactionId();
+        Transaction linkedTransaction = existingLinkedId != null
+                ? transactionRepository.findByIdAndTenantId(existingLinkedId, tenantId).orElse(null)
+                : null;
+
         transactionMapper.updateEntity(
                 existingTransaction,
                 transactionDTO,
@@ -211,12 +246,39 @@ public class TransactionService {
                 normalizedCurrency,
                 timestamp);
 
-        Transaction savedTransaction = transactionRepository.save(existingTransaction);
+        if (linkedTransaction != null) {
+            // Double-entry transfer: revert both sides, update both, apply both
+            revertSingleAccountBalance(oldSourceAccountId, oldAmount, oldStatus, tenantId);
+            revertSingleAccountBalance(linkedTransaction.getSourceAccount().getId(),
+                    linkedTransaction.getAmount(), linkedTransaction.getStatus(), tenantId);
 
-        revertBalanceForUpdate(oldSourceAccountId, oldDestinationAccountId, oldAmount, oldStatus, tenantId);
-        applyBalanceForUpdate(savedTransaction, tenantId);
+            Transaction savedTransaction = transactionRepository.save(existingTransaction);
 
-        return transactionMapper.toDto(savedTransaction);
+            // Mirror source tracks the transfer destination
+            Account mirrorSource = destinationAccount != null ? destinationAccount : linkedTransaction.getSourceAccount();
+            linkedTransaction.setSourceAccount(mirrorSource);
+            linkedTransaction.setAmount(savedTransaction.getAmount().negate());
+            linkedTransaction.setBookingDate(savedTransaction.getBookingDate());
+            linkedTransaction.setValueDate(savedTransaction.getValueDate());
+            linkedTransaction.setDescriptionRaw(savedTransaction.getDescriptionRaw());
+            linkedTransaction.setStatus(status);
+            linkedTransaction.setCategory(category);
+            linkedTransaction.setMerchant(merchant);
+            linkedTransaction.setTransactionType(transactionType);
+            linkedTransaction.setCurrency(normalizedCurrency);
+            linkedTransaction.setUpdatedAt(timestamp);
+            transactionRepository.save(linkedTransaction);
+
+            applySingleAccountBalance(savedTransaction, tenantId);
+            applySingleAccountBalance(linkedTransaction, tenantId);
+
+            return transactionMapper.toDto(savedTransaction);
+        } else {
+            Transaction savedTransaction = transactionRepository.save(existingTransaction);
+            revertBalanceForUpdate(oldSourceAccountId, oldDestinationAccountId, oldAmount, oldStatus, tenantId);
+            applyBalanceForUpdate(savedTransaction, tenantId);
+            return transactionMapper.toDto(savedTransaction);
+        }
     }
 
     public void deleteTransaction(Long transactionId, Long tenantId) {
@@ -225,13 +287,37 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
             .orElseThrow(() -> new TransactionNotFoundException("Transaction not found with id: " + transactionId));
 
-        TransactionStatus status = transaction.getStatus();
+        Long linkedId = transaction.getLinkedTransactionId();
         Long sourceAccountId = transaction.getSourceAccount().getId();
-        Long destinationAccountId = transaction.getDestinationAccount() != null ? transaction.getDestinationAccount().getId() : null;
         java.math.BigDecimal amount = transaction.getAmount();
+        TransactionStatus status = transaction.getStatus();
 
-        transactionRepository.delete(transaction);
-        revertBalanceForDelete(sourceAccountId, destinationAccountId, amount, status, tenantId);
+        if (linkedId != null) {
+            // Double-entry transfer: delete both halves
+            transactionRepository.findByIdAndTenantId(linkedId, tenantId).ifPresent(mirror -> {
+                Long mirrorSourceId = mirror.getSourceAccount().getId();
+                java.math.BigDecimal mirrorAmount = mirror.getAmount();
+                TransactionStatus mirrorStatus = mirror.getStatus();
+
+                // Break mutual links first to avoid FK constraint issues
+                mirror.setLinkedTransactionId(null);
+                transactionRepository.save(mirror);
+                transaction.setLinkedTransactionId(null);
+                transactionRepository.save(transaction);
+
+                transactionRepository.delete(mirror);
+                revertSingleAccountBalance(mirrorSourceId, mirrorAmount, mirrorStatus, tenantId);
+            });
+
+            transactionRepository.delete(transaction);
+            revertSingleAccountBalance(sourceAccountId, amount, status, tenantId);
+        } else {
+            // Non-transfer or legacy single transaction
+            Long destinationAccountId = transaction.getDestinationAccount() != null
+                    ? transaction.getDestinationAccount().getId() : null;
+            transactionRepository.delete(transaction);
+            revertBalanceForDelete(sourceAccountId, destinationAccountId, amount, status, tenantId);
+        }
     }
 
     public Double getAccountBalance(Long accountId, Long tenantId) {
@@ -457,6 +543,23 @@ public class TransactionService {
         return 0.0;
     }
 
+    private void applySingleAccountBalance(Transaction transaction, Long tenantId) {
+        BalanceDeltas deltas = computeBalanceDeltas(
+            transaction.getSourceAccount().getId(),
+            null,
+            transaction.getAmount(),
+            transaction.getStatus(),
+            false,
+            false);
+        adjustAccountsForTransaction(deltas.sourceId, null, tenantId, deltas.sourceDelta, null, deltas.updateBoth);
+    }
+
+    private void revertSingleAccountBalance(Long sourceAccountId, java.math.BigDecimal amount,
+            TransactionStatus status, Long tenantId) {
+        BalanceDeltas deltas = computeBalanceDeltas(sourceAccountId, null, amount, status, true, true);
+        adjustAccountsForTransaction(deltas.sourceId, null, tenantId, deltas.sourceDelta, null, deltas.updateBoth);
+    }
+
     private void applyBalanceForCreate(Transaction transaction, Long tenantId) {
         BalanceDeltas deltas = computeBalanceDeltas(
             transaction.getSourceAccount().getId(),
@@ -560,13 +663,14 @@ public class TransactionService {
                 updateBoth = true;
             }
         } else {
+            // Transfer: amount represents the outflow from source (negative = deduct source, credit dest)
             if (pending) {
-                sourceDelta = amount.negate();
-                destDelta = amount;
+                sourceDelta = amount;
+                destDelta = amount.negate();
                 updateBoth = false;
             } else {
-                sourceDelta = amount.negate();
-                destDelta = amount;
+                sourceDelta = amount;
+                destDelta = amount.negate();
                 updateBoth = true;
             }
         }

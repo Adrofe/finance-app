@@ -1,0 +1,489 @@
+/* ─── Editing row ──────────────────────────────────────────────────────────── */
+
+.tt-row--editing {
+  background: #fafbff !important;
+  box-shadow: inset 0 0 0 2px #818cf8;
+}
+
+.tt-row--editing:hover {
+  background: #f5f3ff !important;
+}
+
+/* ─── Editable cells ───────────────────────────────────────────────────────── */
+
+/* Read-only cell indicator (destination account in transfers) */
+.tie-readonly {
+  opacity: 0.75;
+  cursor: default;
+}
+
+.tie-editable {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.tie-editable:hover {
+  background: #eef2ff;
+}
+
+.tie-cell--active {
+  background: #e0e7ff !important;
+}
+
+/* Placeholder text shown when a field is empty */
+.tie-placeholder {
+  color: #a5b4fc;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ─── Inline text input (date, description, amount) ───────────────────────── */
+
+.tie-text-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Date: float out of the narrow column */
+.tie-text-edit--date {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  transform: translateY(-50%);
+  z-index: 50;
+  background: #fff;
+  border: 1.5px solid #6366f1;
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  min-width: 220px;
+  gap: 6px;
+}
+
+.tt-td-date.tie-cell--active {
+  overflow: visible;
+  position: relative;
+}
+
+.tie-text-edit--wide {
+  width: 100%;
+}
+
+/* Amount: float out to the right so confirm/cancel buttons aren't squished */
+.tie-text-edit--amount {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  z-index: 50;
+  background: #fff;
+  border: 1.5px solid #6366f1;
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.tt-td-amount.tie-cell--active {
+  overflow: visible;
+  position: relative;
+}
+
+.tie-input {
+  height: 28px;
+  padding: 0 8px;
+  border: 1.5px solid #6366f1;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  outline: none;
+  min-width: 0;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  color: #111827;
+}
+
+/* Date input inside the floating overlay — no double border */
+.tie-input--date {
+  border: none;
+  box-shadow: none;
+  min-width: 140px;
+  padding: 0 4px;
+}
+
+.tie-input--wide {
+  flex: 1;
+  min-width: 100px;
+}
+
+.tie-input--amount {
+  width: 115px;
+  text-align: right;
+  border: none;
+  box-shadow: none;
+}
+
+.tie-btn-confirm,
+.tie-btn-cancel {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+}
+
+.tie-btn-confirm {
+  background: #6366f1;
+  color: #fff;
+}
+
+.tie-btn-confirm:hover    { background: #4f46e5; }
+.tie-btn-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.tie-btn-cancel {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.tie-btn-cancel:hover { background: #e5e7eb; color: #374151; }
+
+/* ─── Actions column ───────────────────────────────────────────────────────── */
+
+.tie-action-btns {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+}
+
+.tie-exit-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1.5px solid #818cf8;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+
+.tie-exit-btn:hover { background: #e0e7ff; border-color: #6366f1; }
+
+/* Saving spinner dot */
+.tie-saving-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6366f1;
+  animation: tie-pulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes tie-pulse {
+  from { opacity: 0.2; transform: scale(0.85); }
+  to   { opacity: 1;   transform: scale(1.1);  }
+}
+
+/* ─── Error bar ────────────────────────────────────────────────────────────── */
+
+.tie-error-tr { background: transparent; }
+
+.tie-error-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-radius: 7px;
+  color: #991b1b;
+  font-size: 12px;
+}
+
+.tie-error-bar button {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #be123c;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.tie-error-bar button:hover { color: #9f1239; }
+
+/* ─── Floating picker base ─────────────────────────────────────────────────── */
+
+.tie-picker {
+  position: fixed;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.13);
+  z-index: 9999;
+  overflow: hidden;
+}
+
+/* ─── Category picker ──────────────────────────────────────────────────────── */
+
+.tie-cat-picker {
+  width: 300px;
+  max-height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tie-picker-search {
+  padding: 10px 10px 7px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tie-search-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 7px;
+  font-size: 13px;
+  outline: none;
+  background: #f9fafb;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.tie-search-input:focus {
+  border-color: #6366f1;
+  background: #fff;
+}
+
+.tie-picker-body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 5px 4px;
+}
+
+.tie-cat-clear {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: #9ca3af;
+  text-align: left;
+  border-radius: 7px;
+}
+
+.tie-cat-clear:hover { background: #f9fafb; color: #6b7280; }
+
+.tie-cat-group-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.tie-cat-emoji {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.tie-cat-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: #1f2937;
+  text-align: left;
+  border-radius: 7px;
+  transition: background 0.1s;
+}
+
+.tie-cat-item:hover { background: #f8fafc; }
+
+.tie-cat-item--active {
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 600;
+}
+
+.tie-cat-child {
+  padding-left: 28px;
+  font-size: 12.5px;
+}
+
+/* ─── Status picker ────────────────────────────────────────────────────────── */
+
+.tie-status-picker,
+.tie-type-picker {
+  padding: 5px 4px;
+  min-width: 160px;
+}
+
+.tie-status-item,
+.tie-type-item {
+  display: flex;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 7px;
+  transition: background 0.1s;
+}
+
+.tie-status-item:hover,
+.tie-type-item:hover { background: #f8fafc; }
+
+.tie-item--active { background: #eef2ff !important; }
+
+/* ─── Account picker ───────────────────────────────────────────────────────── */
+
+.tie-acc-picker {
+  padding: 5px 4px;
+}
+
+.tie-acc-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 7px;
+  transition: background 0.1s;
+}
+
+.tie-acc-item:hover { background: #f8fafc; }
+
+.tie-acc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+}
+
+.tie-acc-name { font-size: 13px; font-weight: 600; color: #111827; }
+.tie-acc-bank { font-size: 11px; color: #9ca3af; }
+
+/* ─── Tag picker ───────────────────────────────────────────────────────────── */
+
+.tie-tag-picker {
+  padding: 0;
+  max-width: 280px;
+}
+
+.tie-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px;
+}
+
+.tie-empty-tags {
+  font-size: 12px;
+  color: #9ca3af;
+  padding: 4px;
+}
+
+.tie-tag-item {
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1.5px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.tie-tag-item:hover {
+  border-color: #a5b4fc;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.tie-tag-item--on {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #fff;
+  font-weight: 600;
+}
+
+.tie-tag-item--on:hover {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+}
+
+.tie-tag-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.tie-picker-save {
+  flex: 1;
+  padding: 6px;
+  border-radius: 7px;
+  border: none;
+  background: #6366f1;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.tie-picker-save:hover    { background: #4f46e5; }
+.tie-picker-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.tie-picker-cancel {
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: 1.5px solid #d1d5db;
+  background: #fff;
+  color: #6b7280;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.tie-picker-cancel:hover { background: #f3f4f6; }

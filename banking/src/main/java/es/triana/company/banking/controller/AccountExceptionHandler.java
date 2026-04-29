@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import es.triana.company.banking.model.api.ApiResponse;
+import es.triana.company.banking.service.exception.AccountConflictException;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
 import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
 import es.triana.company.banking.service.exception.AccountValidationException;
@@ -56,6 +57,12 @@ public class AccountExceptionHandler {
 
     @ExceptionHandler(DuplicateAccountIbanException.class)
     public ResponseEntity<ApiResponse<Void>> handleDuplicateAccountIbanException(DuplicateAccountIbanException exception) {
+        ApiResponse<Void> response = new ApiResponse<>(409, exception.getMessage(), null);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    @ExceptionHandler(AccountConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountConflictException(AccountConflictException exception) {
         ApiResponse<Void> response = new ApiResponse<>(409, exception.getMessage(), null);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }

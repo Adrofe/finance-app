@@ -88,6 +88,9 @@ public class Transaction {
     @Builder.Default
     private Set<Tag> tags = new LinkedHashSet<>();
 
+    @Column(name = "linked_transaction_id")
+    private Long linkedTransactionId;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 

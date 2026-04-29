@@ -17,6 +17,7 @@ public class CategoryMapper {
                 .name(category.getName())
                 .code(category.getCode())
                 .parentId(category.getParent() != null ? category.getParent().getId() : null)
+                .parentName(category.getParent() != null ? category.getParent().getName() : null)
                 .isFixed(category.getIsFixed())
                 .build();
     }

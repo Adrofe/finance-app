@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # Crear la red externa si no existe
 docker network inspect finance-net >/dev/null 2>&1 || docker network create finance-net
 
@@ -16,5 +18,6 @@ docker-compose -f docker-compose.yml down
 docker-compose -f docker-compose.yml up --build -d
 
 echo "All services are up and running."
+echo "Frontend available on http://localhost:${FRONTEND_PORT}"
 
 sleep 10

@@ -15,5 +15,6 @@ public class CategoryDTO {
     private String name;
     private String code;
     private Long parentId;
+    private String parentName;
     private Boolean isFixed;
 }

@@ -71,6 +71,7 @@ public class TransactionMapper {
 
 	public TransactionDTO toDto(Transaction transaction) {
 		return TransactionDTO.builder()
+				.id(transaction.getId())
 				.sourceAccountId(transaction.getSourceAccount() != null ? transaction.getSourceAccount().getId() : null)
 				.destinationAccountId(transaction.getDestinationAccount() != null ? transaction.getDestinationAccount().getId() : null)
 				.bookingDate(transaction.getBookingDate() != null ? transaction.getBookingDate().atStartOfDay() : null)
@@ -85,6 +86,7 @@ public class TransactionMapper {
 				.externalId(transaction.getExternalTxId())
 				.statusId(transaction.getStatus() != null ? transaction.getStatus().getId() : null)
 				.typeId(transaction.getTransactionType() != null ? transaction.getTransactionType().getId() : null)
+				.linkedTransactionId(transaction.getLinkedTransactionId())
 				.createdAt(transaction.getCreatedAt() != null ? transaction.getCreatedAt().toLocalDate() : null)
 				.updatedAt(transaction.getUpdatedAt() != null ? transaction.getUpdatedAt().toLocalDate() : null)
 				.build();

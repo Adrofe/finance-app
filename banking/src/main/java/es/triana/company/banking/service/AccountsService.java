@@ -16,6 +16,8 @@ import es.triana.company.banking.model.db.Institution;
 import es.triana.company.banking.repository.AccountTypeRepository;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.repository.InstitutionRepository;
+import es.triana.company.banking.repository.TransactionRepository;
+import es.triana.company.banking.service.exception.AccountConflictException;
 import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
 import es.triana.company.banking.service.exception.InstitutionNotFoundException;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
@@ -35,6 +37,8 @@ public class AccountsService {
     private AccountTypeRepository accountTypeRepository;
     @Autowired
     private InstitutionRepository institutionRepository;
+    @Autowired
+    private TransactionRepository transactionRepository;
     @Autowired
     private AccountMapper accountMapper;
     @Autowired
