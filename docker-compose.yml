@@ -10,6 +10,17 @@ services:
     networks:
       - finance-net
 
+  investments:
+    build:
+      context: .
+      dockerfile: investments/Dockerfile
+    env_file:
+      - ./investments/.env
+    ports:
+      - "8082:8082"
+    networks:
+      - finance-net
+
   frontend:
     build:
       context: ./frontend
@@ -20,6 +31,7 @@ services:
         VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID}
     depends_on:
       - banking
+      - investments
     ports:
       - "${FRONTEND_PORT:-5173}:80"
     networks:
