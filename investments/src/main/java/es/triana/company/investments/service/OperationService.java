@@ -2,6 +2,7 @@ package es.triana.company.investments.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import es.triana.company.investments.model.api.CreateOperationRequest;
 import es.triana.company.investments.model.api.FifoRebuildResultDTO;
 import es.triana.company.investments.model.api.OperationDTO;
+import es.triana.company.investments.model.api.TaxSummaryDTO;
 import es.triana.company.investments.model.db.Investment;
 import es.triana.company.investments.model.db.InvestmentOperation;
 import es.triana.company.investments.model.db.OperationFifoLot;
@@ -116,6 +118,43 @@ public class OperationService {
                 .stream()
                 .map(op -> toDTO(op, fifoLotRepository.findBySellOperationId(op.getId())))
                 .toList();
+    }
+
+    public TaxSummaryDTO getTaxSummary(Long tenantId, int year) {
+        if (tenantId == null || tenantId <= 0) {
+            throw new InvestmentValidationException("tenantId is required and must be > 0");
+        }
+        if (year < 1900 || year > 3000) {
+            throw new InvestmentValidationException("year is required and must be between 1900 and 3000");
+        }
+
+        LocalDate startDate = LocalDate.of(year, 1, 1);
+        LocalDate endDate = LocalDate.of(year, 12, 31);
+
+        BigDecimal total = fifoLotRepository
+                .sumGainLossByTenantAndSellDateBetween(tenantId, startDate, endDate)
+                .setScale(4, RoundingMode.HALF_UP);
+
+        List<TaxSummaryDTO.ByInstrument> byInstrument = fifoLotRepository
+                .sumGainLossByInstrumentAndSellDateBetween(tenantId, startDate, endDate)
+                .stream()
+                .map(row -> new TaxSummaryDTO.ByInstrument(
+                        (Long) row[0],
+                        (String) row[1],
+                        (String) row[2],
+                        (String) row[3],
+                        ((BigDecimal) row[4]).setScale(4, RoundingMode.HALF_UP)))
+                .toList();
+
+        List<TaxSummaryDTO.ByCurrency> byCurrency = fifoLotRepository
+                .sumGainLossByCurrencyAndSellDateBetween(tenantId, startDate, endDate)
+                .stream()
+                .map(row -> new TaxSummaryDTO.ByCurrency(
+                        (String) row[0],
+                        ((BigDecimal) row[1]).setScale(4, RoundingMode.HALF_UP)))
+                .toList();
+
+        return new TaxSummaryDTO(tenantId, year, total, byInstrument, byCurrency);
     }
 
         /**

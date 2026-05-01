@@ -15,6 +15,7 @@ import es.triana.company.investments.model.api.ApiResponse;
 import es.triana.company.investments.model.api.CreateOperationRequest;
 import es.triana.company.investments.model.api.FifoRebuildResultDTO;
 import es.triana.company.investments.model.api.OperationDTO;
+import es.triana.company.investments.model.api.TaxSummaryDTO;
 import es.triana.company.investments.service.OperationService;
 import jakarta.validation.Valid;
 
@@ -53,6 +54,18 @@ public class OperationsController {
     public ResponseEntity<ApiResponse<List<OperationDTO>>> getByTenant(@RequestParam Long tenantId) {
         List<OperationDTO> data = operationService.getByTenant(tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Operations retrieved successfully", data));
+    }
+
+    /**
+     * Fiscal summary for one year based on realised FIFO lots (SELL side date).
+     * Includes totals and breakdowns by instrument and currency.
+     */
+    @GetMapping("/tax-summary")
+    public ResponseEntity<ApiResponse<TaxSummaryDTO>> getTaxSummary(
+            @RequestParam Long tenantId,
+            @RequestParam int year) {
+        TaxSummaryDTO data = operationService.getTaxSummary(tenantId, year);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Tax summary retrieved successfully", data));
     }
 
     /**

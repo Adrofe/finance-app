@@ -30,6 +30,7 @@ import org.mockito.quality.Strictness;
 import es.triana.company.investments.model.api.CreateOperationRequest;
 import es.triana.company.investments.model.api.FifoRebuildResultDTO;
 import es.triana.company.investments.model.api.OperationDTO;
+import es.triana.company.investments.model.api.TaxSummaryDTO;
 import es.triana.company.investments.model.db.ExchangeRate;
 import es.triana.company.investments.model.db.Investment;
 import es.triana.company.investments.model.db.InvestmentOperation;
@@ -543,6 +544,58 @@ class OperationServiceTest {
             verify(fifoLotRepository, times(0)).save(any());
         }
     }
+
+        // =========================================================================
+        // Tax summary
+        // =========================================================================
+
+        @Nested
+        @DisplayName("Tax summary")
+        class TaxSummary {
+
+                @Test
+                @DisplayName("Returns annual realised gain/loss with breakdowns by instrument and currency")
+                void taxSummary_returnsAggregatedData() {
+                        when(fifoLotRepository.sumGainLossByTenantAndSellDateBetween(
+                                        eq(TENANT_ID), eq(LocalDate.of(2024, 1, 1)), eq(LocalDate.of(2024, 12, 31))))
+                                        .thenReturn(bd("321.98765"));
+
+                        when(fifoLotRepository.sumGainLossByInstrumentAndSellDateBetween(
+                                        eq(TENANT_ID), eq(LocalDate.of(2024, 1, 1)), eq(LocalDate.of(2024, 12, 31))))
+                                        .thenReturn(List.of(
+                                                        new Object[] {10L, "AAPL", "AAPL", "Apple Inc.", bd("250.11111")},
+                                                        new Object[] {20L, "MSFT", "MSFT", "Microsoft", bd("71.87654")}));
+
+                        when(fifoLotRepository.sumGainLossByCurrencyAndSellDateBetween(
+                                        eq(TENANT_ID), eq(LocalDate.of(2024, 1, 1)), eq(LocalDate.of(2024, 12, 31))))
+                                        .thenReturn(List.of(
+                                                        new Object[] {"USD", bd("300.10001")},
+                                                        new Object[] {"EUR", bd("21.88764")}));
+
+                        TaxSummaryDTO result = operationService.getTaxSummary(TENANT_ID, 2024);
+
+                        assertThat(result.tenantId()).isEqualTo(TENANT_ID);
+                        assertThat(result.year()).isEqualTo(2024);
+                        assertThat(result.realizedGainLossEur()).isEqualByComparingTo("321.9877");
+
+                        assertThat(result.byInstrument()).hasSize(2);
+                        assertThat(result.byInstrument().get(0).instrumentId()).isEqualTo(10L);
+                        assertThat(result.byInstrument().get(0).instrumentCode()).isEqualTo("AAPL");
+                        assertThat(result.byInstrument().get(0).realizedGainLossEur()).isEqualByComparingTo("250.1111");
+
+                        assertThat(result.byCurrency()).hasSize(2);
+                        assertThat(result.byCurrency().get(0).currency()).isEqualTo("USD");
+                        assertThat(result.byCurrency().get(0).realizedGainLossEur()).isEqualByComparingTo("300.1000");
+                }
+
+                @Test
+                @DisplayName("Invalid year throws validation error")
+                void taxSummary_invalidYear_throws() {
+                        assertThatThrownBy(() -> operationService.getTaxSummary(TENANT_ID, 1800))
+                                        .isInstanceOf(InvestmentValidationException.class)
+                                        .hasMessageContaining("year");
+                }
+        }
 
     // =========================================================================
     // Helpers
