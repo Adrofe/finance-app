@@ -14,7 +14,7 @@ public record CreateOperationRequest(
         @NotNull(message = "investmentId is required")
         Long investmentId,
 
-        @NotNull(message = "tenantId is required")
+        /** Tenant ID will be extracted from Keycloak token if not provided */
         Long tenantId,
 
         /** BUY or SELL */

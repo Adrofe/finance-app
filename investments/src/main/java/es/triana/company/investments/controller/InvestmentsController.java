@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import es.triana.company.investments.model.api.ApiResponse;
@@ -19,6 +18,7 @@ import es.triana.company.investments.model.api.InvestmentDTO;
 import es.triana.company.investments.model.api.InvestmentSummaryDTO;
 import es.triana.company.investments.model.api.PriceRefreshResultDTO;
 import es.triana.company.investments.model.api.PriceUpdateRequestDTO;
+import es.triana.company.investments.security.TenantContext;
 import es.triana.company.investments.service.InvestmentService;
 import es.triana.company.investments.service.PriceRefreshService;
 import jakarta.validation.Valid;
@@ -29,28 +29,31 @@ public class InvestmentsController {
 
     private final InvestmentService investmentService;
     private final PriceRefreshService priceRefreshService;
+    private final TenantContext tenantContext;
 
-    public InvestmentsController(InvestmentService investmentService, PriceRefreshService priceRefreshService) {
+    public InvestmentsController(InvestmentService investmentService, PriceRefreshService priceRefreshService, TenantContext tenantContext) {
         this.investmentService = investmentService;
         this.priceRefreshService = priceRefreshService;
+        this.tenantContext = tenantContext;
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<InvestmentDTO>>> getAll(@RequestParam(name = "tenantId") Long tenantId) {
+    public ResponseEntity<ApiResponse<List<InvestmentDTO>>> getAll() {
+        Long tenantId = tenantContext.getCurrentTenantId();
         List<InvestmentDTO> data = investmentService.getAllByTenant(tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Investments retrieved successfully", data));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<InvestmentDTO>> getById(
-            @PathVariable("id") Long id,
-            @RequestParam(name = "tenantId") Long tenantId) {
+    public ResponseEntity<ApiResponse<InvestmentDTO>> getById(@PathVariable("id") Long id) {
+        Long tenantId = tenantContext.getCurrentTenantId();
         InvestmentDTO data = investmentService.getById(id, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Investment retrieved successfully", data));
     }
 
     @GetMapping("/summary")
-    public ResponseEntity<ApiResponse<InvestmentSummaryDTO>> getSummary(@RequestParam(name = "tenantId") Long tenantId) {
+    public ResponseEntity<ApiResponse<InvestmentSummaryDTO>> getSummary() {
+        Long tenantId = tenantContext.getCurrentTenantId();
         InvestmentSummaryDTO data = investmentService.getSummary(tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Investment summary retrieved successfully", data));
     }
@@ -71,9 +74,8 @@ public class InvestmentsController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> delete(
-            @PathVariable("id") Long id,
-            @RequestParam(name = "tenantId") Long tenantId) {
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable("id") Long id) {
+        Long tenantId = tenantContext.getCurrentTenantId();
         investmentService.delete(id, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Investment deleted successfully", null));
     }

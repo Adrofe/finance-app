@@ -16,6 +16,7 @@ import es.triana.company.investments.model.api.CreateOperationRequest;
 import es.triana.company.investments.model.api.FifoRebuildResultDTO;
 import es.triana.company.investments.model.api.OperationDTO;
 import es.triana.company.investments.model.api.TaxSummaryDTO;
+import es.triana.company.investments.security.TenantContext;
 import es.triana.company.investments.service.OperationService;
 import jakarta.validation.Valid;
 
@@ -24,18 +25,33 @@ import jakarta.validation.Valid;
 public class OperationsController {
 
     private final OperationService operationService;
+    private final TenantContext tenantContext;
 
-    public OperationsController(OperationService operationService) {
+    public OperationsController(OperationService operationService, TenantContext tenantContext) {
         this.operationService = operationService;
+        this.tenantContext = tenantContext;
     }
 
     /**
      * Register a BUY or SELL operation.
      * On SELL, the FIFO matching is computed automatically and returned in the response.
+     * The tenant_id is extracted from the Keycloak token.
      */
     @PostMapping
     public ResponseEntity<ApiResponse<OperationDTO>> register(@Valid @RequestBody CreateOperationRequest request) {
-        OperationDTO result = operationService.registerOperation(request);
+        Long tenantId = tenantContext.getCurrentTenantId();
+        // Ensure tenantId is always from the authenticated token
+        CreateOperationRequest securedRequest = new CreateOperationRequest(
+                request.investmentId(),
+                tenantId,
+                request.type(),
+                request.operationDate(),
+                request.quantity(),
+                request.unitPrice(),
+                request.fees(),
+                request.currency(),
+                request.notes());
+        OperationDTO result = operationService.registerOperation(securedRequest);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponse<>(201, "Operation registered successfully", result));
     }
@@ -43,15 +59,16 @@ public class OperationsController {
     /** List all operations for a specific investment position */
     @GetMapping("/by-investment")
     public ResponseEntity<ApiResponse<List<OperationDTO>>> getByInvestment(
-            @RequestParam Long investmentId,
-            @RequestParam Long tenantId) {
+            @RequestParam Long investmentId) {
+        Long tenantId = tenantContext.getCurrentTenantId();
         List<OperationDTO> data = operationService.getByInvestment(investmentId, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Operations retrieved successfully", data));
     }
 
     /** List all operations for a tenant (all investments) */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<OperationDTO>>> getByTenant(@RequestParam Long tenantId) {
+    public ResponseEntity<ApiResponse<List<OperationDTO>>> getByTenant() {
+        Long tenantId = tenantContext.getCurrentTenantId();
         List<OperationDTO> data = operationService.getByTenant(tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Operations retrieved successfully", data));
     }
@@ -62,8 +79,8 @@ public class OperationsController {
      */
     @GetMapping("/tax-summary")
     public ResponseEntity<ApiResponse<TaxSummaryDTO>> getTaxSummary(
-            @RequestParam Long tenantId,
             @RequestParam int year) {
+        Long tenantId = tenantContext.getCurrentTenantId();
         TaxSummaryDTO data = operationService.getTaxSummary(tenantId, year);
         return ResponseEntity.ok(new ApiResponse<>(200, "Tax summary retrieved successfully", data));
     }
@@ -74,8 +91,8 @@ public class OperationsController {
      */
     @PostMapping("/rebuild-fifo")
     public ResponseEntity<ApiResponse<FifoRebuildResultDTO>> rebuildFifo(
-            @RequestParam Long instrumentId,
-            @RequestParam Long tenantId) {
+            @RequestParam Long instrumentId) {
+        Long tenantId = tenantContext.getCurrentTenantId();
         FifoRebuildResultDTO data = operationService.rebuildFifoForInstrumentTenant(instrumentId, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "FIFO rebuilt successfully", data));
     }
