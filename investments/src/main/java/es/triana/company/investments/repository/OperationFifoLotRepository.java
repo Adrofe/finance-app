@@ -3,6 +3,7 @@ package es.triana.company.investments.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -19,6 +20,9 @@ public interface OperationFifoLotRepository extends JpaRepository<OperationFifoL
      * Used to compute already-consumed quantities without a full-table scan.
      */
     List<OperationFifoLot> findByBuyOperationIdIn(java.util.Collection<Long> buyOperationIds);
+
+    @Modifying
+    void deleteBySellOperationIdIn(java.util.Collection<Long> sellOperationIds);
 
     /** Total gain/loss in EUR for a given sell operation (sum of all matched lots) */
     @Query("SELECT COALESCE(SUM(l.gainLossEur), 0) FROM OperationFifoLot l WHERE l.sellOperationId = :sellId")

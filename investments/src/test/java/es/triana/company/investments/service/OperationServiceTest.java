@@ -28,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import es.triana.company.investments.model.api.CreateOperationRequest;
+import es.triana.company.investments.model.api.FifoRebuildResultDTO;
 import es.triana.company.investments.model.api.OperationDTO;
 import es.triana.company.investments.model.db.ExchangeRate;
 import es.triana.company.investments.model.db.Investment;
@@ -472,6 +473,74 @@ class OperationServiceTest {
             OperationDTO result = operationService.registerOperation(sell(DATE_SELL, "10", "180", "4"));
             assertThat(result.fifoLots()).hasSize(1);
             assertThat(result.fifoLots().getFirst().quantity()).isEqualByComparingTo("10");
+        }
+    }
+
+    // =========================================================================
+    // FIFO rebuild command
+    // =========================================================================
+
+    @Nested
+    @DisplayName("FIFO rebuild")
+    class FifoRebuild {
+
+        @Test
+        @DisplayName("Rebuild FIFO from scratch for instrument+tenant in temporal order")
+        void rebuild_backdatedOperations_rebuildsLotsInOrder() {
+            InvestmentOperation buy1 = savedOp(101L, "BUY", LocalDate.of(2024, 1, 10),
+                    bd("10"), bd("100"), bd("0"), bd("1000.0000"), "USD", bd("1.10"), bd("909.0909"));
+            InvestmentOperation sell1 = savedOp(102L, "SELL", LocalDate.of(2024, 1, 20),
+                    bd("4"), bd("120"), bd("0"), bd("480.0000"), "USD", bd("1.20"), bd("400.0000"));
+            // Backdated BUY inserted before an existing later SELL
+            InvestmentOperation buy2 = savedOp(103L, "BUY", LocalDate.of(2024, 2, 1),
+                    bd("5"), bd("90"), bd("0"), bd("450.0000"), "USD", bd("1.08"), bd("416.6667"));
+            InvestmentOperation sell2 = savedOp(104L, "SELL", LocalDate.of(2024, 2, 10),
+                    bd("5"), bd("110"), bd("0"), bd("550.0000"), "USD", bd("1.10"), bd("500.0000"));
+
+            when(operationRepository.findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(
+                    INSTRUMENT_ID, TENANT_ID)).thenReturn(List.of(buy1, sell1, buy2, sell2));
+            when(fifoLotRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            FifoRebuildResultDTO result = operationService.rebuildFifoForInstrumentTenant(INSTRUMENT_ID, TENANT_ID);
+
+            verify(fifoLotRepository).deleteBySellOperationIdIn(List.of(102L, 104L));
+            ArgumentCaptor<OperationFifoLot> captor = ArgumentCaptor.forClass(OperationFifoLot.class);
+            verify(fifoLotRepository, times(2)).save(captor.capture());
+
+            List<OperationFifoLot> savedLots = captor.getAllValues();
+            // SELL1 consumes 4 from BUY1
+            assertThat(savedLots.get(0).getSellOperationId()).isEqualTo(102L);
+            assertThat(savedLots.get(0).getBuyOperationId()).isEqualTo(101L);
+            assertThat(savedLots.get(0).getQuantity()).isEqualByComparingTo("4");
+
+            // SELL2 consumes remaining 5 from BUY1 first (10 - 4)
+            assertThat(savedLots.get(1).getSellOperationId()).isEqualTo(104L);
+            assertThat(savedLots.get(1).getBuyOperationId()).isEqualTo(101L);
+            assertThat(savedLots.get(1).getQuantity()).isEqualByComparingTo("5");
+
+            assertThat(result.instrumentId()).isEqualTo(INSTRUMENT_ID);
+            assertThat(result.tenantId()).isEqualTo(TENANT_ID);
+            assertThat(result.operationsProcessed()).isEqualTo(4);
+            assertThat(result.sellsRebuilt()).isEqualTo(2);
+                        assertThat(result.lotsCreated()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("Rebuild FIFO throws when historical SELL cannot be covered")
+        void rebuild_insufficientHistoricalStock_throws() {
+            InvestmentOperation sellOnly = savedOp(202L, "SELL", LocalDate.of(2024, 4, 10),
+                    bd("5"), bd("150"), bd("0"), bd("750.0000"), "USD", bd("1.15"), bd("652.1739"));
+
+            when(operationRepository.findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(
+                    INSTRUMENT_ID, TENANT_ID)).thenReturn(List.of(sellOnly));
+
+            assertThatThrownBy(() -> operationService.rebuildFifoForInstrumentTenant(INSTRUMENT_ID, TENANT_ID))
+                    .isInstanceOf(InvestmentValidationException.class)
+                    .hasMessageContaining("Cannot rebuild FIFO")
+                    .hasMessageContaining("short by");
+
+            verify(fifoLotRepository).deleteBySellOperationIdIn(List.of(202L));
+            verify(fifoLotRepository, times(0)).save(any());
         }
     }
 

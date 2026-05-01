@@ -49,4 +49,20 @@ public interface InvestmentOperationRepository extends JpaRepository<InvestmentO
     List<InvestmentOperation> findBuysByInstrumentAndTenantFifo(
             @Param("instrumentId") Long instrumentId,
             @Param("tenantId") Long tenantId);
+
+    /**
+     * Returns all operations for an instrument+tenant in strict temporal order.
+     * Acquires PESSIMISTIC_WRITE lock to safely rebuild FIFO lots in-place.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT o FROM InvestmentOperation o
+            JOIN Investment inv ON inv.id = o.investmentId
+            WHERE inv.instrumentId = :instrumentId
+              AND o.tenantId = :tenantId
+            ORDER BY o.operationDate ASC, o.id ASC
+            """)
+    List<InvestmentOperation> findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(
+            @Param("instrumentId") Long instrumentId,
+            @Param("tenantId") Long tenantId);
 }

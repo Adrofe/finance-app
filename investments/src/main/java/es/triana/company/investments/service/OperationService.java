@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import es.triana.company.investments.model.api.CreateOperationRequest;
+import es.triana.company.investments.model.api.FifoRebuildResultDTO;
 import es.triana.company.investments.model.api.OperationDTO;
 import es.triana.company.investments.model.db.Investment;
 import es.triana.company.investments.model.db.InvestmentOperation;
@@ -115,6 +118,95 @@ public class OperationService {
                 .toList();
     }
 
+        /**
+         * Rebuilds FIFO matching from scratch for one instrument+tenant.
+         * Existing lots for SELL operations are deleted and recalculated in temporal order.
+         */
+        @Transactional
+        public FifoRebuildResultDTO rebuildFifoForInstrumentTenant(Long instrumentId, Long tenantId) {
+                List<InvestmentOperation> operations = operationRepository
+                                .findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(instrumentId, tenantId);
+
+                if (operations.isEmpty()) {
+                        return new FifoRebuildResultDTO(instrumentId, tenantId, 0, 0, 0);
+                }
+
+                List<Long> sellIds = operations.stream()
+                                .filter(op -> "SELL".equals(op.getType()))
+                                .map(InvestmentOperation::getId)
+                                .toList();
+                if (!sellIds.isEmpty()) {
+                        fifoLotRepository.deleteBySellOperationIdIn(sellIds);
+                }
+
+                List<InvestmentOperation> buyQueue = new ArrayList<>();
+                Map<Long, BigDecimal> consumed = new HashMap<>();
+                int lotsCreated = 0;
+                int sellsRebuilt = 0;
+
+                for (InvestmentOperation op : operations) {
+                        if ("BUY".equals(op.getType())) {
+                                buyQueue.add(op);
+                                continue;
+                        }
+
+                        if (!"SELL".equals(op.getType())) {
+                                continue;
+                        }
+
+                        sellsRebuilt++;
+                        BigDecimal sellUnitPriceEur = op.getUnitPrice()
+                                        .divide(op.getEurExchangeRate(), SCALE, RoundingMode.HALF_UP);
+
+                        BigDecimal remaining = op.getQuantity();
+                        for (InvestmentOperation buy : buyQueue) {
+                                if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                                        break;
+                                }
+
+                                BigDecimal alreadyConsumed = consumed.getOrDefault(buy.getId(), BigDecimal.ZERO);
+                                BigDecimal available = buy.getQuantity().subtract(alreadyConsumed);
+                                if (available.compareTo(BigDecimal.ZERO) <= 0) {
+                                        continue;
+                                }
+
+                                BigDecimal lotQty = remaining.min(available);
+                                BigDecimal buyUnitPriceEur = buy.getUnitPrice()
+                                                .divide(buy.getEurExchangeRate(), SCALE, RoundingMode.HALF_UP);
+                                BigDecimal gainLoss = sellUnitPriceEur.subtract(buyUnitPriceEur)
+                                                .multiply(lotQty)
+                                                .setScale(4, RoundingMode.HALF_UP);
+
+                                OperationFifoLot lot = OperationFifoLot.builder()
+                                                .sellOperationId(op.getId())
+                                                .buyOperationId(buy.getId())
+                                                .quantity(lotQty)
+                                                .buyUnitPriceEur(buyUnitPriceEur)
+                                                .sellUnitPriceEur(sellUnitPriceEur)
+                                                .gainLossEur(gainLoss)
+                                                .build();
+
+                                fifoLotRepository.save(lot);
+                                consumed.merge(buy.getId(), lotQty, BigDecimal::add);
+                                remaining = remaining.subtract(lotQty);
+                                lotsCreated++;
+                        }
+
+                        if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+                                throw new InvestmentValidationException(
+                                                "Cannot rebuild FIFO for instrument " + instrumentId
+                                                + " and tenant " + tenantId
+                                                + ": SELL operation " + op.getId()
+                                                + " is short by " + remaining.stripTrailingZeros().toPlainString() + " units.");
+                        }
+                }
+
+                LOG.info("Rebuilt FIFO for instrument={} tenant={} operations={} sells={} lots={}",
+                                instrumentId, tenantId, operations.size(), sellsRebuilt, lotsCreated);
+
+                return new FifoRebuildResultDTO(instrumentId, tenantId, operations.size(), sellsRebuilt, lotsCreated);
+        }
+
     // -------------------------------------------------------------------------
     // FIFO matching
     // -------------------------------------------------------------------------
@@ -131,7 +223,7 @@ public class OperationService {
                 .findBuysByInstrumentAndTenantFifo(investment.getInstrumentId(), investment.getTenantId());
 
         List<Long> buyIds = buyLots.stream().map(InvestmentOperation::getId).toList();
-        java.util.Map<Long, BigDecimal> consumed = new java.util.HashMap<>();
+        Map<Long, BigDecimal> consumed = new HashMap<>();
         for (OperationFifoLot lot : fifoLotRepository.findByBuyOperationIdIn(buyIds)) {
             consumed.merge(lot.getBuyOperationId(), lot.getQuantity(), BigDecimal::add);
         }
@@ -161,7 +253,7 @@ public class OperationService {
         // Compute already-consumed quantities per buy lot from previous sells.
         // Use a scoped query instead of findAll() — BUY rows are already locked.
         List<Long> buyIds = buyLots.stream().map(InvestmentOperation::getId).toList();
-        java.util.Map<Long, BigDecimal> consumed = new java.util.HashMap<>();
+        Map<Long, BigDecimal> consumed = new HashMap<>();
         for (OperationFifoLot lot : fifoLotRepository.findByBuyOperationIdIn(buyIds)) {
             consumed.merge(lot.getBuyOperationId(), lot.getQuantity(), BigDecimal::add);
         }

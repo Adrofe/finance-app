@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import es.triana.company.investments.model.api.ApiResponse;
 import es.triana.company.investments.model.api.CreateOperationRequest;
+import es.triana.company.investments.model.api.FifoRebuildResultDTO;
 import es.triana.company.investments.model.api.OperationDTO;
 import es.triana.company.investments.service.OperationService;
 import jakarta.validation.Valid;
@@ -52,5 +53,17 @@ public class OperationsController {
     public ResponseEntity<ApiResponse<List<OperationDTO>>> getByTenant(@RequestParam Long tenantId) {
         List<OperationDTO> data = operationService.getByTenant(tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Operations retrieved successfully", data));
+    }
+
+    /**
+     * Rebuild FIFO lots from scratch for one instrument+tenant.
+     * Useful when backdated operations were inserted and prior matching is stale.
+     */
+    @PostMapping("/rebuild-fifo")
+    public ResponseEntity<ApiResponse<FifoRebuildResultDTO>> rebuildFifo(
+            @RequestParam Long instrumentId,
+            @RequestParam Long tenantId) {
+        FifoRebuildResultDTO data = operationService.rebuildFifoForInstrumentTenant(instrumentId, tenantId);
+        return ResponseEntity.ok(new ApiResponse<>(200, "FIFO rebuilt successfully", data));
     }
 }
