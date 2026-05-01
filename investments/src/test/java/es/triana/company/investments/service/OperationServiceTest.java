@@ -424,6 +424,51 @@ class OperationServiceTest {
                     .isInstanceOf(InvestmentValidationException.class)
                     .hasMessageContaining("EUR/USD");
         }
+
+        @Test
+        @DisplayName("SELL with more units than available BUY stock throws before persisting anything")
+        void sell_insufficientStock_throwsAndNothingPersisted() {
+            // Only 5 units available (one BUY lot of 5), trying to sell 10
+            investment.setQuantity(bd("5"));
+            InvestmentOperation smallBuy = savedOp(1L, "BUY", DATE_BUY1, bd("5"), bd("150"), bd("0"),
+                    bd("750.0000"), "USD", bd("1.08"), bd("694.4444"));
+
+            when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
+                    .thenReturn(List.of(smallBuy));
+            when(fifoLotRepository.findAll()).thenReturn(List.of());
+
+            // Note: validation runs before resolveEurRate, so no exchange rate stub needed
+            CreateOperationRequest req = sell(DATE_SELL, "10", "180", "4");
+
+            assertThatThrownBy(() -> operationService.registerOperation(req))
+                    .isInstanceOf(InvestmentValidationException.class)
+                    .hasMessageContaining("Insufficient stock");
+
+            // Nothing should be written to DB
+            verify(operationRepository, times(0)).save(any());
+            verify(fifoLotRepository, times(0)).save(any());
+            verify(investmentRepository, times(0)).save(any());
+        }
+
+        @Test
+        @DisplayName("SELL with exact available stock succeeds")
+        void sell_exactStock_succeeds() {
+            investment.setQuantity(bd("10"));
+            InvestmentOperation buyLot = savedOp(1L, "BUY", DATE_BUY1, bd("10"), bd("150"), bd("5"),
+                    bd("1505.0000"), "USD", bd("1.08"), bd("1393.5185"));
+
+            stubEurRate("USD", DATE_SELL, "1.12");
+            stubSellOperation(savedOp(3L, "SELL", DATE_SELL, bd("10"), bd("180"), bd("4"),
+                    bd("1796.0000"), "USD", bd("1.12"), bd("1603.5714")));
+            when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
+                    .thenReturn(List.of(buyLot));
+            when(fifoLotRepository.findAll()).thenReturn(List.of());
+            when(fifoLotRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            OperationDTO result = operationService.registerOperation(sell(DATE_SELL, "10", "180", "4"));
+            assertThat(result.fifoLots()).hasSize(1);
+            assertThat(result.fifoLots().getFirst().quantity()).isEqualByComparingTo("10");
+        }
     }
 
     // =========================================================================

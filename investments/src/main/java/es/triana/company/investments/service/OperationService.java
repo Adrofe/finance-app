@@ -52,6 +52,12 @@ public class OperationService {
     public OperationDTO registerOperation(CreateOperationRequest req) {
         Investment investment = findInvestment(req.investmentId(), req.tenantId());
 
+        // For SELL: validate FIFO coverage BEFORE any other work so nothing is
+        // persisted and no external calls are made if stock is insufficient.
+        if ("SELL".equals(req.type())) {
+            validateFifoCoverage(req.quantity(), investment);
+        }
+
         BigDecimal fees = req.fees() != null ? req.fees() : BigDecimal.ZERO;
         BigDecimal totalAmount = computeTotalAmount(req.type(), req.quantity(), req.unitPrice(), fees);
 
@@ -112,6 +118,33 @@ public class OperationService {
     // -------------------------------------------------------------------------
 
     /**
+     * Dry-run check: verifies that enough unconsumed BUY lots exist to cover the
+     * requested sell quantity. Throws InvestmentValidationException if not.
+     * Called before any DB write so nothing is persisted on failure.
+     */
+    private void validateFifoCoverage(BigDecimal sellQty, Investment investment) {
+        List<InvestmentOperation> buyLots = operationRepository
+                .findBuysByInstrumentAndTenantFifo(investment.getInstrumentId(), investment.getTenantId());
+
+        java.util.Map<Long, BigDecimal> consumed = new java.util.HashMap<>();
+        for (OperationFifoLot lot : fifoLotRepository.findAll()) {
+            consumed.merge(lot.getBuyOperationId(), lot.getQuantity(), BigDecimal::add);
+        }
+
+        BigDecimal available = buyLots.stream()
+                .map(b -> b.getQuantity().subtract(consumed.getOrDefault(b.getId(), BigDecimal.ZERO)))
+                .filter(a -> a.compareTo(BigDecimal.ZERO) > 0)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (available.compareTo(sellQty) < 0) {
+            throw new InvestmentValidationException(
+                    "Insufficient stock: trying to sell " + sellQty.stripTrailingZeros().toPlainString()
+                    + " units but only " + available.stripTrailingZeros().toPlainString()
+                    + " are available for instrument " + investment.getInstrumentId() + ".");
+        }
+    }
+
+    /**
      * Matches a SELL operation against the oldest BUY lots of the same investment
      * (FIFO). For Spain AEAT the criterion is per instrument + tenant across all
      * platforms, so we use findBuysByInstrumentAndTenantFifo.
@@ -165,8 +198,9 @@ public class OperationService {
         }
 
         if (remaining.compareTo(BigDecimal.ZERO) > 0) {
-            LOG.warn("SELL operation id={} has {} units without matching BUY lots (position may be partially imported)",
-                    sell.getId(), remaining);
+            throw new InvestmentValidationException(
+                    "Insufficient stock to sell: " + remaining.stripTrailingZeros().toPlainString()
+                    + " units of investment " + sell.getInvestmentId() + " have no matching BUY lots.");
         }
 
         return result;
