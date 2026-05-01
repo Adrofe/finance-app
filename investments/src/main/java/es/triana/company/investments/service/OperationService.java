@@ -50,7 +50,9 @@ public class OperationService {
 
     @Transactional
     public OperationDTO registerOperation(CreateOperationRequest req) {
-        Investment investment = findInvestment(req.investmentId(), req.tenantId());
+        // Lock the Investment row for update to serialise concurrent position changes
+        // (BUY+BUY, BUY+SELL, or SELL+SELL on the same investment).
+        Investment investment = findAndLockInvestment(req.investmentId(), req.tenantId());
 
         // For SELL: validate FIFO coverage BEFORE any other work so nothing is
         // persisted and no external calls are made if stock is insufficient.
@@ -123,11 +125,14 @@ public class OperationService {
      * Called before any DB write so nothing is persisted on failure.
      */
     private void validateFifoCoverage(BigDecimal sellQty, Investment investment) {
+        // findBuysByInstrumentAndTenantFifo acquires PESSIMISTIC_WRITE — concurrent
+        // SELLs on the same instrument+tenant will block here until this tx commits.
         List<InvestmentOperation> buyLots = operationRepository
                 .findBuysByInstrumentAndTenantFifo(investment.getInstrumentId(), investment.getTenantId());
 
+        List<Long> buyIds = buyLots.stream().map(InvestmentOperation::getId).toList();
         java.util.Map<Long, BigDecimal> consumed = new java.util.HashMap<>();
-        for (OperationFifoLot lot : fifoLotRepository.findAll()) {
+        for (OperationFifoLot lot : fifoLotRepository.findByBuyOperationIdIn(buyIds)) {
             consumed.merge(lot.getBuyOperationId(), lot.getQuantity(), BigDecimal::add);
         }
 
@@ -153,10 +158,11 @@ public class OperationService {
         List<InvestmentOperation> buyLots = operationRepository
                 .findBuysByInstrumentAndTenantFifo(investment.getInstrumentId(), sell.getTenantId());
 
-        // Compute already-consumed quantities per buy lot from previous sells
-        List<OperationFifoLot> allExistingLots = fifoLotRepository.findAll(); // small table, acceptable
+        // Compute already-consumed quantities per buy lot from previous sells.
+        // Use a scoped query instead of findAll() — BUY rows are already locked.
+        List<Long> buyIds = buyLots.stream().map(InvestmentOperation::getId).toList();
         java.util.Map<Long, BigDecimal> consumed = new java.util.HashMap<>();
-        for (OperationFifoLot lot : allExistingLots) {
+        for (OperationFifoLot lot : fifoLotRepository.findByBuyOperationIdIn(buyIds)) {
             consumed.merge(lot.getBuyOperationId(), lot.getQuantity(), BigDecimal::add);
         }
 
@@ -261,8 +267,16 @@ public class OperationService {
                 });
     }
 
+    /** Read-only lookup — no lock. Used by getByInvestment / getByTenant. */
     private Investment findInvestment(Long investmentId, Long tenantId) {
         return investmentRepository.findByIdAndTenantId(investmentId, tenantId)
+                .orElseThrow(() -> new InvestmentValidationException(
+                        "Investment " + investmentId + " not found for tenant " + tenantId));
+    }
+
+    /** Write lookup — acquires PESSIMISTIC_WRITE lock. Used by registerOperation. */
+    private Investment findAndLockInvestment(Long investmentId, Long tenantId) {
+        return investmentRepository.findByIdAndTenantIdForUpdate(investmentId, tenantId)
                 .orElseThrow(() -> new InvestmentValidationException(
                         "Investment " + investmentId + " not found for tenant " + tenantId));
     }

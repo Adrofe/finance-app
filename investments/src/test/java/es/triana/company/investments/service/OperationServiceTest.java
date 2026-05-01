@@ -99,6 +99,8 @@ class OperationServiceTest {
 
         when(investmentRepository.findByIdAndTenantId(INVESTMENT_ID, TENANT_ID))
                 .thenReturn(Optional.of(investment));
+        when(investmentRepository.findByIdAndTenantIdForUpdate(INVESTMENT_ID, TENANT_ID))
+                .thenReturn(Optional.of(investment));
     }
 
     // =========================================================================
@@ -188,6 +190,8 @@ class OperationServiceTest {
                     .createdAt(LocalDateTime.now()).updatedAt(LocalDateTime.now()).build();
             when(investmentRepository.findByIdAndTenantId(2L, TENANT_ID))
                     .thenReturn(Optional.of(eurInvestment));
+            when(investmentRepository.findByIdAndTenantIdForUpdate(2L, TENANT_ID))
+                    .thenReturn(Optional.of(eurInvestment));
 
             InvestmentOperation op = savedOp(10L, "BUY", DATE_BUY1, bd("100"), bd("50"), bd("2"),
                     bd("5002.0000"), "EUR", BigDecimal.ONE, bd("5002.0000"));
@@ -245,7 +249,7 @@ class OperationServiceTest {
                     bd("1436.0000"), "USD", bd("1.12"), bd("1282.1429")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buy1, buy2));
-            when(fifoLotRepository.findAll()).thenReturn(List.of());
+            when(fifoLotRepository.findByBuyOperationIdIn(any())).thenReturn(List.of());
             when(fifoLotRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             operationService.registerOperation(sell(DATE_SELL, "8", "180", "4"));
@@ -270,7 +274,7 @@ class OperationServiceTest {
                     bd("1436.0000"), "USD", bd("1.12"), bd("1282.1429")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buy1, buy2));
-            when(fifoLotRepository.findAll()).thenReturn(List.of());
+            when(fifoLotRepository.findByBuyOperationIdIn(any())).thenReturn(List.of());
             when(fifoLotRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             operationService.registerOperation(sell(DATE_SELL, "8", "180", "4"));
@@ -293,7 +297,7 @@ class OperationServiceTest {
                     bd("1436.0000"), "USD", bd("1.12"), bd("1282.1429")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buy1, buy2));
-            when(fifoLotRepository.findAll()).thenReturn(List.of());
+            when(fifoLotRepository.findByBuyOperationIdIn(any())).thenReturn(List.of());
             when(fifoLotRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             OperationDTO result = operationService.registerOperation(sell(DATE_SELL, "8", "180", "4"));
@@ -331,7 +335,7 @@ class OperationServiceTest {
                     bd("2156.0000"), "USD", bd("1.12"), bd("1925.0000")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buy1, buy2));
-            when(fifoLotRepository.findAll()).thenReturn(List.of());
+            when(fifoLotRepository.findByBuyOperationIdIn(any())).thenReturn(List.of());
             when(fifoLotRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             OperationDTO result = operationService.registerOperation(sell(DATE_SELL, "12", "180", "4"));
@@ -374,7 +378,7 @@ class OperationServiceTest {
                     bd("1076.0000"), "USD", bd("1.12"), bd("960.7143")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buy1, buy2));
-            when(fifoLotRepository.findAll()).thenReturn(List.of(previousLot));
+            when(fifoLotRepository.findByBuyOperationIdIn(any())).thenReturn(List.of(previousLot));
             when(fifoLotRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             OperationDTO result = operationService.registerOperation(sell(DATE_SELL, "6", "180", "4"));
@@ -400,7 +404,7 @@ class OperationServiceTest {
         @Test
         @DisplayName("Investment not found throws InvestmentValidationException")
         void invalidInvestment_throws() {
-            when(investmentRepository.findByIdAndTenantId(999L, TENANT_ID)).thenReturn(Optional.empty());
+            when(investmentRepository.findByIdAndTenantIdForUpdate(999L, TENANT_ID)).thenReturn(Optional.empty());
 
             CreateOperationRequest req = new CreateOperationRequest(
                     999L, TENANT_ID, "BUY", DATE_BUY1, bd("10"), bd("150"), null, "USD", null);
@@ -435,7 +439,7 @@ class OperationServiceTest {
 
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(smallBuy));
-            when(fifoLotRepository.findAll()).thenReturn(List.of());
+            when(fifoLotRepository.findByBuyOperationIdIn(any())).thenReturn(List.of());
 
             // Note: validation runs before resolveEurRate, so no exchange rate stub needed
             CreateOperationRequest req = sell(DATE_SELL, "10", "180", "4");
@@ -462,7 +466,7 @@ class OperationServiceTest {
                     bd("1796.0000"), "USD", bd("1.12"), bd("1603.5714")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buyLot));
-            when(fifoLotRepository.findAll()).thenReturn(List.of());
+            when(fifoLotRepository.findByBuyOperationIdIn(any())).thenReturn(List.of());
             when(fifoLotRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             OperationDTO result = operationService.registerOperation(sell(DATE_SELL, "10", "180", "4"));
@@ -532,3 +536,4 @@ class OperationServiceTest {
         return new BigDecimal(val);
     }
 }
+
