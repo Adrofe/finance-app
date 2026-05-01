@@ -11,5 +11,7 @@ public interface InvestmentRepository extends JpaRepository<Investment, Long> {
 
     List<Investment> findByTenantIdOrderByUpdatedAtDescIdDesc(Long tenantId);
 
+    List<Investment> findByInstrumentId(Long instrumentId);
+
     Optional<Investment> findByIdAndTenantId(Long id, Long tenantId);
 }

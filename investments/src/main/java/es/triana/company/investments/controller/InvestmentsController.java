@@ -17,7 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 import es.triana.company.investments.model.api.ApiResponse;
 import es.triana.company.investments.model.api.InvestmentDTO;
 import es.triana.company.investments.model.api.InvestmentSummaryDTO;
+import es.triana.company.investments.model.api.PriceRefreshResultDTO;
+import es.triana.company.investments.model.api.PriceUpdateRequestDTO;
 import es.triana.company.investments.service.InvestmentService;
+import es.triana.company.investments.service.PriceRefreshService;
 import jakarta.validation.Valid;
 
 @RestController
@@ -25,9 +28,11 @@ import jakarta.validation.Valid;
 public class InvestmentsController {
 
     private final InvestmentService investmentService;
+    private final PriceRefreshService priceRefreshService;
 
-    public InvestmentsController(InvestmentService investmentService) {
+    public InvestmentsController(InvestmentService investmentService, PriceRefreshService priceRefreshService) {
         this.investmentService = investmentService;
+        this.priceRefreshService = priceRefreshService;
     }
 
     @GetMapping
@@ -71,5 +76,18 @@ public class InvestmentsController {
             @RequestParam(name = "tenantId") Long tenantId) {
         investmentService.delete(id, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Investment deleted successfully", null));
+    }
+
+    @PostMapping("/prices/refresh")
+    public ResponseEntity<ApiResponse<PriceRefreshResultDTO>> refreshPricesOnDemand(
+            @RequestBody List<@Valid PriceUpdateRequestDTO> updates) {
+        PriceRefreshResultDTO result = priceRefreshService.refreshPricesOnDemand(updates);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Prices refreshed on demand", result));
+    }
+
+    @PostMapping("/prices/refresh/auto")
+    public ResponseEntity<ApiResponse<PriceRefreshResultDTO>> refreshPricesAutoNow() {
+        PriceRefreshResultDTO result = priceRefreshService.refreshPricesAutomaticallyNow();
+        return ResponseEntity.ok(new ApiResponse<>(200, "Automatic price refresh executed", result));
     }
 }
