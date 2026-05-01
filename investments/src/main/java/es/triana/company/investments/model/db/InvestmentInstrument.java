@@ -29,6 +29,9 @@ public class InvestmentInstrument {
     @Column(name = "type_id", nullable = false)
     private Long typeId;
 
+    @Column(name = "code", nullable = false, length = 100, unique = true)
+    private String code;
+
     @Column(name = "symbol", nullable = false, length = 50)
     private String symbol;
 

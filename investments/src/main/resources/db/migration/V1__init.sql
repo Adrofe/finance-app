@@ -15,6 +15,7 @@ create table if not exists investments.investment_platforms (
 create table if not exists investments.investment_instruments (
     id bigserial primary key,
     type_id bigint not null,
+    code varchar(100) not null unique,
     symbol varchar(50) not null,
     name varchar(150) not null,
     market varchar(80),
@@ -75,19 +76,14 @@ on conflict (code) do nothing;
 
 insert into investments.investment_platforms (code, name)
 values
-    ('BROKER', 'Broker'),
-    ('BANK', 'Banco'),
-    ('EXCHANGE', 'Exchange'),
-    ('WALLET', 'Wallet')
+    ('MYINVESTOR', 'MyInvestor'),
+    ('IBKR', 'Interactive Brokers')
 on conflict (code) do nothing;
 
-insert into investments.investment_instruments (type_id, symbol, name, market, currency)
-select t.id, x.symbol, x.name, x.market, x.currency
+insert into investments.investment_instruments (type_id, code, symbol, name, market, currency)
+select t.id, x.code, x.symbol, x.name, x.market, x.currency
 from (values
-    ('ETF', 'VWCE', 'Vanguard FTSE All-World UCITS ETF', 'XETRA', 'EUR'),
-    ('STOCK', 'AAPL', 'Apple Inc.', 'NASDAQ', 'USD'),
-    ('CRYPTO', 'BTC', 'Bitcoin', 'CRYPTO', 'USD'),
-    ('FUND', 'AMUNDI-MSCI-WORLD', 'Amundi MSCI World', 'FUND', 'EUR')
-) as x(type_code, symbol, name, market, currency)
+    ('STOCK', 'AAPL', 'AAPL', 'Apple Inc.', 'NASDAQ', 'USD')
+) as x(type_code, code, symbol, name, market, currency)
 join investments.investment_types t on t.code = x.type_code
-on conflict (type_id, symbol, market) do nothing;
+on conflict (code) do nothing;
