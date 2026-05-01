@@ -64,6 +64,16 @@ public class EcbExchangeRateClient {
         return fetchAndParse(hist90dUrl);
     }
 
+    /**
+     * Fetches rates for a specific date from the 90-day historical feed.
+     * Returns an empty list when the date is not present in the feed.
+     */
+    public List<ExchangeRate> fetchRatesForDate(LocalDate date) {
+        return fetchLast90DaysRates().stream()
+                .filter(rate -> date.equals(rate.getAsOf()))
+                .toList();
+    }
+
     private List<ExchangeRate> fetchAndParse(String url) {
         List<ExchangeRate> result = new ArrayList<>();
         try {

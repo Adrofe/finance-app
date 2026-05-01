@@ -1,6 +1,11 @@
 package es.triana.company.investments.service;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +22,7 @@ import es.triana.company.investments.repository.ExchangeRateRepository;
 public class ExchangeRateRefreshService {
 
     private static final Logger LOG = LoggerFactory.getLogger(ExchangeRateRefreshService.class);
+    private static final String BASE_CURRENCY = "EUR";
 
     private final EcbExchangeRateClient ecbClient;
     private final ExchangeRateRepository exchangeRateRepository;
@@ -28,18 +34,49 @@ public class ExchangeRateRefreshService {
     }
 
     /**
-     * On startup: if the exchange_rates table is empty, load the last 90 days
-     * so historical valuations are available immediately.
+     * On startup: verify business-day coverage for the last 90 days and fill gaps.
      */
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void onStartup() {
-        if (exchangeRateRepository.count() == 0) {
-            LOG.info("Exchange rates table is empty — loading last 90 days from ECB on startup");
-            refreshLast90DaysRates();
-        } else {
-            LOG.debug("Exchange rates already present — skipping historical load on startup");
+        LocalDate toDate = LocalDate.now();
+        LocalDate fromDate = toDate.minusDays(89);
+
+        List<LocalDate> existingDates = exchangeRateRepository
+                .findDistinctAsOfByFromCurrencyBetween(BASE_CURRENCY, fromDate, toDate);
+
+        Set<LocalDate> existingSet = new HashSet<>(existingDates);
+        List<LocalDate> missingBusinessDays = new ArrayList<>();
+
+        LocalDate cursor = fromDate;
+        while (!cursor.isAfter(toDate)) {
+            DayOfWeek dow = cursor.getDayOfWeek();
+            boolean isBusinessDay = dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY;
+            if (isBusinessDay && !existingSet.contains(cursor)) {
+                missingBusinessDays.add(cursor);
+            }
+            cursor = cursor.plusDays(1);
         }
+
+        if (missingBusinessDays.isEmpty()) {
+            LOG.info("Exchange rates startup check complete — no missing business days in last 90 days");
+            return;
+        }
+
+        LOG.info("Exchange rates startup check found {} missing business days in last 90 days — backfilling",
+                missingBusinessDays.size());
+
+        List<ExchangeRate> rates = ecbClient.fetchLast90DaysRates().stream()
+                .filter(rate -> missingBusinessDays.contains(rate.getAsOf()))
+                .toList();
+
+        int saved = upsertRates(rates);
+
+        Set<LocalDate> recoveredDays = new HashSet<>(rates.stream().map(ExchangeRate::getAsOf).toList());
+        int unresolved = (int) missingBusinessDays.stream().filter(d -> !recoveredDays.contains(d)).count();
+
+        LOG.info("Exchange rates startup backfill finished — {} rates upserted, {} business days unresolved",
+                saved, unresolved);
     }
 
     /**
@@ -78,6 +115,22 @@ public class ExchangeRateRefreshService {
         List<ExchangeRate> rates = ecbClient.fetchLast90DaysRates();
         int saved = upsertRates(rates);
         LOG.info("Exchange rate historical refresh finished — {} rates upserted", saved);
+        return saved;
+    }
+
+    /**
+     * Loads rates for one specific day from the ECB 90-day feed and upserts them.
+     */
+    @Transactional
+    public int refreshRatesForDate(LocalDate asOf) {
+        LOG.info("Exchange rate refresh started (specific day: {})", asOf);
+        List<ExchangeRate> rates = ecbClient.fetchRatesForDate(asOf);
+        if (rates.isEmpty()) {
+            LOG.warn("No ECB rates found for {} (outside feed range or no publication day)", asOf);
+            return 0;
+        }
+        int saved = upsertRates(rates);
+        LOG.info("Exchange rate refresh finished for {} — {} rates upserted", asOf, saved);
         return saved;
     }
 
