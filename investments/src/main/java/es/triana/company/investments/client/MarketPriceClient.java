@@ -1,4 +1,4 @@
-package es.triana.company.investments.service;
+package es.triana.company.investments.client;
 
 import java.io.IOException;
 import java.math.BigDecimal;
