@@ -47,8 +47,7 @@ public class OperationsController {
 
     /** List all operations for a specific investment position */
     @GetMapping("/by-investment")
-    public ResponseEntity<ApiResponse<List<OperationDTO>>> getByInvestment(
-            @RequestParam Long investmentId) {
+    public ResponseEntity<ApiResponse<List<OperationDTO>>> getByInvestment(@RequestParam Long investmentId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         List<OperationDTO> data = operationService.getByInvestment(investmentId, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Operations retrieved successfully", data));
@@ -67,8 +66,7 @@ public class OperationsController {
      * Includes totals and breakdowns by instrument and currency.
      */
     @GetMapping("/tax-summary")
-    public ResponseEntity<ApiResponse<TaxSummaryDTO>> getTaxSummary(
-            @RequestParam int year) {
+    public ResponseEntity<ApiResponse<TaxSummaryDTO>> getTaxSummary(@RequestParam int year) {
         Long tenantId = tenantContext.getCurrentTenantId();
         TaxSummaryDTO data = operationService.getTaxSummary(tenantId, year);
         return ResponseEntity.ok(new ApiResponse<>(200, "Tax summary retrieved successfully", data));
@@ -79,8 +77,7 @@ public class OperationsController {
      * Useful when backdated operations were inserted and prior matching is stale.
      */
     @PostMapping("/rebuild-fifo")
-    public ResponseEntity<ApiResponse<FifoRebuildResultDTO>> rebuildFifo(
-            @RequestParam Long instrumentId) {
+    public ResponseEntity<ApiResponse<FifoRebuildResultDTO>> rebuildFifo(@RequestParam Long instrumentId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         FifoRebuildResultDTO data = operationService.rebuildFifoForInstrumentTenant(instrumentId, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "FIFO rebuilt successfully", data));
