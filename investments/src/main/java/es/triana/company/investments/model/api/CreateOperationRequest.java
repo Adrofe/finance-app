@@ -9,38 +9,59 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-public record CreateOperationRequest(
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-        @NotNull(message = "investmentId is required")
-        Long investmentId,
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class CreateOperationRequest {
 
-        /** Tenant ID will be extracted from Keycloak token if not provided */
-        Long tenantId,
+    @NotNull(message = "investmentId is required")
+    private Long investmentId;
 
-        /** BUY or SELL */
-        @NotBlank(message = "type is required")
-        @Pattern(regexp = "BUY|SELL", message = "type must be BUY or SELL")
-        String type,
+    /** Tenant ID will be extracted from Keycloak token if not provided */
+    private Long tenantId;
 
-        @NotNull(message = "operationDate is required")
-        LocalDate operationDate,
+    /** BUY or SELL */
+    @NotBlank(message = "type is required")
+    @Pattern(regexp = "BUY|SELL", message = "type must be BUY or SELL")
+    private String type;
 
-        @NotNull(message = "quantity is required")
-        @DecimalMin(value = "0.0000000001", message = "quantity must be positive")
-        BigDecimal quantity,
+    @NotNull(message = "operationDate is required")
+    private LocalDate operationDate;
 
-        @NotNull(message = "unitPrice is required")
-        @DecimalMin(value = "0.0000000001", message = "unitPrice must be positive")
-        BigDecimal unitPrice,
+    @NotNull(message = "quantity is required")
+    @DecimalMin(value = "0.0000000001", message = "quantity must be positive")
+    private BigDecimal quantity;
 
-        /** Commissions/fees in operation currency. Defaults to 0 if null. */
-        BigDecimal fees,
+    @NotNull(message = "unitPrice is required")
+    @DecimalMin(value = "0.0000000001", message = "unitPrice must be positive")
+    private BigDecimal unitPrice;
 
-        /** 3-letter ISO currency code of the operation */
-        @NotBlank(message = "currency is required")
-        @Size(min = 3, max = 3, message = "currency must be exactly 3 letters")
-        String currency,
+    /** Commissions/fees in operation currency. Defaults to 0 if null. */
+    private BigDecimal fees;
 
-        @Size(max = 500)
-        String notes
-) {}
+    /** 3-letter ISO currency code of the operation */
+    @NotBlank(message = "currency is required")
+    @Size(min = 3, max = 3, message = "currency must be exactly 3 letters")
+    private String currency;
+
+    @Size(max = 500)
+    private String notes;
+
+    public CreateOperationRequest(CreateOperationRequest request, Long tenantId) {
+        this.investmentId = request.getInvestmentId();
+        this.tenantId = tenantId;
+        this.type = request.getType();
+        this.operationDate = request.getOperationDate();
+        this.quantity = request.getQuantity();
+        this.unitPrice = request.getUnitPrice();
+        this.fees = request.getFees();
+        this.currency = request.getCurrency();
+        this.notes = request.getNotes();
+    }
+}

@@ -40,20 +40,9 @@ public class OperationsController {
     @PostMapping
     public ResponseEntity<ApiResponse<OperationDTO>> register(@Valid @RequestBody CreateOperationRequest request) {
         Long tenantId = tenantContext.getCurrentTenantId();
-        // Ensure tenantId is always from the authenticated token
-        CreateOperationRequest securedRequest = new CreateOperationRequest(
-                request.investmentId(),
-                tenantId,
-                request.type(),
-                request.operationDate(),
-                request.quantity(),
-                request.unitPrice(),
-                request.fees(),
-                request.currency(),
-                request.notes());
+        CreateOperationRequest securedRequest = new CreateOperationRequest(request, tenantId);
         OperationDTO result = operationService.registerOperation(securedRequest);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new ApiResponse<>(201, "Operation registered successfully", result));
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(201, "Operation registered successfully", result));
     }
 
     /** List all operations for a specific investment position */

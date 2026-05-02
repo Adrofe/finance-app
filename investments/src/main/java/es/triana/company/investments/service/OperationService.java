@@ -57,34 +57,34 @@ public class OperationService {
     public OperationDTO registerOperation(CreateOperationRequest req) {
         // Lock the Investment row for update to serialise concurrent position changes
         // (BUY+BUY, BUY+SELL, or SELL+SELL on the same investment).
-        Investment investment = findAndLockInvestment(req.investmentId(), req.tenantId());
+        Investment investment = findAndLockInvestment(req.getInvestmentId(), req.getTenantId());
 
         // For SELL: validate FIFO coverage BEFORE any other work so nothing is
         // persisted and no external calls are made if stock is insufficient.
-        if ("SELL".equals(req.type())) {
-            validateFifoCoverage(req.quantity(), investment);
+        if ("SELL".equals(req.getType())) {
+            validateFifoCoverage(req.getQuantity(), investment);
         }
 
-        BigDecimal fees = req.fees() != null ? req.fees() : BigDecimal.ZERO;
-        BigDecimal totalAmount = computeTotalAmount(req.type(), req.quantity(), req.unitPrice(), fees);
+        BigDecimal fees = req.getFees() != null ? req.getFees() : BigDecimal.ZERO;
+        BigDecimal totalAmount = computeTotalAmount(req.getType(), req.getQuantity(), req.getUnitPrice(), fees);
 
-        BigDecimal eurRate = resolveEurRate(req.currency(), req.operationDate());
+        BigDecimal eurRate = resolveEurRate(req.getCurrency(), req.getOperationDate());
         BigDecimal totalAmountEur = totalAmount.divide(eurRate, 4, RoundingMode.HALF_UP);
 
         LocalDateTime now = LocalDateTime.now();
         InvestmentOperation op = InvestmentOperation.builder()
-                .investmentId(req.investmentId())
-                .tenantId(req.tenantId())
-                .type(req.type())
-                .operationDate(req.operationDate())
-                .quantity(req.quantity())
-                .unitPrice(req.unitPrice())
+                .investmentId(req.getInvestmentId())
+                .tenantId(req.getTenantId())
+                .type(req.getType())
+                .operationDate(req.getOperationDate())
+                .quantity(req.getQuantity())
+                .unitPrice(req.getUnitPrice())
                 .fees(fees)
                 .totalAmount(totalAmount)
-                .currency(req.currency())
+                .currency(req.getCurrency())
                 .eurExchangeRate(eurRate)
                 .totalAmountEur(totalAmountEur)
-                .notes(req.notes())
+                .notes(req.getNotes())
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -94,11 +94,11 @@ public class OperationService {
                 op.getType(), op.getId(), op.getInvestmentId(), op.getQuantity(), op.getTotalAmountEur());
 
         List<OperationFifoLot> lots = new ArrayList<>();
-        if ("SELL".equals(req.type())) {
+        if ("SELL".equals(req.getType())) {
             lots = applyFifo(op, investment);
         }
 
-        updateInvestmentPosition(investment, req.type(), req.quantity(), totalAmount);
+        updateInvestmentPosition(investment, req.getType(), req.getQuantity(), totalAmount);
 
         return toDTO(op, lots);
     }
