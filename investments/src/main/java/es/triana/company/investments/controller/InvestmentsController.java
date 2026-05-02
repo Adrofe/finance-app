@@ -1,7 +1,6 @@
 package es.triana.company.investments.controller;
 
 import java.util.List;
-import java.time.LocalDate;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,18 +11,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import es.triana.company.investments.model.api.ApiResponse;
 import es.triana.company.investments.model.api.InvestmentDTO;
 import es.triana.company.investments.model.api.InvestmentSummaryDTO;
-import es.triana.company.investments.model.api.PriceRefreshResultDTO;
-import es.triana.company.investments.model.api.PriceUpdateRequestDTO;
 import es.triana.company.investments.security.TenantContext;
-import es.triana.company.investments.service.ExchangeRateRefreshService;
 import es.triana.company.investments.service.InvestmentService;
-import es.triana.company.investments.service.PriceRefreshService;
 import jakarta.validation.Valid;
 
 @RestController
@@ -31,17 +25,10 @@ import jakarta.validation.Valid;
 public class InvestmentsController {
 
     private final InvestmentService investmentService;
-    private final PriceRefreshService priceRefreshService;
-    private final ExchangeRateRefreshService exchangeRateRefreshService;
     private final TenantContext tenantContext;
 
-    public InvestmentsController(InvestmentService investmentService,
-                                 PriceRefreshService priceRefreshService,
-                                 ExchangeRateRefreshService exchangeRateRefreshService,
-                                 TenantContext tenantContext) {
+    public InvestmentsController(InvestmentService investmentService, TenantContext tenantContext) {
         this.investmentService = investmentService;
-        this.priceRefreshService = priceRefreshService;
-        this.exchangeRateRefreshService = exchangeRateRefreshService;
         this.tenantContext = tenantContext;
     }
 
@@ -69,14 +56,11 @@ public class InvestmentsController {
     @PostMapping
     public ResponseEntity<ApiResponse<InvestmentDTO>> create(@Valid @RequestBody InvestmentDTO request) {
         InvestmentDTO created = investmentService.create(request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new ApiResponse<>(201, "Investment created successfully", created));
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(201, "Investment created successfully", created));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<InvestmentDTO>> update(
-            @PathVariable("id") Long id,
-            @Valid @RequestBody InvestmentDTO request) {
+    public ResponseEntity<ApiResponse<InvestmentDTO>> update(@PathVariable("id") Long id, @Valid @RequestBody InvestmentDTO request) {
         InvestmentDTO updated = investmentService.update(id, request);
         return ResponseEntity.ok(new ApiResponse<>(200, "Investment updated successfully", updated));
     }
@@ -86,27 +70,5 @@ public class InvestmentsController {
         Long tenantId = tenantContext.getCurrentTenantId();
         investmentService.delete(id, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Investment deleted successfully", null));
-    }
-
-    @PostMapping("/prices/refresh")
-    public ResponseEntity<ApiResponse<PriceRefreshResultDTO>> refreshPricesOnDemand(
-            @RequestBody List<@Valid PriceUpdateRequestDTO> updates) {
-        PriceRefreshResultDTO result = priceRefreshService.refreshPricesOnDemand(updates);
-        return ResponseEntity.ok(new ApiResponse<>(200, "Prices refreshed on demand", result));
-    }
-
-    @PostMapping("/prices/refresh/auto")
-    public ResponseEntity<ApiResponse<PriceRefreshResultDTO>> refreshPricesAutoNow() {
-        PriceRefreshResultDTO result = priceRefreshService.refreshPricesAutomaticallyNow();
-        return ResponseEntity.ok(new ApiResponse<>(200, "Automatic price refresh executed", result));
-    }
-
-    @PostMapping("/forex/refresh-day")
-    public ResponseEntity<ApiResponse<Integer>> refreshForexForDay(
-            @RequestParam LocalDate asOf) {
-        int saved = exchangeRateRefreshService.refreshRatesForDate(asOf);
-        return ResponseEntity.ok(new ApiResponse<>(200,
-                "Forex rates refresh executed for day " + asOf,
-                saved));
     }
 }
