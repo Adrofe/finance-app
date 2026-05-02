@@ -24,8 +24,7 @@ public class PriceController {
     private final PriceRefreshService priceRefreshService;
     private final ExchangeRateRefreshService exchangeRateRefreshService;
 
-    public PriceController(PriceRefreshService priceRefreshService,
-                           ExchangeRateRefreshService exchangeRateRefreshService) {
+    public PriceController(PriceRefreshService priceRefreshService, ExchangeRateRefreshService exchangeRateRefreshService) {
         this.priceRefreshService = priceRefreshService;
         this.exchangeRateRefreshService = exchangeRateRefreshService;
     }
@@ -43,8 +42,7 @@ public class PriceController {
     }
 
     @PostMapping("/forex/refresh-day")
-    public ResponseEntity<ApiResponse<Integer>> refreshForexForDay(
-            @RequestParam LocalDate asOf) {
+    public ResponseEntity<ApiResponse<Integer>> refreshForexForDay(@RequestParam LocalDate asOf) {
         int saved = exchangeRateRefreshService.refreshRatesForDate(asOf);
         return ResponseEntity.ok(new ApiResponse<>(200, "Forex rates refresh executed for day " + asOf, saved));
     }
