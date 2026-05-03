@@ -40,13 +40,15 @@ public class OperationService {
     private final OperationFifoLotRepository fifoLotRepository;
     private final InvestmentRepository investmentRepository;
     private final ExchangeRateRepository exchangeRateRepository;
+    private final es.triana.company.investments.service.mapper.OperationMapper operationMapper;
 
-    public OperationService(InvestmentOperationRepository operationRepository, OperationFifoLotRepository fifoLotRepository, InvestmentRepository investmentRepository, ExchangeRateRepository exchangeRateRepository) {
-        this.operationRepository = operationRepository;
-        this.fifoLotRepository = fifoLotRepository;
-        this.investmentRepository = investmentRepository;
-        this.exchangeRateRepository = exchangeRateRepository;
-    }
+        public OperationService(InvestmentOperationRepository operationRepository, OperationFifoLotRepository fifoLotRepository, InvestmentRepository investmentRepository, ExchangeRateRepository exchangeRateRepository, es.triana.company.investments.service.mapper.OperationMapper operationMapper) {
+                this.operationRepository = operationRepository;
+                this.fifoLotRepository = fifoLotRepository;
+                this.investmentRepository = investmentRepository;
+                this.exchangeRateRepository = exchangeRateRepository;
+                this.operationMapper = operationMapper;
+        }
 
     // -------------------------------------------------------------------------
     // Public API
@@ -71,22 +73,7 @@ public class OperationService {
         BigDecimal totalAmountEur = totalAmount.divide(eurRate, 4, RoundingMode.HALF_UP);
 
         LocalDateTime now = LocalDateTime.now();
-        InvestmentOperation op = InvestmentOperation.builder()
-                .investmentId(req.getInvestmentId())
-                .tenantId(req.getTenantId())
-                .type(req.getType())
-                .operationDate(req.getOperationDate())
-                .quantity(req.getQuantity())
-                .unitPrice(req.getUnitPrice())
-                .fees(fees)
-                .totalAmount(totalAmount)
-                .currency(req.getCurrency())
-                .eurExchangeRate(eurRate)
-                .totalAmountEur(totalAmountEur)
-                .notes(req.getNotes())
-                .createdAt(now)
-                .updatedAt(now)
-                .build();
+        InvestmentOperation op = operationMapper.toEntity(req, totalAmount, eurRate, totalAmountEur, now);
 
         op = operationRepository.save(op);
         LOG.info("Registered {} operation id={} investment={} quantity={} totalEur={}",
@@ -99,7 +86,7 @@ public class OperationService {
 
         updateInvestmentPosition(investment, req.getType(), req.getQuantity(), totalAmount);
 
-        return toDTO(op, lots);
+        return operationMapper.toDto(op, lots);
     }
 
     public List<OperationDTO> getByInvestment(Long investmentId, Long tenantId) {
@@ -107,7 +94,7 @@ public class OperationService {
         return operationRepository
                 .findByInvestmentIdOrderByOperationDateAscIdAsc(investmentId)
                 .stream()
-                .map(op -> toDTO(op, fifoLotRepository.findBySellOperationId(op.getId())))
+                .map(op -> operationMapper.toDto(op, fifoLotRepository.findBySellOperationId(op.getId())))
                 .toList();
     }
 
@@ -115,7 +102,7 @@ public class OperationService {
         return operationRepository
                 .findByTenantIdOrderByOperationDateDescIdDesc(tenantId)
                 .stream()
-                .map(op -> toDTO(op, fifoLotRepository.findBySellOperationId(op.getId())))
+                .map(op -> operationMapper.toDto(op, fifoLotRepository.findBySellOperationId(op.getId())))
                 .toList();
     }
 
@@ -443,31 +430,4 @@ public class OperationService {
                         "Investment " + investmentId + " not found for tenant " + tenantId));
     }
 
-    private OperationDTO toDTO(InvestmentOperation op, List<OperationFifoLot> lots) {
-        List<OperationDTO.FifoLotDTO> lotDTOs = lots.stream()
-                .map(l -> new OperationDTO.FifoLotDTO(
-                        l.getBuyOperationId(),
-                        l.getQuantity(),
-                        l.getBuyUnitPriceEur(),
-                        l.getSellUnitPriceEur(),
-                        l.getGainLossEur()))
-                .toList();
-
-        return new OperationDTO(
-                op.getId(),
-                op.getInvestmentId(),
-                op.getTenantId(),
-                op.getType(),
-                op.getOperationDate(),
-                op.getQuantity(),
-                op.getUnitPrice(),
-                op.getFees(),
-                op.getTotalAmount(),
-                op.getCurrency(),
-                op.getEurExchangeRate(),
-                op.getTotalAmountEur(),
-                op.getNotes(),
-                op.getCreatedAt(),
-                lotDTOs);
-    }
 }
