@@ -2,7 +2,6 @@ package es.triana.company.investments.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -65,25 +64,10 @@ public class InvestmentService {
         validateInstrumentBelongsToType(instrument, type);
         InvestmentPlatform platform = resolvePlatform(dto.getPlatformId());
 
-        Investment investment = Investment.builder()
-                .tenantId(dto.getTenantId())
-                .typeId(type.getId())
-                .name(trimToNull(dto.getName()))
-            .instrumentId(instrument.getId())
-                .platformId(platform != null ? platform.getId() : null)
-                .currency(normalizeCurrency(dto.getCurrency()))
-                .investedAmount(dto.getInvestedAmount())
-                .currentValueManual(dto.getCurrentValueManual())
-                .currentValueCalculated(calculateCurrentValue(instrument, dto.getQuantity()))
-                .quantity(dto.getQuantity())
-                .openedAt(dto.getOpenedAt())
-                .notes(trimToNull(dto.getNotes()))
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+        Investment investment = investmentMapper.toEntityForCreate(dto, type, instrument, platform);
 
-            Investment saved = investmentRepository.save(investment);
-            return investmentMapper.toDto(saved);
+        Investment saved = investmentRepository.save(investment);
+        return investmentMapper.toDto(saved);
     }
 
     public InvestmentDTO update(Long id, InvestmentDTO dto) {
@@ -98,18 +82,7 @@ public class InvestmentService {
         Investment investment = investmentRepository.findByIdAndTenantId(id, dto.getTenantId())
                 .orElseThrow(() -> new InvestmentNotFoundException(id));
 
-        investment.setTypeId(type.getId());
-        investment.setName(trimToNull(dto.getName()));
-        investment.setInstrumentId(instrument.getId());
-        investment.setPlatformId(platform != null ? platform.getId() : null);
-        investment.setCurrency(normalizeCurrency(dto.getCurrency()));
-        investment.setInvestedAmount(dto.getInvestedAmount());
-        investment.setCurrentValueManual(dto.getCurrentValueManual());
-        investment.setCurrentValueCalculated(calculateCurrentValue(instrument, dto.getQuantity()));
-        investment.setQuantity(dto.getQuantity());
-        investment.setOpenedAt(dto.getOpenedAt());
-        investment.setNotes(trimToNull(dto.getNotes()));
-        investment.setUpdatedAt(LocalDateTime.now());
+        investment = investmentMapper.updateEntityFromDto(investment, dto, type, instrument, platform);
 
         Investment saved = investmentRepository.save(investment);
         return investmentMapper.toDto(saved);
@@ -202,20 +175,6 @@ public class InvestmentService {
         }
     }
 
-    private String normalizeCurrency(String currency) {
-        if (currency == null) {
-            return "EUR";
-        }
-        String c = currency.trim().toUpperCase();
-        return c.isEmpty() ? "EUR" : c;
-    }
-
-    private String trimToNull(String value) {
-        if (value == null) return null;
-        String t = value.trim();
-        return t.isEmpty() ? null : t;
-    }
-
     private InvestmentTypeCatalog resolveType(Long typeId) {
         if (typeId == null || typeId <= 0) {
             throw new InvestmentValidationException("typeId is required and must be > 0");
@@ -248,18 +207,6 @@ public class InvestmentService {
         }
         return investmentPlatformRepository.findById(platformId)
                 .orElseThrow(() -> new InvestmentValidationException("Unknown platformId: " + platformId));
-    }
-
-    /**
-     * Calcula el valor actual: 
-     * - Si cantidad y último precio existen, cantidad × lastPrice
-     * - Sino, null (debe usarse manual + histórico)
-     */
-    private BigDecimal calculateCurrentValue(InvestmentInstrument instrument, BigDecimal quantity) {
-        if (quantity == null || instrument.getLastPrice() == null) {
-            return null;
-        }
-        return quantity.multiply(instrument.getLastPrice());
     }
 
     /**
