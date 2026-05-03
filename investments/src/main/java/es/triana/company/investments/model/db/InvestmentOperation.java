@@ -5,6 +5,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -34,8 +36,9 @@ public class InvestmentOperation {
     private Long tenantId;
 
     /** BUY or SELL */
+    @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false, length = 4)
-    private String type;
+    private OperationType type;
 
     @Column(name = "operation_date", nullable = false)
     private LocalDate operationDate;

@@ -6,7 +6,6 @@ import java.time.LocalDate;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import lombok.AllArgsConstructor;
@@ -27,9 +26,8 @@ public class CreateOperationRequest {
     private Long tenantId;
 
     /** BUY or SELL */
-    @NotBlank(message = "type is required")
-    @Pattern(regexp = "BUY|SELL", message = "type must be BUY or SELL")
-    private String type;
+    @NotNull(message = "type is required")
+    private es.triana.company.investments.model.db.OperationType type;
 
     @NotNull(message = "operationDate is required")
     private LocalDate operationDate;

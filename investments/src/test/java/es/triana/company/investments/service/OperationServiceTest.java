@@ -35,6 +35,7 @@ import es.triana.company.investments.model.db.ExchangeRate;
 import es.triana.company.investments.model.db.Investment;
 import es.triana.company.investments.model.db.InvestmentOperation;
 import es.triana.company.investments.model.db.OperationFifoLot;
+import es.triana.company.investments.model.db.OperationType;
 import es.triana.company.investments.repository.ExchangeRateRepository;
 import es.triana.company.investments.repository.InvestmentOperationRepository;
 import es.triana.company.investments.repository.InvestmentRepository;
@@ -117,7 +118,7 @@ class OperationServiceTest {
         @DisplayName("BUY inserts a row in investment_operations with correct totals in original currency and EUR")
         void buy_insertsOperationWithCorrectAmounts() {
             stubEurRate("USD", DATE_BUY1, "1.08");
-            stubSaveOperation(savedOp(1L, "BUY", DATE_BUY1, bd("10"), bd("150"), bd("5"),
+            stubSaveOperation(savedOp(1L, OperationType.BUY, DATE_BUY1, bd("10"), bd("150"), bd("5"),
                     bd("1505.0000"), "USD", bd("1.08"), bd("1393.5185")));
 
             CreateOperationRequest req = buy(DATE_BUY1, "10", "150", "5");
@@ -127,7 +128,7 @@ class OperationServiceTest {
             verify(operationRepository).save(captor.capture());
             InvestmentOperation saved = captor.getValue();
 
-            assertThat(saved.getType()).isEqualTo("BUY");
+            assertThat(saved.getType()).isEqualTo(OperationType.BUY);
             assertThat(saved.getQuantity()).isEqualByComparingTo("10");
             assertThat(saved.getUnitPrice()).isEqualByComparingTo("150");
             assertThat(saved.getFees()).isEqualByComparingTo("5");
@@ -143,7 +144,7 @@ class OperationServiceTest {
         @DisplayName("BUY increments investment.quantity and investment.invested_amount")
         void buy_updatesInvestmentQuantityAndInvestedAmount() {
             stubEurRate("USD", DATE_BUY1, "1.08");
-            stubSaveOperation(savedOp(1L, "BUY", DATE_BUY1, bd("10"), bd("150"), bd("5"),
+            stubSaveOperation(savedOp(1L, OperationType.BUY, DATE_BUY1, bd("10"), bd("150"), bd("5"),
                     bd("1505.0000"), "USD", bd("1.08"), bd("1393.5185")));
 
             operationService.registerOperation(buy(DATE_BUY1, "10", "150", "5"));
@@ -163,7 +164,7 @@ class OperationServiceTest {
         void buy_twoBuysAccumulatePosition() {
             // BUY 1
             stubEurRate("USD", DATE_BUY1, "1.08");
-            stubSaveOperation(savedOp(1L, "BUY", DATE_BUY1, bd("10"), bd("150"), bd("5"),
+            stubSaveOperation(savedOp(1L, OperationType.BUY, DATE_BUY1, bd("10"), bd("150"), bd("5"),
                     bd("1505.0000"), "USD", bd("1.08"), bd("1393.5185")));
             operationService.registerOperation(buy(DATE_BUY1, "10", "150", "5"));
 
@@ -173,7 +174,7 @@ class OperationServiceTest {
 
             // BUY 2
             stubEurRate("USD", DATE_BUY2, "1.09");
-            stubSaveOperation(savedOp(2L, "BUY", DATE_BUY2, bd("5"), bd("160"), bd("3"),
+            stubSaveOperation(savedOp(2L, OperationType.BUY, DATE_BUY2, bd("5"), bd("160"), bd("3"),
                     bd("803.0000"), "USD", bd("1.09"), bd("736.6972")));
             operationService.registerOperation(buy(DATE_BUY2, "5", "160", "3"));
 
@@ -195,12 +196,12 @@ class OperationServiceTest {
             when(investmentRepository.findByIdAndTenantIdForUpdate(2L, TENANT_ID))
                     .thenReturn(Optional.of(eurInvestment));
 
-            InvestmentOperation op = savedOp(10L, "BUY", DATE_BUY1, bd("100"), bd("50"), bd("2"),
+            InvestmentOperation op = savedOp(10L, OperationType.BUY, DATE_BUY1, bd("100"), bd("50"), bd("2"),
                     bd("5002.0000"), "EUR", BigDecimal.ONE, bd("5002.0000"));
             when(operationRepository.save(any())).thenReturn(op);
 
             CreateOperationRequest req = new CreateOperationRequest(
-                    2L, TENANT_ID, "BUY", DATE_BUY1, bd("100"), bd("50"), bd("2"), "EUR", null);
+                    2L, TENANT_ID, OperationType.BUY, DATE_BUY1, bd("100"), bd("50"), bd("2"), "EUR", null);
             OperationDTO result = operationService.registerOperation(req);
 
             assertThat(result.eurExchangeRate()).isEqualByComparingTo("1");
@@ -211,7 +212,7 @@ class OperationServiceTest {
         @DisplayName("BUY does NOT insert anything in operation_fifo_lots")
         void buy_noFifoLotsCreated() {
             stubEurRate("USD", DATE_BUY1, "1.08");
-            stubSaveOperation(savedOp(1L, "BUY", DATE_BUY1, bd("10"), bd("150"), bd("5"),
+            stubSaveOperation(savedOp(1L, OperationType.BUY, DATE_BUY1, bd("10"), bd("150"), bd("5"),
                     bd("1505.0000"), "USD", bd("1.08"), bd("1393.5185")));
 
             operationService.registerOperation(buy(DATE_BUY1, "10", "150", "5"));
@@ -237,9 +238,9 @@ class OperationServiceTest {
             investment.setQuantity(bd("15"));
             investment.setInvestedAmount(bd("2308.00"));
 
-            buy1 = savedOp(1L, "BUY", DATE_BUY1, bd("10"), bd("150"), bd("5"),
+            buy1 = savedOp(1L, OperationType.BUY, DATE_BUY1, bd("10"), bd("150"), bd("5"),
                     bd("1505.0000"), "USD", bd("1.08"), bd("1393.5185"));
-            buy2 = savedOp(2L, "BUY", DATE_BUY2, bd("5"), bd("160"), bd("3"),
+            buy2 = savedOp(2L, OperationType.BUY, DATE_BUY2, bd("5"), bd("160"), bd("3"),
                     bd("803.0000"), "USD", bd("1.09"), bd("736.6972"));
         }
 
@@ -247,7 +248,7 @@ class OperationServiceTest {
         @DisplayName("SELL inserts a row in investment_operations with correct totals (gross - fees)")
         void sell_insertsOperationWithCorrectAmounts() {
             stubEurRate("USD", DATE_SELL, "1.12");
-            stubSellOperation(savedOp(3L, "SELL", DATE_SELL, bd("8"), bd("180"), bd("4"),
+            stubSellOperation(savedOp(3L, OperationType.SELL, DATE_SELL, bd("8"), bd("180"), bd("4"),
                     bd("1436.0000"), "USD", bd("1.12"), bd("1282.1429")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buy1, buy2));
@@ -260,7 +261,7 @@ class OperationServiceTest {
             verify(operationRepository).save(captor.capture());
             InvestmentOperation saved = captor.getValue();
 
-            assertThat(saved.getType()).isEqualTo("SELL");
+            assertThat(saved.getType()).isEqualTo(OperationType.SELL);
             assertThat(saved.getQuantity()).isEqualByComparingTo("8");
             // total_amount = 8*180 - 4 = 1436 (fees subtracted on sell)
             assertThat(saved.getTotalAmount()).isEqualByComparingTo("1436.0000");
@@ -272,7 +273,7 @@ class OperationServiceTest {
         @DisplayName("SELL reduces investment.quantity; invested_amount is NOT changed")
         void sell_reducesQuantityButNotInvestedAmount() {
             stubEurRate("USD", DATE_SELL, "1.12");
-            stubSellOperation(savedOp(3L, "SELL", DATE_SELL, bd("8"), bd("180"), bd("4"),
+            stubSellOperation(savedOp(3L, OperationType.SELL, DATE_SELL, bd("8"), bd("180"), bd("4"),
                     bd("1436.0000"), "USD", bd("1.12"), bd("1282.1429")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buy1, buy2));
@@ -295,7 +296,7 @@ class OperationServiceTest {
         @DisplayName("SELL applies FIFO: consumes oldest BUY first and inserts correct fifo_lot")
         void sell_fifoConsumesOldestBuyFirst() {
             stubEurRate("USD", DATE_SELL, "1.12");
-            stubSellOperation(savedOp(3L, "SELL", DATE_SELL, bd("8"), bd("180"), bd("4"),
+            stubSellOperation(savedOp(3L, OperationType.SELL, DATE_SELL, bd("8"), bd("180"), bd("4"),
                     bd("1436.0000"), "USD", bd("1.12"), bd("1282.1429")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buy1, buy2));
@@ -333,7 +334,7 @@ class OperationServiceTest {
             // Selling 12 shares: first exhausts BUY1 (10) then takes 2 from BUY2 (5)
             investment.setQuantity(bd("15"));
             stubEurRate("USD", DATE_SELL, "1.12");
-            stubSellOperation(savedOp(3L, "SELL", DATE_SELL, bd("12"), bd("180"), bd("4"),
+            stubSellOperation(savedOp(3L, OperationType.SELL, DATE_SELL, bd("12"), bd("180"), bd("4"),
                     bd("2156.0000"), "USD", bd("1.12"), bd("1925.0000")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buy1, buy2));
@@ -376,7 +377,7 @@ class OperationServiceTest {
 
             stubEurRate("USD", DATE_SELL, "1.12");
             // Now we sell 6 shares: 4 from BUY1 remainder + 2 from BUY2
-            stubSellOperation(savedOp(3L, "SELL", DATE_SELL, bd("6"), bd("180"), bd("4"),
+            stubSellOperation(savedOp(3L, OperationType.SELL, DATE_SELL, bd("6"), bd("180"), bd("4"),
                     bd("1076.0000"), "USD", bd("1.12"), bd("960.7143")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buy1, buy2));
@@ -409,7 +410,7 @@ class OperationServiceTest {
             when(investmentRepository.findByIdAndTenantIdForUpdate(999L, TENANT_ID)).thenReturn(Optional.empty());
 
             CreateOperationRequest req = new CreateOperationRequest(
-                    999L, TENANT_ID, "BUY", DATE_BUY1, bd("10"), bd("150"), null, "USD", null);
+                    999L, TENANT_ID, OperationType.BUY, DATE_BUY1, bd("10"), bd("150"), null, "USD", null);
 
             assertThatThrownBy(() -> operationService.registerOperation(req))
                     .isInstanceOf(InvestmentValidationException.class)
@@ -436,7 +437,7 @@ class OperationServiceTest {
         void sell_insufficientStock_throwsAndNothingPersisted() {
             // Only 5 units available (one BUY lot of 5), trying to sell 10
             investment.setQuantity(bd("5"));
-            InvestmentOperation smallBuy = savedOp(1L, "BUY", DATE_BUY1, bd("5"), bd("150"), bd("0"),
+            InvestmentOperation smallBuy = savedOp(1L, OperationType.BUY, DATE_BUY1, bd("5"), bd("150"), bd("0"),
                     bd("750.0000"), "USD", bd("1.08"), bd("694.4444"));
 
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
@@ -460,11 +461,11 @@ class OperationServiceTest {
         @DisplayName("SELL with exact available stock succeeds")
         void sell_exactStock_succeeds() {
             investment.setQuantity(bd("10"));
-            InvestmentOperation buyLot = savedOp(1L, "BUY", DATE_BUY1, bd("10"), bd("150"), bd("5"),
+            InvestmentOperation buyLot = savedOp(1L, OperationType.BUY, DATE_BUY1, bd("10"), bd("150"), bd("5"),
                     bd("1505.0000"), "USD", bd("1.08"), bd("1393.5185"));
 
             stubEurRate("USD", DATE_SELL, "1.12");
-            stubSellOperation(savedOp(3L, "SELL", DATE_SELL, bd("10"), bd("180"), bd("4"),
+            stubSellOperation(savedOp(3L, OperationType.SELL, DATE_SELL, bd("10"), bd("180"), bd("4"),
                     bd("1796.0000"), "USD", bd("1.12"), bd("1603.5714")));
             when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
                     .thenReturn(List.of(buyLot));
@@ -488,14 +489,14 @@ class OperationServiceTest {
         @Test
         @DisplayName("Rebuild FIFO from scratch for instrument+tenant in temporal order")
         void rebuild_backdatedOperations_rebuildsLotsInOrder() {
-            InvestmentOperation buy1 = savedOp(101L, "BUY", LocalDate.of(2024, 1, 10),
+            InvestmentOperation buy1 = savedOp(101L, OperationType.BUY, LocalDate.of(2024, 1, 10),
                     bd("10"), bd("100"), bd("0"), bd("1000.0000"), "USD", bd("1.10"), bd("909.0909"));
-            InvestmentOperation sell1 = savedOp(102L, "SELL", LocalDate.of(2024, 1, 20),
+            InvestmentOperation sell1 = savedOp(102L, OperationType.SELL, LocalDate.of(2024, 1, 20),
                     bd("4"), bd("120"), bd("0"), bd("480.0000"), "USD", bd("1.20"), bd("400.0000"));
             // Backdated BUY inserted before an existing later SELL
-            InvestmentOperation buy2 = savedOp(103L, "BUY", LocalDate.of(2024, 2, 1),
+            InvestmentOperation buy2 = savedOp(103L, OperationType.BUY, LocalDate.of(2024, 2, 1),
                     bd("5"), bd("90"), bd("0"), bd("450.0000"), "USD", bd("1.08"), bd("416.6667"));
-            InvestmentOperation sell2 = savedOp(104L, "SELL", LocalDate.of(2024, 2, 10),
+            InvestmentOperation sell2 = savedOp(104L, OperationType.SELL, LocalDate.of(2024, 2, 10),
                     bd("5"), bd("110"), bd("0"), bd("550.0000"), "USD", bd("1.10"), bd("500.0000"));
 
             when(operationRepository.findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(
@@ -529,7 +530,7 @@ class OperationServiceTest {
         @Test
         @DisplayName("Rebuild FIFO throws when historical SELL cannot be covered")
         void rebuild_insufficientHistoricalStock_throws() {
-            InvestmentOperation sellOnly = savedOp(202L, "SELL", LocalDate.of(2024, 4, 10),
+            InvestmentOperation sellOnly = savedOp(202L, OperationType.SELL, LocalDate.of(2024, 4, 10),
                     bd("5"), bd("150"), bd("0"), bd("750.0000"), "USD", bd("1.15"), bd("652.1739"));
 
             when(operationRepository.findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(
@@ -602,15 +603,11 @@ class OperationServiceTest {
     // =========================================================================
 
     private CreateOperationRequest buy(LocalDate date, String qty, String unitPrice, String fees) {
-        return new CreateOperationRequest(
-                INVESTMENT_ID, TENANT_ID, "BUY", date,
-                bd(qty), bd(unitPrice), bd(fees), "USD", null);
+        return new CreateOperationRequest(INVESTMENT_ID, TENANT_ID, OperationType.BUY, date, bd(qty), bd(unitPrice), bd(fees), "USD", null);
     }
 
     private CreateOperationRequest sell(LocalDate date, String qty, String unitPrice, String fees) {
-        return new CreateOperationRequest(
-                INVESTMENT_ID, TENANT_ID, "SELL", date,
-                bd(qty), bd(unitPrice), bd(fees), "USD", null);
+        return new CreateOperationRequest(INVESTMENT_ID, TENANT_ID, OperationType.SELL, date, bd(qty), bd(unitPrice), bd(fees), "USD", null);
     }
 
     private void stubEurRate(String currency, LocalDate date, String rate) {
@@ -632,7 +629,7 @@ class OperationServiceTest {
         when(operationRepository.save(any())).thenReturn(op);
     }
 
-    private InvestmentOperation savedOp(Long id, String type, LocalDate date,
+    private InvestmentOperation savedOp(Long id, OperationType type, LocalDate date,
                                         BigDecimal qty, BigDecimal unitPrice, BigDecimal fees,
                                         BigDecimal totalAmount, String currency,
                                         BigDecimal eurRate, BigDecimal totalAmountEur) {

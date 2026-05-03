@@ -5,11 +5,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import es.triana.company.investments.model.db.OperationType;
+
 public record OperationDTO(
         Long id,
         Long investmentId,
         Long tenantId,
-        String type,
+        OperationType type,
         LocalDate operationDate,
         BigDecimal quantity,
         BigDecimal unitPrice,

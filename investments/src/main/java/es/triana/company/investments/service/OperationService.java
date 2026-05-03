@@ -20,6 +20,7 @@ import es.triana.company.investments.model.api.OperationDTO;
 import es.triana.company.investments.model.api.TaxSummaryDTO;
 import es.triana.company.investments.model.db.Investment;
 import es.triana.company.investments.model.db.InvestmentOperation;
+import es.triana.company.investments.model.db.OperationType;
 import es.triana.company.investments.model.db.OperationFifoLot;
 import es.triana.company.investments.repository.ExchangeRateRepository;
 import es.triana.company.investments.repository.InvestmentOperationRepository;
@@ -39,10 +40,7 @@ public class OperationService {
     private final InvestmentRepository investmentRepository;
     private final ExchangeRateRepository exchangeRateRepository;
 
-    public OperationService(InvestmentOperationRepository operationRepository,
-                            OperationFifoLotRepository fifoLotRepository,
-                            InvestmentRepository investmentRepository,
-                            ExchangeRateRepository exchangeRateRepository) {
+    public OperationService(InvestmentOperationRepository operationRepository, OperationFifoLotRepository fifoLotRepository, InvestmentRepository investmentRepository, ExchangeRateRepository exchangeRateRepository) {
         this.operationRepository = operationRepository;
         this.fifoLotRepository = fifoLotRepository;
         this.investmentRepository = investmentRepository;
@@ -61,7 +59,7 @@ public class OperationService {
 
         // For SELL: validate FIFO coverage BEFORE any other work so nothing is
         // persisted and no external calls are made if stock is insufficient.
-        if ("SELL".equals(req.getType())) {
+        if (OperationType.SELL.equals(req.getType())) {
             validateFifoCoverage(req.getQuantity(), investment);
         }
 
@@ -94,7 +92,7 @@ public class OperationService {
                 op.getType(), op.getId(), op.getInvestmentId(), op.getQuantity(), op.getTotalAmountEur());
 
         List<OperationFifoLot> lots = new ArrayList<>();
-        if ("SELL".equals(req.getType())) {
+        if (OperationType.SELL.equals(req.getType())) {
             lots = applyFifo(op, investment);
         }
 
@@ -171,7 +169,7 @@ public class OperationService {
                 }
 
                 List<Long> sellIds = operations.stream()
-                                .filter(op -> "SELL".equals(op.getType()))
+                                .filter(op -> OperationType.SELL.equals(op.getType()))
                                 .map(InvestmentOperation::getId)
                                 .toList();
                 if (!sellIds.isEmpty()) {
@@ -184,12 +182,12 @@ public class OperationService {
                 int sellsRebuilt = 0;
 
                 for (InvestmentOperation op : operations) {
-                        if ("BUY".equals(op.getType())) {
+                        if (OperationType.BUY.equals(op.getType())) {
                                 buyQueue.add(op);
                                 continue;
                         }
 
-                        if (!"SELL".equals(op.getType())) {
+                        if (!OperationType.SELL.equals(op.getType())) {
                                 continue;
                         }
 
@@ -347,8 +345,8 @@ public class OperationService {
     // Position update
     // -------------------------------------------------------------------------
 
-    private void updateInvestmentPosition(Investment inv, String type, BigDecimal quantity, BigDecimal totalAmount) {
-        if ("BUY".equals(type)) {
+    private void updateInvestmentPosition(Investment inv, OperationType type, BigDecimal quantity, BigDecimal totalAmount) {
+        if (OperationType.BUY.equals(type)) {
             BigDecimal newQty = (inv.getQuantity() != null ? inv.getQuantity() : BigDecimal.ZERO).add(quantity);
             BigDecimal newInvested = (inv.getInvestedAmount() != null ? inv.getInvestedAmount() : BigDecimal.ZERO)
                     .add(totalAmount).setScale(2, RoundingMode.HALF_UP);
@@ -368,11 +366,11 @@ public class OperationService {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private BigDecimal computeTotalAmount(String type, BigDecimal qty, BigDecimal unitPrice, BigDecimal fees) {
-        BigDecimal gross = qty.multiply(unitPrice);
-        return "BUY".equals(type)
-                ? gross.add(fees).setScale(4, RoundingMode.HALF_UP)
-                : gross.subtract(fees).setScale(4, RoundingMode.HALF_UP);
+    private BigDecimal computeTotalAmount(OperationType type, BigDecimal qty, BigDecimal unitPrice, BigDecimal fees) {
+                BigDecimal gross = qty.multiply(unitPrice);
+                return OperationType.BUY.equals(type)
+                                ? gross.add(fees).setScale(4, RoundingMode.HALF_UP)
+                                : gross.subtract(fees).setScale(4, RoundingMode.HALF_UP);
     }
 
     /**
