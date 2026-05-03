@@ -13,7 +13,13 @@ import jakarta.persistence.LockModeType;
 
 public interface InvestmentRepository extends JpaRepository<Investment, Long> {
 
-    List<Investment> findByTenantIdOrderByUpdatedAtDescIdDesc(Long tenantId);
+        @Query("SELECT i FROM Investment i "
+            + "LEFT JOIN FETCH i.type t "
+            + "LEFT JOIN FETCH i.instrument inst "
+            + "LEFT JOIN FETCH i.platform p "
+            + "WHERE i.tenantId = :tenantId "
+            + "ORDER BY i.updatedAt DESC, i.id DESC")
+        List<Investment> findByTenantIdOrderByUpdatedAtDescIdDesc(@Param("tenantId") Long tenantId);
 
     List<Investment> findByInstrumentId(Long instrumentId);
 

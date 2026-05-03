@@ -6,9 +6,12 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,14 +36,26 @@ public class Investment {
     @Column(name = "type_id", nullable = false)
     private Long typeId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "type_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private InvestmentTypeCatalog type;
+
     @Column(name = "name", nullable = false, length = 150)
     private String name;
 
     @Column(name = "instrument_id", nullable = false)
     private Long instrumentId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "instrument_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private InvestmentInstrument instrument;
+
     @Column(name = "platform_id")
     private Long platformId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "platform_id", referencedColumnName = "id", insertable = false, updatable = false)
+    private InvestmentPlatform platform;
 
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;

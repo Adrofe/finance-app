@@ -3,10 +3,8 @@ package es.triana.company.investments.service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -33,11 +31,7 @@ public class InvestmentService {
     private final InvestmentInstrumentRepository investmentInstrumentRepository;
     private final InvestmentPlatformRepository investmentPlatformRepository;
 
-    public InvestmentService(
-            InvestmentRepository investmentRepository,
-            InvestmentTypeCatalogRepository investmentTypeCatalogRepository,
-            InvestmentInstrumentRepository investmentInstrumentRepository,
-            InvestmentPlatformRepository investmentPlatformRepository) {
+    public InvestmentService(InvestmentRepository investmentRepository, InvestmentTypeCatalogRepository investmentTypeCatalogRepository, InvestmentInstrumentRepository investmentInstrumentRepository, InvestmentPlatformRepository investmentPlatformRepository) {
         this.investmentRepository = investmentRepository;
         this.investmentTypeCatalogRepository = investmentTypeCatalogRepository;
         this.investmentInstrumentRepository = investmentInstrumentRepository;
@@ -47,11 +41,8 @@ public class InvestmentService {
     public List<InvestmentDTO> getAllByTenant(Long tenantId) {
         validateTenant(tenantId);
         List<Investment> items = investmentRepository.findByTenantIdOrderByUpdatedAtDescIdDesc(tenantId);
-        Map<Long, InvestmentTypeCatalog> typeMap = loadTypeMap(items);
-        Map<Long, InvestmentInstrument> instrumentMap = loadInstrumentMap(items);
-        Map<Long, InvestmentPlatform> platformMap = loadPlatformMap(items);
         return items.stream()
-            .map(item -> toDto(item, typeMap, instrumentMap, platformMap))
+                .map(this::toDto)
                 .toList();
     }
 
@@ -59,10 +50,7 @@ public class InvestmentService {
         validateTenant(tenantId);
         Investment investment = investmentRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new InvestmentNotFoundException(id));
-        Map<Long, InvestmentTypeCatalog> typeMap = loadTypeMap(List.of(investment));
-        Map<Long, InvestmentInstrument> instrumentMap = loadInstrumentMap(List.of(investment));
-        Map<Long, InvestmentPlatform> platformMap = loadPlatformMap(List.of(investment));
-        return toDto(investment, typeMap, instrumentMap, platformMap);
+        return toDto(investment);
     }
 
     public InvestmentDTO create(InvestmentDTO dto) {
@@ -92,11 +80,7 @@ public class InvestmentService {
                 .build();
 
             Investment saved = investmentRepository.save(investment);
-            return toDto(
-                saved,
-                Map.of(type.getId(), type),
-                Map.of(instrument.getId(), instrument),
-                platform != null ? Map.of(platform.getId(), platform) : Map.of());
+            return toDto(saved);
     }
 
     public InvestmentDTO update(Long id, InvestmentDTO dto) {
@@ -125,11 +109,7 @@ public class InvestmentService {
         investment.setUpdatedAt(LocalDateTime.now());
 
         Investment saved = investmentRepository.save(investment);
-        return toDto(
-            saved,
-            Map.of(type.getId(), type),
-            Map.of(instrument.getId(), instrument),
-            platform != null ? Map.of(platform.getId(), platform) : Map.of());
+        return toDto(saved);
     }
 
     public void delete(Long id, Long tenantId) {
@@ -142,7 +122,6 @@ public class InvestmentService {
     public InvestmentSummaryDTO getSummary(Long tenantId) {
         validateTenant(tenantId);
         List<Investment> items = investmentRepository.findByTenantIdOrderByUpdatedAtDescIdDesc(tenantId);
-        Map<Long, InvestmentTypeCatalog> typeMap = loadTypeMap(items);
 
         BigDecimal totalInvested = items.stream()
                 .map(Investment::getInvestedAmount)
@@ -161,20 +140,20 @@ public class InvestmentService {
                     .setScale(2, RoundingMode.HALF_UP);
         }
 
-                Map<Long, List<Investment>> groupedByType = items.stream()
-                    .collect(Collectors.groupingBy(Investment::getTypeId));
+        Map<Long, List<Investment>> groupedByType = items.stream()
+                .collect(Collectors.groupingBy(Investment::getTypeId));
 
-                List<InvestmentTypeSummaryDTO> byType = groupedByType.entrySet().stream()
-                    .map(entry -> {
-                        List<Investment> byTypeItems = entry.getValue();
-                        BigDecimal invested = byTypeItems.stream()
+        List<InvestmentTypeSummaryDTO> byType = groupedByType.entrySet().stream()
+                .map(entry -> {
+                    List<Investment> byTypeItems = entry.getValue();
+                    BigDecimal invested = byTypeItems.stream()
                             .map(Investment::getInvestedAmount)
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
-                        BigDecimal current = byTypeItems.stream()
+                    BigDecimal current = byTypeItems.stream()
                             .map(this::getCurrentValue)
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
-                        InvestmentTypeCatalog type = typeMap.get(entry.getKey());
-                        return InvestmentTypeSummaryDTO.builder()
+                    InvestmentTypeCatalog type = byTypeItems.isEmpty() ? null : byTypeItems.get(0).getType();
+                    return InvestmentTypeSummaryDTO.builder()
                             .typeId(entry.getKey())
                             .typeCode(type != null ? type.getCode() : null)
                             .typeName(type != null ? type.getName() : null)
@@ -183,7 +162,7 @@ public class InvestmentService {
                             .currentValue(current)
                             .pnl(current.subtract(invested))
                             .build();
-                    })
+                })
                 .toList();
 
         return InvestmentSummaryDTO.builder()
@@ -268,53 +247,13 @@ public class InvestmentService {
                 .orElseThrow(() -> new InvestmentValidationException("Unknown platformId: " + platformId));
     }
 
-    private Map<Long, InvestmentTypeCatalog> loadTypeMap(List<Investment> items) {
-        Set<Long> ids = items.stream()
-                .map(Investment::getTypeId)
-                .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toSet());
-        if (ids.isEmpty()) {
-            return Map.of();
-        }
-        Map<Long, InvestmentTypeCatalog> result = new HashMap<>();
-        investmentTypeCatalogRepository.findAllById(ids).forEach(type -> result.put(type.getId(), type));
-        return result;
-    }
+    // Relationship lookups are now handled via JPA @ManyToOne mappings on Investment
+    // and repository methods that JOIN FETCH the associations to avoid N+1 queries.
 
-    private Map<Long, InvestmentInstrument> loadInstrumentMap(List<Investment> items) {
-        Set<Long> ids = items.stream()
-                .map(Investment::getInstrumentId)
-                .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toSet());
-        if (ids.isEmpty()) {
-            return Map.of();
-        }
-        Map<Long, InvestmentInstrument> result = new HashMap<>();
-        investmentInstrumentRepository.findAllById(ids).forEach(instrument -> result.put(instrument.getId(), instrument));
-        return result;
-    }
-
-    private Map<Long, InvestmentPlatform> loadPlatformMap(List<Investment> items) {
-        Set<Long> ids = items.stream()
-                .map(Investment::getPlatformId)
-                .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toSet());
-        if (ids.isEmpty()) {
-            return Map.of();
-        }
-        Map<Long, InvestmentPlatform> result = new HashMap<>();
-        investmentPlatformRepository.findAllById(ids).forEach(platform -> result.put(platform.getId(), platform));
-        return result;
-    }
-
-    private InvestmentDTO toDto(
-            Investment entity,
-            Map<Long, InvestmentTypeCatalog> typeMap,
-            Map<Long, InvestmentInstrument> instrumentMap,
-            Map<Long, InvestmentPlatform> platformMap) {
-        InvestmentTypeCatalog type = typeMap.get(entity.getTypeId());
-        InvestmentInstrument instrument = instrumentMap.get(entity.getInstrumentId());
-        InvestmentPlatform platform = platformMap.get(entity.getPlatformId());
+    private InvestmentDTO toDto(Investment entity) {
+        InvestmentTypeCatalog type = entity.getType();
+        InvestmentInstrument instrument = entity.getInstrument();
+        InvestmentPlatform platform = entity.getPlatform();
         return InvestmentDTO.builder()
                 .id(entity.getId())
                 .tenantId(entity.getTenantId())
@@ -322,9 +261,9 @@ public class InvestmentService {
                 .typeCode(type != null ? type.getCode() : null)
                 .typeName(type != null ? type.getName() : null)
                 .name(entity.getName())
-            .instrumentId(entity.getInstrumentId())
-            .instrumentSymbol(instrument != null ? instrument.getSymbol() : null)
-            .instrumentName(instrument != null ? instrument.getName() : null)
+                .instrumentId(entity.getInstrumentId())
+                .instrumentSymbol(instrument != null ? instrument.getSymbol() : null)
+                .instrumentName(instrument != null ? instrument.getName() : null)
                 .platformId(entity.getPlatformId())
                 .platformCode(platform != null ? platform.getCode() : null)
                 .platformName(platform != null ? platform.getName() : null)

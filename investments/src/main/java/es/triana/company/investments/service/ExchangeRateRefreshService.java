@@ -15,6 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import es.triana.company.investments.client.EcbExchangeRateClient;
 import es.triana.company.investments.model.db.ExchangeRate;
 import es.triana.company.investments.repository.ExchangeRateRepository;
 
@@ -42,8 +43,7 @@ public class ExchangeRateRefreshService {
         LocalDate toDate = LocalDate.now();
         LocalDate fromDate = toDate.minusDays(89);
 
-        List<LocalDate> existingDates = exchangeRateRepository
-                .findDistinctAsOfByFromCurrencyBetween(BASE_CURRENCY, fromDate, toDate);
+        List<LocalDate> existingDates = exchangeRateRepository.findDistinctAsOfByFromCurrencyBetween(BASE_CURRENCY, fromDate, toDate);
 
         Set<LocalDate> existingSet = new HashSet<>(existingDates);
         List<LocalDate> missingBusinessDays = new ArrayList<>();
