@@ -15,6 +15,7 @@
     </properties>
     <modules>
         <module>banking</module>
+        <module>investments</module>
     </modules>
     <dependencyManagement>
         <dependencies>
