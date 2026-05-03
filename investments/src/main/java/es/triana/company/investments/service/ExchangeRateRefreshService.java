@@ -143,10 +143,7 @@ public class ExchangeRateRefreshService {
         for (ExchangeRate incoming : rates) {
             try {
                 exchangeRateRepository
-                        .findByFromCurrencyAndToCurrencyAndAsOf(
-                                incoming.getFromCurrency(),
-                                incoming.getToCurrency(),
-                                incoming.getAsOf())
+                        .findByFromCurrencyAndToCurrencyAndAsOf(incoming.getFromCurrency(), incoming.getToCurrency(), incoming.getAsOf())
                         .ifPresentOrElse(
                                 existing -> {
                                     existing.setRate(incoming.getRate());

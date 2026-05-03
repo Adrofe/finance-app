@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import es.triana.company.investments.client.MarketPriceClient;
 import es.triana.company.investments.model.api.PriceRefreshResultDTO;
 import es.triana.company.investments.model.api.PriceUpdateRequestDTO;
 import es.triana.company.investments.model.db.Investment;
@@ -34,11 +35,7 @@ public class PriceRefreshService {
     private final InvestmentRepository investmentRepository;
     private final MarketPriceClient marketPriceClient;
 
-    public PriceRefreshService(
-            InvestmentInstrumentRepository investmentInstrumentRepository,
-            InvestmentPriceRepository investmentPriceRepository,
-            InvestmentRepository investmentRepository,
-            MarketPriceClient marketPriceClient) {
+    public PriceRefreshService(InvestmentInstrumentRepository investmentInstrumentRepository, InvestmentPriceRepository investmentPriceRepository,InvestmentRepository investmentRepository, MarketPriceClient marketPriceClient) {
         this.investmentInstrumentRepository = investmentInstrumentRepository;
         this.investmentPriceRepository = investmentPriceRepository;
         this.investmentRepository = investmentRepository;
@@ -60,8 +57,7 @@ public class PriceRefreshService {
             validateUpdate(update);
 
             InvestmentInstrument instrument = investmentInstrumentRepository.findById(update.getInstrumentId())
-                    .orElseThrow(() -> new InvestmentValidationException(
-                            "Unknown instrumentId: " + update.getInstrumentId()));
+                    .orElseThrow(() -> new InvestmentValidationException("Unknown instrumentId: " + update.getInstrumentId()));
 
             LocalDateTime asOf = update.getAsOf() != null ? update.getAsOf() : LocalDateTime.now();
             String source = trimOrDefault(update.getSource(), "MANUAL");
@@ -196,12 +192,7 @@ public class PriceRefreshService {
         investmentPriceRepository.save(previousSnapshot);
     }
 
-    private void updateCurrentPrice(
-            InvestmentInstrument instrument,
-            BigDecimal newPrice,
-            String source,
-            LocalDateTime asOf,
-            String currency) {
+    private void updateCurrentPrice(InvestmentInstrument instrument, BigDecimal newPrice, String source, LocalDateTime asOf, String currency) {
         InvestmentPrice currentSnapshot = InvestmentPrice.builder()
                 .instrumentId(instrument.getId())
                 .price(newPrice)
