@@ -20,6 +20,7 @@ import es.triana.company.investments.repository.InvestmentInstrumentRepository;
 import es.triana.company.investments.repository.InvestmentPlatformRepository;
 import es.triana.company.investments.repository.InvestmentRepository;
 import es.triana.company.investments.repository.InvestmentTypeCatalogRepository;
+import es.triana.company.investments.service.mapper.InvestmentMapper;
 import es.triana.company.investments.service.exception.InvestmentNotFoundException;
 import es.triana.company.investments.service.exception.InvestmentValidationException;
 
@@ -30,27 +31,29 @@ public class InvestmentService {
     private final InvestmentTypeCatalogRepository investmentTypeCatalogRepository;
     private final InvestmentInstrumentRepository investmentInstrumentRepository;
     private final InvestmentPlatformRepository investmentPlatformRepository;
+    private final InvestmentMapper investmentMapper;
 
-    public InvestmentService(InvestmentRepository investmentRepository, InvestmentTypeCatalogRepository investmentTypeCatalogRepository, InvestmentInstrumentRepository investmentInstrumentRepository, InvestmentPlatformRepository investmentPlatformRepository) {
+    public InvestmentService(InvestmentRepository investmentRepository, InvestmentTypeCatalogRepository investmentTypeCatalogRepository, InvestmentInstrumentRepository investmentInstrumentRepository, InvestmentPlatformRepository investmentPlatformRepository, InvestmentMapper investmentMapper) {
         this.investmentRepository = investmentRepository;
         this.investmentTypeCatalogRepository = investmentTypeCatalogRepository;
         this.investmentInstrumentRepository = investmentInstrumentRepository;
         this.investmentPlatformRepository = investmentPlatformRepository;
+        this.investmentMapper = investmentMapper;
     }
 
     public List<InvestmentDTO> getAllByTenant(Long tenantId) {
         validateTenant(tenantId);
         List<Investment> items = investmentRepository.findByTenantIdOrderByUpdatedAtDescIdDesc(tenantId);
         return items.stream()
-                .map(this::toDto)
-                .toList();
+            .map(investmentMapper::toDto)
+            .toList();
     }
 
     public InvestmentDTO getById(Long id, Long tenantId) {
         validateTenant(tenantId);
         Investment investment = investmentRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new InvestmentNotFoundException(id));
-        return toDto(investment);
+        return investmentMapper.toDto(investment);
     }
 
     public InvestmentDTO create(InvestmentDTO dto) {
@@ -80,7 +83,7 @@ public class InvestmentService {
                 .build();
 
             Investment saved = investmentRepository.save(investment);
-            return toDto(saved);
+            return investmentMapper.toDto(saved);
     }
 
     public InvestmentDTO update(Long id, InvestmentDTO dto) {
@@ -109,7 +112,7 @@ public class InvestmentService {
         investment.setUpdatedAt(LocalDateTime.now());
 
         Investment saved = investmentRepository.save(investment);
-        return toDto(saved);
+        return investmentMapper.toDto(saved);
     }
 
     public void delete(Long id, Long tenantId) {
@@ -245,38 +248,6 @@ public class InvestmentService {
         }
         return investmentPlatformRepository.findById(platformId)
                 .orElseThrow(() -> new InvestmentValidationException("Unknown platformId: " + platformId));
-    }
-
-    // Relationship lookups are now handled via JPA @ManyToOne mappings on Investment
-    // and repository methods that JOIN FETCH the associations to avoid N+1 queries.
-
-    private InvestmentDTO toDto(Investment entity) {
-        InvestmentTypeCatalog type = entity.getType();
-        InvestmentInstrument instrument = entity.getInstrument();
-        InvestmentPlatform platform = entity.getPlatform();
-        return InvestmentDTO.builder()
-                .id(entity.getId())
-                .tenantId(entity.getTenantId())
-                .typeId(entity.getTypeId())
-                .typeCode(type != null ? type.getCode() : null)
-                .typeName(type != null ? type.getName() : null)
-                .name(entity.getName())
-                .instrumentId(entity.getInstrumentId())
-                .instrumentSymbol(instrument != null ? instrument.getSymbol() : null)
-                .instrumentName(instrument != null ? instrument.getName() : null)
-                .platformId(entity.getPlatformId())
-                .platformCode(platform != null ? platform.getCode() : null)
-                .platformName(platform != null ? platform.getName() : null)
-                .currency(entity.getCurrency())
-                .investedAmount(entity.getInvestedAmount())
-                .currentValueManual(entity.getCurrentValueManual())
-                .currentValueCalculated(entity.getCurrentValueCalculated())
-                .quantity(entity.getQuantity())
-                .openedAt(entity.getOpenedAt())
-                .notes(entity.getNotes())
-                .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
-                .build();
     }
 
     /**
