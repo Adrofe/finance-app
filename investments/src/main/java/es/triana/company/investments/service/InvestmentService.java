@@ -98,58 +98,80 @@ public class InvestmentService {
     public InvestmentSummaryDTO getSummary(Long tenantId) {
         validateTenant(tenantId);
         List<Investment> items = investmentRepository.findByTenantIdOrderByUpdatedAtDescIdDesc(tenantId);
+        BigDecimal totalInvested = calculateTotalInvested(items);
+        BigDecimal totalCurrent = calculateTotalCurrent(items);
 
-        BigDecimal totalInvested = items.stream()
+        BigDecimal pnl = totalCurrent.subtract(totalInvested);
+        BigDecimal pnlPct = calculatePnlPercentage(pnl, totalInvested);
+
+        List<InvestmentTypeSummaryDTO> byType = summarizeByType(items);
+
+        return buildSummary(items.size(), totalInvested, totalCurrent, pnl, pnlPct, byType);
+    }
+
+        private BigDecimal calculateTotalInvested(List<Investment> items) {
+            return items.stream()
+                .map(Investment::getInvestedAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
+        private BigDecimal calculateTotalCurrent(List<Investment> items) {
+            return items.stream()
+                .map(this::getCurrentValue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
+        private BigDecimal calculatePnlPercentage(BigDecimal pnl, BigDecimal totalInvested) {
+            if (totalInvested == null || totalInvested.compareTo(BigDecimal.ZERO) <= 0) {
+                return BigDecimal.ZERO;
+            }
+            return pnl
+                .divide(totalInvested, 6, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100))
+                .setScale(2, RoundingMode.HALF_UP);
+        }
+
+        private List<InvestmentTypeSummaryDTO> summarizeByType(List<Investment> items) {
+            Map<Long, List<Investment>> groupedByType = items.stream()
+                .collect(Collectors.groupingBy(Investment::getTypeId));
+
+            return groupedByType.entrySet().stream()
+                .map(this::toTypeSummary)
+                .toList();
+        }
+
+        private InvestmentTypeSummaryDTO toTypeSummary(Map.Entry<Long, List<Investment>> entry) {
+            List<Investment> byTypeItems = entry.getValue();
+            BigDecimal invested = byTypeItems.stream()
                 .map(Investment::getInvestedAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal totalCurrent = items.stream()
+            BigDecimal current = byTypeItems.stream()
                 .map(this::getCurrentValue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+            InvestmentTypeCatalog type = byTypeItems.isEmpty() ? null : byTypeItems.get(0).getType();
 
-        BigDecimal pnl = totalCurrent.subtract(totalInvested);
-        BigDecimal pnlPct = BigDecimal.ZERO;
-        if (totalInvested.compareTo(BigDecimal.ZERO) > 0) {
-            pnlPct = pnl
-                    .divide(totalInvested, 6, RoundingMode.HALF_UP)
-                    .multiply(BigDecimal.valueOf(100))
-                    .setScale(2, RoundingMode.HALF_UP);
+            return InvestmentTypeSummaryDTO.builder()
+                .typeId(entry.getKey())
+                .typeCode(type != null ? type.getCode() : null)
+                .typeName(type != null ? type.getName() : null)
+                .count(byTypeItems.size())
+                .investedAmount(invested)
+                .currentValue(current)
+                .pnl(current.subtract(invested))
+                .build();
         }
 
-        Map<Long, List<Investment>> groupedByType = items.stream()
-                .collect(Collectors.groupingBy(Investment::getTypeId));
-
-        List<InvestmentTypeSummaryDTO> byType = groupedByType.entrySet().stream()
-                .map(entry -> {
-                    List<Investment> byTypeItems = entry.getValue();
-                    BigDecimal invested = byTypeItems.stream()
-                            .map(Investment::getInvestedAmount)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-                    BigDecimal current = byTypeItems.stream()
-                            .map(this::getCurrentValue)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
-                    InvestmentTypeCatalog type = byTypeItems.isEmpty() ? null : byTypeItems.get(0).getType();
-                    return InvestmentTypeSummaryDTO.builder()
-                            .typeId(entry.getKey())
-                            .typeCode(type != null ? type.getCode() : null)
-                            .typeName(type != null ? type.getName() : null)
-                            .count(byTypeItems.size())
-                            .investedAmount(invested)
-                            .currentValue(current)
-                            .pnl(current.subtract(invested))
-                            .build();
-                })
-                .toList();
-
-        return InvestmentSummaryDTO.builder()
+        private InvestmentSummaryDTO buildSummary(int positions, BigDecimal totalInvested, BigDecimal totalCurrent, BigDecimal pnl, BigDecimal pnlPct, List<InvestmentTypeSummaryDTO> byType) {
+            return InvestmentSummaryDTO.builder()
                 .totalInvested(totalInvested)
                 .totalCurrentValue(totalCurrent)
                 .totalPnl(pnl)
                 .totalPnlPct(pnlPct)
-                .positions(items.size())
+                .positions(positions)
                 .byType(byType)
                 .build();
-    }
+        }
 
     private void validateTenant(Long tenantId) {
         if (tenantId == null || tenantId <= 0) {
