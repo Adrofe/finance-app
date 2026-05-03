@@ -254,28 +254,11 @@ public class OperationService {
      * Called before any DB write so nothing is persisted on failure.
      */
     private void validateFifoCoverage(BigDecimal sellQty, Investment investment) {
-        // findBuysByInstrumentAndTenantFifo acquires PESSIMISTIC_WRITE — concurrent
-        // SELLs on the same instrument+tenant will block here until this tx commits.
-        List<InvestmentOperation> buyLots = operationRepository
-                .findBuysByInstrumentAndTenantFifo(investment.getInstrumentId(), investment.getTenantId());
+        List<InvestmentOperation> buyLots = findBuyLotsForFifo(investment.getInstrumentId(), investment.getTenantId());
+        Map<Long, BigDecimal> consumedByBuyId = loadConsumedByBuyOperationId(buyLots);
+        BigDecimal availableQty = calculateAvailableQuantity(buyLots, consumedByBuyId);
 
-        List<Long> buyIds = buyLots.stream().map(InvestmentOperation::getId).toList();
-        Map<Long, BigDecimal> consumed = new HashMap<>();
-        for (OperationFifoLot lot : fifoLotRepository.findByBuyOperationIdIn(buyIds)) {
-            consumed.merge(lot.getBuyOperationId(), lot.getQuantity(), BigDecimal::add);
-        }
-
-        BigDecimal available = buyLots.stream()
-                .map(b -> b.getQuantity().subtract(consumed.getOrDefault(b.getId(), BigDecimal.ZERO)))
-                .filter(a -> a.compareTo(BigDecimal.ZERO) > 0)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (available.compareTo(sellQty) < 0) {
-            throw new InvestmentValidationException(
-                    "Insufficient stock: trying to sell " + sellQty.stripTrailingZeros().toPlainString()
-                    + " units but only " + available.stripTrailingZeros().toPlainString()
-                    + " are available for instrument " + investment.getInstrumentId() + ".");
-        }
+        ensureSufficientStock(sellQty, availableQty, investment.getInstrumentId());
     }
 
     /**
@@ -284,16 +267,11 @@ public class OperationService {
      * platforms, so we use findBuysByInstrumentAndTenantFifo.
      */
     private List<OperationFifoLot> applyFifo(InvestmentOperation sell, Investment investment) {
-        List<InvestmentOperation> buyLots = operationRepository
-                .findBuysByInstrumentAndTenantFifo(investment.getInstrumentId(), sell.getTenantId());
+        List<InvestmentOperation> buyLots = findBuyLotsForFifo(investment.getInstrumentId(), sell.getTenantId());
 
         // Compute already-consumed quantities per buy lot from previous sells.
         // Use a scoped query instead of findAll() — BUY rows are already locked.
-        List<Long> buyIds = buyLots.stream().map(InvestmentOperation::getId).toList();
-        Map<Long, BigDecimal> consumed = new HashMap<>();
-        for (OperationFifoLot lot : fifoLotRepository.findByBuyOperationIdIn(buyIds)) {
-            consumed.merge(lot.getBuyOperationId(), lot.getQuantity(), BigDecimal::add);
-        }
+        Map<Long, BigDecimal> consumed = loadConsumedByBuyOperationId(buyLots);
 
         BigDecimal sellUnitPriceEur = sell.getUnitPrice()
                 .divide(sell.getEurExchangeRate(), SCALE, RoundingMode.HALF_UP);
@@ -340,6 +318,46 @@ public class OperationService {
 
         return result;
     }
+
+        private List<InvestmentOperation> findBuyLotsForFifo(Long instrumentId, Long tenantId) {
+            // findBuysByInstrumentAndTenantFifo acquires PESSIMISTIC_WRITE — concurrent
+            // SELLs on the same instrument+tenant will block here until this tx commits.
+            return operationRepository.findBuysByInstrumentAndTenantFifo(instrumentId, tenantId);
+        }
+
+        private Map<Long, BigDecimal> loadConsumedByBuyOperationId(List<InvestmentOperation> buyLots) {
+            List<Long> buyIds = buyLots.stream()
+                            .map(InvestmentOperation::getId)
+                            .toList();
+
+            if (buyIds.isEmpty()) {
+                    return new HashMap<>();
+            }
+
+            Map<Long, BigDecimal> consumedByBuyId = new HashMap<>();
+            for (OperationFifoLot lot : fifoLotRepository.findByBuyOperationIdIn(buyIds)) {
+                    consumedByBuyId.merge(lot.getBuyOperationId(), lot.getQuantity(), BigDecimal::add);
+            }
+            return consumedByBuyId;
+        }
+
+        private BigDecimal calculateAvailableQuantity(List<InvestmentOperation> buyLots, Map<Long, BigDecimal> consumedByBuyId) {
+            return buyLots.stream()
+                        .map(buy -> buy.getQuantity().subtract(consumedByBuyId.getOrDefault(buy.getId(), BigDecimal.ZERO)))
+                        .filter(available -> available.compareTo(BigDecimal.ZERO) > 0)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
+        private void ensureSufficientStock(BigDecimal requestedQty, BigDecimal availableQty, Long instrumentId) {
+            if (availableQty.compareTo(requestedQty) >= 0) {
+                return;
+            }
+
+            throw new InvestmentValidationException(
+                            "Insufficient stock: trying to sell " + requestedQty.stripTrailingZeros().toPlainString()
+                                            + " units but only " + availableQty.stripTrailingZeros().toPlainString()
+                                            + " are available for instrument " + instrumentId + ".");
+        }
 
     // -------------------------------------------------------------------------
     // Position update
