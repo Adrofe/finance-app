@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -385,10 +386,10 @@ public class OperationService {
     // -------------------------------------------------------------------------
 
     private BigDecimal computeTotalAmount(OperationType type, BigDecimal qty, BigDecimal unitPrice, BigDecimal fees) {
-                BigDecimal gross = qty.multiply(unitPrice);
-                return OperationType.BUY.equals(type)
-                                ? gross.add(fees).setScale(4, RoundingMode.HALF_UP)
-                                : gross.subtract(fees).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal gross = qty.multiply(unitPrice);
+        return OperationType.BUY.equals(type)
+                        ? gross.add(fees).setScale(4, RoundingMode.HALF_UP)
+                        : gross.subtract(fees).setScale(4, RoundingMode.HALF_UP);
     }
 
     /**
@@ -397,21 +398,35 @@ public class OperationService {
      * and falls back to the most recent available rate.
      */
     private BigDecimal resolveEurRate(String currency, java.time.LocalDate date) {
-        if (EUR.equalsIgnoreCase(currency)) {
+        if (isEur(currency)) {
             return BigDecimal.ONE;
         }
-        // Try exact date first
-        return exchangeRateRepository
-                .findByFromCurrencyAndToCurrencyAndAsOf(EUR, currency.toUpperCase(), date)
-                .map(r -> r.getRate())
-                .orElseGet(() -> {
-                    LOG.warn("No ECB rate for EUR/{} on {}. Falling back to most recent available.", currency, date);
-                    return exchangeRateRepository
-                            .findFirstByFromCurrencyAndToCurrencyOrderByAsOfDesc(EUR, currency.toUpperCase())
+
+        String curr = currency.toUpperCase();
+        Optional<BigDecimal> exactRateOpt = findExactEurRate(curr, date);
+        if (exactRateOpt.isPresent()) {
+            return exactRateOpt.get();
+        } else {
+            LOG.warn("No exact ECB rate for EUR/{} on {}. Attempting to find most recent available rate.", currency, date);
+            return findMostRecentEurRateOrThrow(curr);
+        }
+    }
+
+    private boolean isEur(String currency) {
+            return EUR.equalsIgnoreCase(currency);
+    }
+
+    private java.util.Optional<BigDecimal> findExactEurRate(String currency, java.time.LocalDate date) {
+            return exchangeRateRepository.findByFromCurrencyAndToCurrencyAndAsOf(EUR, currency, date)
+                            .map(r -> r.getRate());
+    }
+
+    private BigDecimal findMostRecentEurRateOrThrow(String currency) {
+            return exchangeRateRepository
+                            .findFirstByFromCurrencyAndToCurrencyOrderByAsOfDesc(EUR, currency)
                             .map(r -> r.getRate())
                             .orElseThrow(() -> new InvestmentValidationException(
-                                    "No EUR/" + currency + " exchange rate available. Populate exchange_rates first."));
-                });
+                                            "No EUR/" + currency + " exchange rate available. Populate exchange_rates first."));
     }
 
     /** Read-only lookup — no lock. Used by getByInvestment / getByTenant. */
