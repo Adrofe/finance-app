@@ -9,10 +9,15 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import es.triana.company.investments.model.api.ApiResponse;
+import es.triana.company.investments.service.exception.CatalogNotFoundException;
 import es.triana.company.investments.service.exception.InvestmentNotFoundException;
 import es.triana.company.investments.service.exception.InvestmentValidationException;
 
-@RestControllerAdvice(assignableTypes = InvestmentsController.class)
+@RestControllerAdvice(assignableTypes = {
+    InvestmentsController.class,
+    OperationsController.class,
+    PriceController.class,
+    InvestmentCatalogController.class })
 public class InvestmentExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -35,6 +40,12 @@ public class InvestmentExceptionHandler {
 
     @ExceptionHandler(InvestmentNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvestmentNotFoundException(InvestmentNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiResponse<>(404, exception.getMessage(), null));
+    }
+
+    @ExceptionHandler(CatalogNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleCatalogNotFoundException(CatalogNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiResponse<>(404, exception.getMessage(), null));
     }
