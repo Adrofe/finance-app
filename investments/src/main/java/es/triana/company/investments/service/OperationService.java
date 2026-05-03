@@ -107,40 +107,65 @@ public class OperationService {
     }
 
     public TaxSummaryDTO getTaxSummary(Long tenantId, int year) {
-        if (tenantId == null || tenantId <= 0) {
-            throw new InvestmentValidationException("tenantId is required and must be > 0");
-        }
-        if (year < 1900 || year > 3000) {
-            throw new InvestmentValidationException("year is required and must be between 1900 and 3000");
-        }
+        validateTaxSummaryInput(tenantId, year);
 
         LocalDate startDate = LocalDate.of(year, 1, 1);
         LocalDate endDate = LocalDate.of(year, 12, 31);
 
-        BigDecimal total = fifoLotRepository
-                .sumGainLossByTenantAndSellDateBetween(tenantId, startDate, endDate)
-                .setScale(4, RoundingMode.HALF_UP);
-
-        List<TaxSummaryDTO.ByInstrument> byInstrument = fifoLotRepository
-                .sumGainLossByInstrumentAndSellDateBetween(tenantId, startDate, endDate)
-                .stream()
-                .map(row -> new TaxSummaryDTO.ByInstrument(
-                        (Long) row[0],
-                        (String) row[1],
-                        (String) row[2],
-                        (String) row[3],
-                        ((BigDecimal) row[4]).setScale(4, RoundingMode.HALF_UP)))
-                .toList();
-
-        List<TaxSummaryDTO.ByCurrency> byCurrency = fifoLotRepository
-                .sumGainLossByCurrencyAndSellDateBetween(tenantId, startDate, endDate)
-                .stream()
-                .map(row -> new TaxSummaryDTO.ByCurrency(
-                        (String) row[0],
-                        ((BigDecimal) row[1]).setScale(4, RoundingMode.HALF_UP)))
-                .toList();
+        BigDecimal total = loadTaxSummaryTotal(tenantId, startDate, endDate);
+        List<TaxSummaryDTO.ByInstrument> byInstrument = loadTaxSummaryByInstrument(tenantId, startDate, endDate);
+        List<TaxSummaryDTO.ByCurrency> byCurrency = loadTaxSummaryByCurrency(tenantId, startDate, endDate);
 
         return new TaxSummaryDTO(tenantId, year, total, byInstrument, byCurrency);
+    }
+
+    private void validateTaxSummaryInput(Long tenantId, int year) {
+            if (tenantId == null || tenantId <= 0) {
+                    throw new InvestmentValidationException("tenantId is required and must be > 0");
+            }
+            if (year < 1900 || year > 3000) {
+                    throw new InvestmentValidationException("year is required and must be between 1900 and 3000");
+            }
+    }
+
+    private BigDecimal loadTaxSummaryTotal(Long tenantId, LocalDate startDate, LocalDate endDate) {
+        return scaleTaxValue(fifoLotRepository.sumGainLossByTenantAndSellDateBetween(tenantId, startDate, endDate));
+    }
+
+    private List<TaxSummaryDTO.ByInstrument> loadTaxSummaryByInstrument(Long tenantId, LocalDate startDate, LocalDate endDate) {
+        return fifoLotRepository
+                        .sumGainLossByInstrumentAndSellDateBetween(tenantId, startDate, endDate)
+                        .stream()
+                        .map(this::mapTaxByInstrumentRow)
+                        .toList();
+    }
+
+    private List<TaxSummaryDTO.ByCurrency> loadTaxSummaryByCurrency(Long tenantId, LocalDate startDate, LocalDate endDate) {
+        return fifoLotRepository
+                        .sumGainLossByCurrencyAndSellDateBetween(tenantId, startDate, endDate)
+                        .stream()
+                        .map(this::mapTaxByCurrencyRow)
+                        .toList();
+    }
+
+    private TaxSummaryDTO.ByInstrument mapTaxByInstrumentRow(Object[] row) {
+            return new TaxSummaryDTO.ByInstrument(
+                            (Long) row[0],
+                            (String) row[1],
+                            (String) row[2],
+                            (String) row[3],
+                            scaleTaxValue((BigDecimal) row[4]));
+    }
+
+    private TaxSummaryDTO.ByCurrency mapTaxByCurrencyRow(Object[] row) {
+            return new TaxSummaryDTO.ByCurrency(
+                            (String) row[0],
+                            scaleTaxValue((BigDecimal) row[1]));
+    }
+
+    private BigDecimal scaleTaxValue(BigDecimal value) {
+            BigDecimal amount = value != null ? value : BigDecimal.ZERO;
+            return amount.setScale(4, RoundingMode.HALF_UP);
     }
 
         /**
