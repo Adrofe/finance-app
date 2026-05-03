@@ -168,94 +168,144 @@ public class OperationService {
             return amount.setScale(4, RoundingMode.HALF_UP);
     }
 
-        /**
-         * Rebuilds FIFO matching from scratch for one instrument+tenant.
-         * Existing lots for SELL operations are deleted and recalculated in temporal order.
-         */
-        @Transactional
-        public FifoRebuildResultDTO rebuildFifoForInstrumentTenant(Long instrumentId, Long tenantId) {
-                List<InvestmentOperation> operations = operationRepository
-                                .findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(instrumentId, tenantId);
-
-                if (operations.isEmpty()) {
-                        return new FifoRebuildResultDTO(instrumentId, tenantId, 0, 0, 0);
-                }
-
-                List<Long> sellIds = operations.stream()
-                                .filter(op -> OperationType.SELL.equals(op.getType()))
-                                .map(InvestmentOperation::getId)
-                                .toList();
-                if (!sellIds.isEmpty()) {
-                        fifoLotRepository.deleteBySellOperationIdIn(sellIds);
-                }
-
-                List<InvestmentOperation> buyQueue = new ArrayList<>();
-                Map<Long, BigDecimal> consumed = new HashMap<>();
-                int lotsCreated = 0;
-                int sellsRebuilt = 0;
-
-                for (InvestmentOperation op : operations) {
-                        if (OperationType.BUY.equals(op.getType())) {
-                                buyQueue.add(op);
-                                continue;
-                        }
-
-                        if (!OperationType.SELL.equals(op.getType())) {
-                                continue;
-                        }
-
-                        sellsRebuilt++;
-                        BigDecimal sellUnitPriceEur = op.getUnitPrice()
-                                        .divide(op.getEurExchangeRate(), SCALE, RoundingMode.HALF_UP);
-
-                        BigDecimal remaining = op.getQuantity();
-                        for (InvestmentOperation buy : buyQueue) {
-                                if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
-                                        break;
-                                }
-
-                                BigDecimal alreadyConsumed = consumed.getOrDefault(buy.getId(), BigDecimal.ZERO);
-                                BigDecimal available = buy.getQuantity().subtract(alreadyConsumed);
-                                if (available.compareTo(BigDecimal.ZERO) <= 0) {
-                                        continue;
-                                }
-
-                                BigDecimal lotQty = remaining.min(available);
-                                BigDecimal buyUnitPriceEur = buy.getUnitPrice()
-                                                .divide(buy.getEurExchangeRate(), SCALE, RoundingMode.HALF_UP);
-                                BigDecimal gainLoss = sellUnitPriceEur.subtract(buyUnitPriceEur)
-                                                .multiply(lotQty)
-                                                .setScale(4, RoundingMode.HALF_UP);
-
-                                OperationFifoLot lot = OperationFifoLot.builder()
-                                                .sellOperationId(op.getId())
-                                                .buyOperationId(buy.getId())
-                                                .quantity(lotQty)
-                                                .buyUnitPriceEur(buyUnitPriceEur)
-                                                .sellUnitPriceEur(sellUnitPriceEur)
-                                                .gainLossEur(gainLoss)
-                                                .build();
-
-                                fifoLotRepository.save(lot);
-                                consumed.merge(buy.getId(), lotQty, BigDecimal::add);
-                                remaining = remaining.subtract(lotQty);
-                                lotsCreated++;
-                        }
-
-                        if (remaining.compareTo(BigDecimal.ZERO) > 0) {
-                                throw new InvestmentValidationException(
-                                                "Cannot rebuild FIFO for instrument " + instrumentId
-                                                + " and tenant " + tenantId
-                                                + ": SELL operation " + op.getId()
-                                                + " is short by " + remaining.stripTrailingZeros().toPlainString() + " units.");
-                        }
-                }
-
-                LOG.info("Rebuilt FIFO for instrument={} tenant={} operations={} sells={} lots={}",
-                                instrumentId, tenantId, operations.size(), sellsRebuilt, lotsCreated);
-
-                return new FifoRebuildResultDTO(instrumentId, tenantId, operations.size(), sellsRebuilt, lotsCreated);
+    /**
+     * Rebuilds FIFO matching from scratch for one instrument+tenant.
+     * Existing lots for SELL operations are deleted and recalculated in temporal order.
+     */
+    @Transactional
+    public FifoRebuildResultDTO rebuildFifoForInstrumentTenant(Long instrumentId, Long tenantId) {
+        List<InvestmentOperation> operations = findOperationsForFifoRebuild(instrumentId, tenantId);
+        if (operations.isEmpty()) {
+            return new FifoRebuildResultDTO(instrumentId, tenantId, 0, 0, 0);
         }
+
+        deleteExistingRebuildSellLots(operations);
+
+        RebuildCounters counters = rebuildFifoLots(operations, instrumentId, tenantId);
+
+        LOG.info("Rebuilt FIFO for instrument={} tenant={} operations={} sells={} lots={}",
+                instrumentId, tenantId, operations.size(), counters.sellsRebuilt, counters.lotsCreated);
+
+        return new FifoRebuildResultDTO(
+                instrumentId,
+                tenantId,
+                operations.size(),
+                counters.sellsRebuilt,
+                counters.lotsCreated);
+    }
+
+    private List<InvestmentOperation> findOperationsForFifoRebuild(Long instrumentId, Long tenantId) {
+        return operationRepository.findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(instrumentId, tenantId);
+    }
+
+    private void deleteExistingRebuildSellLots(List<InvestmentOperation> operations) {
+        List<Long> sellIds = operations.stream()
+                .filter(op -> OperationType.SELL.equals(op.getType()))
+                .map(InvestmentOperation::getId)
+                .toList();
+
+        if (!sellIds.isEmpty()) {
+            fifoLotRepository.deleteBySellOperationIdIn(sellIds);
+        }
+    }
+
+    private RebuildCounters rebuildFifoLots(List<InvestmentOperation> operations, Long instrumentId, Long tenantId) {
+        List<InvestmentOperation> buyQueue = new ArrayList<>();
+        Map<Long, BigDecimal> consumedByBuyId = new HashMap<>();
+        int lotsCreated = 0;
+        int sellsRebuilt = 0;
+
+        for (InvestmentOperation operation : operations) {
+            if (OperationType.BUY.equals(operation.getType())) {
+                buyQueue.add(operation);
+                continue;
+            }
+            if (!OperationType.SELL.equals(operation.getType())) {
+                continue;
+            }
+
+            sellsRebuilt++;
+            lotsCreated += rebuildSellOperationLots(operation, buyQueue, consumedByBuyId, instrumentId, tenantId);
+        }
+
+        return new RebuildCounters(sellsRebuilt, lotsCreated);
+    }
+
+    private int rebuildSellOperationLots(InvestmentOperation sellOperation, List<InvestmentOperation> buyQueue, Map<Long, BigDecimal> consumedByBuyId, Long instrumentId, Long tenantId) {
+
+        BigDecimal sellUnitPriceEur = calculateUnitPriceEur(sellOperation);
+        BigDecimal remaining = sellOperation.getQuantity();
+        int lotsCreated = 0;
+
+        for (InvestmentOperation buyOperation : buyQueue) {
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+
+            BigDecimal available = availableBuyQuantity(buyOperation, consumedByBuyId);
+            if (available.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            BigDecimal lotQty = remaining.min(available);
+            OperationFifoLot lot = buildRebuildLot(sellOperation, buyOperation, lotQty, sellUnitPriceEur);
+            fifoLotRepository.save(lot);
+
+            consumedByBuyId.merge(buyOperation.getId(), lotQty, BigDecimal::add);
+            remaining = remaining.subtract(lotQty);
+            lotsCreated++;
+        }
+
+        ensureRebuildSellCovered(remaining, sellOperation.getId(), instrumentId, tenantId);
+        return lotsCreated;
+    }
+
+    private OperationFifoLot buildRebuildLot(InvestmentOperation sellOperation, InvestmentOperation buyOperation, BigDecimal lotQty, BigDecimal sellUnitPriceEur) {
+        BigDecimal buyUnitPriceEur = calculateUnitPriceEur(buyOperation);
+        BigDecimal gainLoss = sellUnitPriceEur.subtract(buyUnitPriceEur)
+                .multiply(lotQty)
+                .setScale(4, RoundingMode.HALF_UP);
+
+        return OperationFifoLot.builder()
+                .sellOperationId(sellOperation.getId())
+                .buyOperationId(buyOperation.getId())
+                .quantity(lotQty)
+                .buyUnitPriceEur(buyUnitPriceEur)
+                .sellUnitPriceEur(sellUnitPriceEur)
+                .gainLossEur(gainLoss)
+                .build();
+    }
+
+    private BigDecimal calculateUnitPriceEur(InvestmentOperation operation) {
+        return operation.getUnitPrice().divide(operation.getEurExchangeRate(), SCALE, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal availableBuyQuantity(InvestmentOperation buyOperation, Map<Long, BigDecimal> consumedByBuyId) {
+        BigDecimal alreadyConsumed = consumedByBuyId.getOrDefault(buyOperation.getId(), BigDecimal.ZERO);
+        return buyOperation.getQuantity().subtract(alreadyConsumed);
+    }
+
+    private void ensureRebuildSellCovered(BigDecimal remaining, Long sellOperationId, Long instrumentId, Long tenantId) {
+        if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        throw new InvestmentValidationException(
+                "Cannot rebuild FIFO for instrument " + instrumentId
+                        + " and tenant " + tenantId
+                        + ": SELL operation " + sellOperationId
+                        + " is short by " + remaining.stripTrailingZeros().toPlainString() + " units.");
+    }
+
+    private static final class RebuildCounters {
+        private final int sellsRebuilt;
+        private final int lotsCreated;
+
+        private RebuildCounters(int sellsRebuilt, int lotsCreated) {
+            this.sellsRebuilt = sellsRebuilt;
+            this.lotsCreated = lotsCreated;
+        }
+    }
 
     // -------------------------------------------------------------------------
     // FIFO matching
