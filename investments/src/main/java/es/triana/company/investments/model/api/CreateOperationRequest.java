@@ -33,14 +33,15 @@ public class CreateOperationRequest {
     private LocalDate operationDate;
 
     @NotNull(message = "quantity is required")
-    @DecimalMin(value = "0.0000000001", message = "quantity must be positive")
+    @DecimalMin(value = "0.0000000001", message = "quantity must be greater than 0")
     private BigDecimal quantity;
 
     @NotNull(message = "unitPrice is required")
-    @DecimalMin(value = "0.0000000001", message = "unitPrice must be positive")
+    @DecimalMin(value = "0.0000000001", message = "unitPrice must be greater than 0")
     private BigDecimal unitPrice;
 
-    /** Commissions/fees in operation currency. Defaults to 0 if null. */
+    /** Commissions/fees in operation currency. Must be >= 0. Defaults to 0 if null. */
+    @DecimalMin(value = "0", message = "fees must not be negative")
     private BigDecimal fees;
 
     /** 3-letter ISO currency code of the operation */

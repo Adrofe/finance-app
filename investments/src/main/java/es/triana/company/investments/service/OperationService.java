@@ -28,6 +28,7 @@ import es.triana.company.investments.repository.InvestmentOperationRepository;
 import es.triana.company.investments.repository.InvestmentRepository;
 import es.triana.company.investments.repository.OperationFifoLotRepository;
 import es.triana.company.investments.service.exception.InvestmentValidationException;
+import es.triana.company.investments.service.exception.InvalidQuantityException;
 
 @Service
 public class OperationService {
@@ -56,6 +57,9 @@ public class OperationService {
 
     @Transactional
     public OperationDTO registerOperation(CreateOperationRequest req) {
+        // Validate operation quantities before any other work
+        validateOperationQuantities(req);
+
         // Lock the Investment row for update to serialise concurrent position changes
         // (BUY+BUY, BUY+SELL, or SELL+SELL on the same investment).
         Investment investment = findAndLockInvestment(req.getInvestmentId(), req.getTenantId());
@@ -126,6 +130,26 @@ public class OperationService {
             if (year < 1900 || year > 3000) {
                     throw new InvestmentValidationException("year is required and must be between 1900 and 3000");
             }
+    }
+
+    private void validateOperationQuantities(CreateOperationRequest req) {
+        if (req.getQuantity() == null || req.getQuantity().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidQuantityException(
+                    "Operation quantity must be greater than 0, but got: " 
+                    + (req.getQuantity() != null ? req.getQuantity() : "null"));
+        }
+
+        if (req.getUnitPrice() == null || req.getUnitPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidQuantityException(
+                    "Operation unitPrice must be greater than 0, but got: " 
+                    + (req.getUnitPrice() != null ? req.getUnitPrice() : "null"));
+        }
+
+        BigDecimal fees = req.getFees() != null ? req.getFees() : BigDecimal.ZERO;
+        if (fees.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidQuantityException(
+                    "Operation fees must not be negative, but got: " + fees);
+        }
     }
 
     private BigDecimal loadTaxSummaryTotal(Long tenantId, LocalDate startDate, LocalDate endDate) {
