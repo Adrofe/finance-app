@@ -360,3 +360,99 @@ body {
     flex: 1;
   }
 }
+
+/* ─── Investments sub-tabs ───────────────────────────────────────────────── */
+
+.inv-subtabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 6px;
+  box-shadow: 0 2px 8px rgba(17, 48, 76, 0.04);
+}
+
+.inv-subtab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-lg) - 4px);
+  background: transparent;
+  color: var(--muted);
+  padding: 9px 18px;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.inv-subtab:hover {
+  background: var(--pill);
+  color: var(--brand);
+  border-color: var(--line);
+}
+
+.inv-subtab.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(15, 107, 180, 0.28);
+}
+
+.inv-subtab-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* ─── Investments placeholder panels ─────────────────────────────────────── */
+
+.inv-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  min-height: 320px;
+  text-align: center;
+  border: 2px dashed var(--line);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  padding: 48px 32px;
+}
+
+.inv-placeholder-icon {
+  font-size: 3.2rem;
+  line-height: 1;
+  opacity: 0.55;
+}
+
+.inv-placeholder h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.inv-placeholder p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  max-width: 480px;
+  line-height: 1.6;
+}
+
+@media (max-width: 840px) {
+  .inv-subtab {
+    padding: 8px 12px;
+    font-size: 0.84rem;
+  }
+
+  .inv-subtab-icon {
+    display: none;
+  }
+}

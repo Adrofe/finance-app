@@ -17,6 +17,13 @@ export function TabsNav({ activeTab, onSelectTab }: TabsNavProps) {
       </button>
       <button
         type="button"
+        className={`tab main-tab ${activeTab === 'investments' ? 'active' : ''}`}
+        onClick={() => onSelectTab('investments')}
+      >
+        Investments
+      </button>
+      <button
+        type="button"
         className={`tab main-tab ${activeTab === 'insights' ? 'active' : ''}`}
         onClick={() => onSelectTab('insights')}
       >

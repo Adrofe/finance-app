@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { BankingSubTabs } from './components/BankingSubTabs';
+import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
 import { LoginForm } from './components/LoginForm';
 import { TabsNav } from './components/TabsNav';
 import { TransactionsTable } from './components/TransactionsTable';
@@ -8,6 +9,7 @@ import { KEYCLOAK_REALM } from './config/env';
 import { useAuth } from './hooks/useAuth';
 import { useTransactions } from './hooks/useTransactions';
 import type { AppTab, BankingSubTab } from './types/banking';
+import type { InvestmentsSubTab } from './types/investments';
 import { AccountsTable } from './components/AccountsTable';
 import { Dashboard } from './components/Dashboard';
 
@@ -20,6 +22,7 @@ function App() {
   const { items, loading, error, refresh } = useTransactions(accessToken, handleUnauthorized);
   const [activeTab, setActiveTab] = useState<AppTab>('banking');
   const [bankingSubTab, setBankingSubTab] = useState<BankingSubTab>('dashboard');
+  const [investmentsSubTab, setInvestmentsSubTab] = useState<InvestmentsSubTab>('dashboard');
 
   if (!accessToken) {
     return <LoginForm loading={authLoading} error={authError} realm={KEYCLOAK_REALM} onSubmit={login} />;
@@ -100,6 +103,49 @@ function App() {
             <article className="sheet">
               <h3>Budgets</h3>
               <p className="state">Budgets preview placeholder to plan future monthly targets.</p>
+            </article>
+          )}
+        </section>
+      )}
+
+      {activeTab === 'investments' && (
+        <section className="panel" aria-label="Investments tab">
+          <div className="section-header">
+            <h2>Investments</h2>
+            <p>Track your portfolio, operations and available assets.</p>
+          </div>
+
+          <InvestmentsSubTabs activeTab={investmentsSubTab} onSelectTab={setInvestmentsSubTab} />
+
+          {investmentsSubTab === 'dashboard' && (
+            <article className="sheet inv-placeholder">
+              <div className="inv-placeholder-icon">📊</div>
+              <h3>Portfolio Dashboard</h3>
+              <p>Summary of your portfolio performance, unrealised gains, and key metrics will appear here.</p>
+            </article>
+          )}
+
+          {investmentsSubTab === 'investments' && (
+            <article className="sheet inv-placeholder">
+              <div className="inv-placeholder-icon">💼</div>
+              <h3>Investments</h3>
+              <p>Your positions grouped by instrument and platform will be listed here.</p>
+            </article>
+          )}
+
+          {investmentsSubTab === 'fifo' && (
+            <article className="sheet inv-placeholder">
+              <div className="inv-placeholder-icon">🔄</div>
+              <h3>FIFO Operations</h3>
+              <p>Detailed FIFO lot assignments and realised gains per operation will appear here.</p>
+            </article>
+          )}
+
+          {investmentsSubTab === 'catalog' && (
+            <article className="sheet inv-placeholder">
+              <div className="inv-placeholder-icon">🏦</div>
+              <h3>Available Assets</h3>
+              <p>Instruments and platforms registered in the system will be listed here.</p>
             </article>
           )}
         </section>
