@@ -1,0 +1,321 @@
+.iot-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.iot-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 252, 0.98));
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+  flex-wrap: wrap;
+}
+
+.iot-summary-stats {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.iot-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.iot-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.iot-stat-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.iot-stat--buy .iot-stat-value { color: #166534; }
+.iot-stat--sell .iot-stat-value { color: #b91c1c; }
+
+.iot-btn-add {
+  padding: 9px 16px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0f4c81, #1d4ed8);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.iot-btn-add--cancel {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid var(--line);
+}
+
+.iot-btn-add:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.iot-toast-error,
+.iot-empty {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.iot-toast-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #991b1b;
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.iot-toast-error button {
+  margin-left: auto;
+  border: 1px solid #fca5a5;
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.iot-container {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+}
+
+.iot-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.iot-table thead {
+  background: linear-gradient(180deg, #f8fafc, #eef4fb);
+  border-bottom: 1px solid var(--line);
+}
+
+.iot-th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.iot-th--right { text-align: right; }
+.iot-th--actions { width: 96px; }
+
+.iot-row {
+  border-bottom: 1px solid #edf2f7;
+}
+
+.iot-row:hover {
+  background: #f8fbff;
+}
+
+.iot-td {
+  padding: 12px 14px;
+  vertical-align: middle;
+  color: var(--ink);
+}
+
+.iot-td--right {
+  text-align: right;
+}
+
+.iot-investment-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.iot-investment-name {
+  font-weight: 700;
+}
+
+.iot-investment-meta,
+.iot-total-cell span,
+.iot-notes {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.iot-total-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-end;
+}
+
+.iot-type-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.iot-type-pill.buy {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.iot-type-pill.sell {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.iot-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.iot-btn-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid #dbe4f0;
+  background: #fff;
+  cursor: pointer;
+}
+
+.iot-btn-icon.danger {
+  border-color: #fecaca;
+  background: #fff5f5;
+}
+
+.iot-empty-row {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.iot-modal {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.iot-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.iot-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.iot-type-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.iot-type-row label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.iot-type-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.iot-type-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.iot-type-btn.active.buy {
+  background: #166534;
+  color: #fff;
+}
+
+.iot-type-btn.active.sell {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.iot-selected-investment {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
+}
+
+.iot-selected-investment-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+}
+
+.iot-confirm-modal {
+  width: min(480px, calc(100vw - 32px));
+}
+
+.iot-confirm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 840px) {
+  .iot-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .iot-summary-bar {
+    align-items: stretch;
+  }
+
+  .iot-btn-add {
+    width: 100%;
+  }
+}

@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { BankingSubTabs } from './components/BankingSubTabs';
 import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
 import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
+import { InvestmentOperationsTable } from './components/InvestmentOperationsTable';
 import { LoginForm } from './components/LoginForm';
 import { TabsNav } from './components/TabsNav';
 import { TransactionsTable } from './components/TransactionsTable';
@@ -135,10 +136,12 @@ function App() {
           )}
 
           {investmentsSubTab === 'fifo' && (
-            <article className="sheet inv-placeholder">
-              <div className="inv-placeholder-icon">🔄</div>
-              <h3>FIFO Operations</h3>
-              <p>Detailed FIFO lot assignments and realised gains per operation will appear here.</p>
+            <article className="sheet">
+              <div className="sheet-header">
+                <h3>Operations</h3>
+                <span>CRUD de compras y ventas con recalculo FIFO</span>
+              </div>
+              <InvestmentOperationsTable token={accessToken} onUnauthorized={handleUnauthorized} />
             </article>
           )}
 
