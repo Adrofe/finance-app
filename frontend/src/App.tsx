@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { BankingSubTabs } from './components/BankingSubTabs';
 import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
+import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
 import { LoginForm } from './components/LoginForm';
 import { TabsNav } from './components/TabsNav';
 import { TransactionsTable } from './components/TransactionsTable';
@@ -142,11 +143,7 @@ function App() {
           )}
 
           {investmentsSubTab === 'catalog' && (
-            <article className="sheet inv-placeholder">
-              <div className="inv-placeholder-icon">🏦</div>
-              <h3>Available Assets</h3>
-              <p>Instruments and platforms registered in the system will be listed here.</p>
-            </article>
+            <InvestmentCatalogTable token={accessToken} onUnauthorized={handleUnauthorized} />
           )}
         </section>
       )}
