@@ -1,8 +1,9 @@
 import axios from 'axios';
 import type { ApiResponse } from '../types/api';
-import type { InvestmentInstrument, InvestmentPlatform, InvestmentType } from '../types/investments';
+import type { InvestmentInstrument, InvestmentPlatform, InvestmentType, PriceRefreshResult } from '../types/investments';
 
 const BASE = '/v1/api/investments/catalog';
+const INVESTMENTS_BASE = '/v1/api/investments';
 
 const headers = (token: string) => ({ Authorization: `Bearer ${token}` });
 
@@ -53,4 +54,9 @@ export async function updatePlatform(token: string, id: number, payload: Omit<In
 
 export async function deletePlatform(token: string, id: number): Promise<void> {
   await axios.delete(`${BASE}/platforms/${id}`, { headers: headers(token) });
+}
+
+export async function refreshInstrumentPrices(token: string): Promise<PriceRefreshResult> {
+  const res = await axios.post<ApiResponse<PriceRefreshResult>>(`${INVESTMENTS_BASE}/prices/refresh/auto`, undefined, { headers: headers(token) });
+  return res.data.data;
 }

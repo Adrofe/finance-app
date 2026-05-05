@@ -98,6 +98,29 @@
 
 .ict-btn-add:hover { background: var(--brand-strong); }
 
+.ict-btn-refresh {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.ict-btn-refresh:hover:not(:disabled) {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.ict-btn-refresh:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 .ict-btn-add--cancel {
   background: #f3f4f6;
   color: #374151;
@@ -127,6 +150,29 @@
   border-radius: 5px;
   background: transparent;
   color: #991b1b;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ict-toast-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1d4ed8;
+  font-size: 13px;
+}
+
+.ict-toast-info button {
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px solid #93c5fd;
+  border-radius: 5px;
+  background: transparent;
+  color: #1d4ed8;
   font-size: 12px;
   cursor: pointer;
 }

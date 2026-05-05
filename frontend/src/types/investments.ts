@@ -24,3 +24,10 @@ export type InvestmentPlatform = {
   code: string;
   name: string;
 };
+
+export type PriceRefreshResult = {
+  updatedInstruments: number;
+  recalculatedPositions: number;
+  instrumentIds: number[];
+  mode: string;
+};

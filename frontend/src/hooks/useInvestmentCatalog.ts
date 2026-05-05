@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import type { InvestmentInstrument, InvestmentPlatform, InvestmentType } from '../types/investments';
+import type { InvestmentInstrument, InvestmentPlatform, InvestmentType, PriceRefreshResult } from '../types/investments';
 import {
   fetchInvestmentTypes,
   fetchInstruments, createInstrument, updateInstrument, deleteInstrument,
   fetchPlatforms, createPlatform, updatePlatform, deletePlatform,
+  refreshInstrumentPrices,
 } from '../services/investmentCatalogService';
 
 export function useInvestmentCatalog(token: string, onUnauthorized?: (message: string) => void) {
@@ -52,6 +53,21 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     setInstruments(prev => prev.filter(i => i.id !== id));
   }, [token]);
 
+  const refreshPrices = useCallback(async (): Promise<PriceRefreshResult> => {
+    try {
+      setError(null);
+      const result = await refreshInstrumentPrices(token);
+      const updatedInstruments = await fetchInstruments(token);
+      setInstruments(updatedInstruments);
+      return result;
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        onUnauthorized?.('Session expired or invalid token. Please login again.');
+      }
+      throw err;
+    }
+  }, [token, onUnauthorized]);
+
   // ── Platforms ────────────────────────────────────────────────────────────────
 
   const addPlatform = useCallback(async (payload: Omit<InvestmentPlatform, 'id'>) => {
@@ -75,6 +91,7 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     types, instruments, platforms,
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
+    refreshPrices,
     addPlatform, editPlatform, removePlatform,
   };
 }

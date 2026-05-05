@@ -58,6 +58,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     types, instruments, platforms,
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
+    refreshPrices,
     addPlatform, editPlatform, removePlatform,
   } = useInvestmentCatalog(token, onUnauthorized);
 
@@ -70,6 +71,8 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [formError, setFormError]         = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null);
   const [deleting, setDeleting]           = useState(false);
+  const [refreshingPrices, setRefreshingPrices] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
   // ── instrument form ───────────────────────────────────────────────────────
   const [instrForm, setInstrForm] = useState({ ...EMPTY_INSTRUMENT });
@@ -192,6 +195,25 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     setSection(s);
     closeForm();
     setConfirmDelete(null);
+    setRefreshMessage(null);
+  };
+
+  const handleRefreshPrices = async () => {
+    setRefreshMessage(null);
+    setRefreshingPrices(true);
+    try {
+      const result = await refreshPrices();
+      setRefreshMessage(
+        result.updatedInstruments > 0
+          ? `Prices refreshed for ${result.updatedInstruments} instruments.`
+          : 'Refresh finished. No instrument prices were updated.'
+      );
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setRefreshMessage(e?.response?.data?.message || e?.message || 'Error refreshing instrument prices');
+    } finally {
+      setRefreshingPrices(false);
+    }
   };
 
   if (loading) return <div className="ict-empty">Cargando catálogo…</div>;
@@ -247,6 +269,16 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         >
           {showForm ? '✕ Cancelar' : section === 'instruments' ? '+ New instrument' : '+ New platform'}
         </button>
+        {section === 'instruments' && (
+          <button
+            type="button"
+            className="ict-btn-refresh"
+            onClick={handleRefreshPrices}
+            disabled={refreshingPrices}
+          >
+            {refreshingPrices ? 'Refreshing prices…' : '↻ Refresh prices'}
+          </button>
+        )}
       </div>
 
       {/* ── Error toast ── */}
@@ -254,6 +286,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         <div className="ict-toast-error" role="alert">
           <span>⚠ {error}</span>
           <button type="button" onClick={clearError}>Cerrar</button>
+        </div>
+      )}
+
+      {refreshMessage && (
+        <div className="ict-toast-info" role="status">
+          <span>{refreshMessage}</span>
+          <button type="button" onClick={() => setRefreshMessage(null)}>Cerrar</button>
         </div>
       )}
 
