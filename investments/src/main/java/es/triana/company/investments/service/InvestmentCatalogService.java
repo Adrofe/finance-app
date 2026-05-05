@@ -10,6 +10,7 @@ import es.triana.company.investments.model.api.InvestmentInstrumentDTO;
 import es.triana.company.investments.model.api.InvestmentPlatformDTO;
 import es.triana.company.investments.model.db.InvestmentInstrument;
 import es.triana.company.investments.model.db.InvestmentPlatform;
+import es.triana.company.investments.model.db.InvestmentTypeCatalog;
 import es.triana.company.investments.repository.InvestmentInstrumentRepository;
 import es.triana.company.investments.repository.InvestmentPlatformRepository;
 import es.triana.company.investments.repository.InvestmentTypeCatalogRepository;
@@ -34,6 +35,10 @@ public class InvestmentCatalogService {
                 .stream()
                 .map(this::toInstrumentDto)
                 .toList();
+    }
+
+    public List<InvestmentTypeCatalog> getAllTypes() {
+        return investmentTypeCatalogRepository.findAll();
     }
 
     public InvestmentInstrumentDTO getInstrumentById(Long id) {

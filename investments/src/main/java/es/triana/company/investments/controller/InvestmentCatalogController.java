@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import es.triana.company.investments.model.api.ApiResponse;
 import es.triana.company.investments.model.api.InvestmentInstrumentDTO;
 import es.triana.company.investments.model.api.InvestmentPlatformDTO;
+import es.triana.company.investments.model.db.InvestmentTypeCatalog;
 import es.triana.company.investments.service.InvestmentCatalogService;
 import jakarta.validation.Valid;
 
@@ -27,6 +28,12 @@ public class InvestmentCatalogController {
 
     public InvestmentCatalogController(InvestmentCatalogService investmentCatalogService) {
         this.investmentCatalogService = investmentCatalogService;
+    }
+
+    @GetMapping("/types")
+    public ResponseEntity<ApiResponse<List<InvestmentTypeCatalog>>> getTypes() {
+        List<InvestmentTypeCatalog> data = investmentCatalogService.getAllTypes();
+        return ResponseEntity.ok(new ApiResponse<>(200, "Investment types retrieved successfully", data));
     }
 
     @GetMapping("/instruments")
