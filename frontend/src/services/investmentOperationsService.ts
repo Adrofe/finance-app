@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type { ApiResponse } from '../types/api';
-import type { InvestmentOperation, InvestmentOperationDraft, InvestmentPosition } from '../types/investments';
+import type { InvestmentOperation, InvestmentOperationDraft, InvestmentPosition, InvestmentSummary } from '../types/investments';
 
 const OPERATIONS_BASE = '/v1/api/investments/operations';
 const INVESTMENTS_BASE = '/v1/api/investments';
@@ -10,6 +10,11 @@ const headers = (token: string) => ({ Authorization: `Bearer ${token}` });
 export async function fetchInvestmentPositions(token: string): Promise<InvestmentPosition[]> {
   const res = await axios.get<ApiResponse<InvestmentPosition[]>>(INVESTMENTS_BASE, { headers: headers(token) });
   return res.data.data ?? [];
+}
+
+export async function fetchInvestmentSummary(token: string): Promise<InvestmentSummary> {
+  const res = await axios.get<ApiResponse<InvestmentSummary>>(`${INVESTMENTS_BASE}/summary`, { headers: headers(token) });
+  return res.data.data;
 }
 
 export async function fetchOperations(token: string): Promise<InvestmentOperation[]> {

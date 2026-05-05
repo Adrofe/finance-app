@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { BankingSubTabs } from './components/BankingSubTabs';
 import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
 import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
+import { InvestmentsOverviewTable } from './components/InvestmentsOverviewTable';
 import { InvestmentOperationsTable } from './components/InvestmentOperationsTable';
 import { LoginForm } from './components/LoginForm';
 import { TabsNav } from './components/TabsNav';
@@ -128,10 +129,12 @@ function App() {
           )}
 
           {investmentsSubTab === 'investments' && (
-            <article className="sheet inv-placeholder">
-              <div className="inv-placeholder-icon">💼</div>
-              <h3>Investments</h3>
-              <p>Your positions grouped by instrument and platform will be listed here.</p>
+            <article className="sheet">
+              <div className="sheet-header">
+                <h3>Investments</h3>
+                <span>Resumen por instrumento y métricas de cartera</span>
+              </div>
+              <InvestmentsOverviewTable token={accessToken} onUnauthorized={handleUnauthorized} />
             </article>
           )}
 

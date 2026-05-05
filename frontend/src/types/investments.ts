@@ -51,6 +51,25 @@ export type InvestmentPosition = {
   updatedAt?: string;
 };
 
+export type InvestmentTypeSummary = {
+  typeId: number;
+  typeCode?: string;
+  typeName?: string;
+  count: number;
+  investedAmount: number;
+  currentValue: number;
+  pnl: number;
+};
+
+export type InvestmentSummary = {
+  totalInvested: number;
+  totalCurrentValue: number;
+  totalPnl: number;
+  totalPnlPct: number;
+  positions: number;
+  byType: InvestmentTypeSummary[];
+};
+
 export type OperationFifoLot = {
   buyOperationId: number;
   quantity: number;
