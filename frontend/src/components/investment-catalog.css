@@ -215,7 +215,9 @@
 }
 
 .ict-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 2px 8px;
   border-radius: 6px;
   font-size: 11px;
@@ -225,6 +227,15 @@
   background: #e0f2fe;
   color: #0369a1;
   border: 1px solid #bae6fd;
+}
+
+.ict-badge__emoji {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.ict-badge--type {
+  text-transform: none;
 }
 
 .ict-badge--platform {
@@ -294,6 +305,27 @@
 .modal-select:focus {
   outline: 2px solid var(--brand);
   outline-offset: 1px;
+}
+
+.ict-type-preview {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ict-type-preview__emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ict-type-preview__code {
+  opacity: 0.8;
 }
 
 /* ─── Delete confirm dialog ───────────────────────────────────────────────── */

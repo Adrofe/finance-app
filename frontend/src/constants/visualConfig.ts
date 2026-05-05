@@ -1,5 +1,62 @@
 // Visual configuration for UI presentation - Backend doesn't need to know about this
 
+type SelectOption = {
+  value: string;
+  label: string;
+};
+
+type InvestmentTypeVisual = {
+  emoji: string;
+  color: string;
+  background: string;
+};
+
+const DEFAULT_INVESTMENT_TYPE_VISUAL: InvestmentTypeVisual = {
+  emoji: '📊',
+  color: '#0f766e',
+  background: '#ccfbf1',
+};
+
+const INVESTMENT_TYPE_VISUALS: Record<string, InvestmentTypeVisual> = {
+  FUND: { emoji: '💰', color: '#9a3412', background: '#ffedd5' },
+  ETF: { emoji: '🗂️', color: '#0f766e', background: '#ccfbf1' },
+  CRYPTO: { emoji: '₿', color: '#a16207', background: '#fef3c7' },
+  STOCK: { emoji: '📈', color: '#1d4ed8', background: '#dbeafe' },
+};
+
+export const INVESTMENT_MARKET_OPTIONS: SelectOption[] = [
+  { value: '', label: 'Sin mercado' },
+  { value: 'NASDAQ', label: 'NASDAQ' },
+  { value: 'NYSE', label: 'NYSE' },
+  { value: 'BME', label: 'BME' },
+  { value: 'XETRA', label: 'XETRA' },
+  { value: 'EURONEXT', label: 'Euronext' },
+  { value: 'LSE', label: 'London Stock Exchange' },
+  { value: 'BINANCE', label: 'Binance' },
+  { value: 'COINBASE', label: 'Coinbase' },
+];
+
+export const INVESTMENT_CURRENCY_OPTIONS: SelectOption[] = [
+  { value: 'EUR', label: 'EUR' },
+  { value: 'USD', label: 'USD' },
+  { value: 'GBP', label: 'GBP' },
+  { value: 'CHF', label: 'CHF' },
+  { value: 'JPY', label: 'JPY' },
+  { value: 'BTC', label: 'BTC' },
+  { value: 'ETH', label: 'ETH' },
+];
+
+export const INVESTMENT_PRICE_SOURCE_OPTIONS: SelectOption[] = [
+  { value: '', label: 'Sin fuente' },
+  { value: 'MANUAL', label: 'Manual' },
+  { value: 'YAHOO', label: 'Yahoo Finance' },
+  { value: 'GOOGLE', label: 'Google Finance' },
+  { value: 'BINANCE', label: 'Binance' },
+  { value: 'COINBASE', label: 'Coinbase' },
+  { value: 'MORNINGSTAR', label: 'Morningstar' },
+  { value: 'INVESTING', label: 'Investing.com' },
+];
+
 export const CATEGORY_VISUALS: Record<string, { emoji: string; color: string }> = {
   // --- Parent categories (codes from DB seed) ---
   'FOOD':   { emoji: '🍽️', color: '#F44336' },
@@ -165,6 +222,17 @@ export function getCategoryVisual(code: string): { emoji: string; color: string 
     CATEGORY_VISUALS[upperCode] ||
     CATEGORY_VISUALS[upperCode.split('.')[0]] ||
     { emoji: '📦', color: '#9E9E9E' }
+  );
+}
+
+export function getInvestmentTypeVisual(code?: string, name?: string): InvestmentTypeVisual {
+  const normalizedCode = (code || '').trim().toUpperCase();
+  const normalizedName = (name || '').trim().toUpperCase();
+
+  return (
+    INVESTMENT_TYPE_VISUALS[normalizedCode] ||
+    INVESTMENT_TYPE_VISUALS[normalizedName] ||
+    DEFAULT_INVESTMENT_TYPE_VISUAL
   );
 }
 

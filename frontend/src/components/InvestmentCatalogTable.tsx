@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { useInvestmentCatalog } from '../hooks/useInvestmentCatalog';
-import type { InvestmentInstrument, InvestmentPlatform } from '../types/investments';
+import {
+  getInvestmentTypeVisual,
+  INVESTMENT_CURRENCY_OPTIONS,
+  INVESTMENT_MARKET_OPTIONS,
+  INVESTMENT_PRICE_SOURCE_OPTIONS,
+} from '../constants/visualConfig';
+import type { InvestmentInstrument, InvestmentPlatform, InvestmentType } from '../types/investments';
 import './investment-catalog.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -40,6 +46,11 @@ interface Props {
   onUnauthorized?: (message: string) => void;
 }
 
+const getTypeLabel = (type: InvestmentType) => {
+  const visual = getInvestmentTypeVisual(type.code, type.name);
+  return `${visual.emoji} ${type.name} (${type.code})`;
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized }) => {
@@ -64,6 +75,11 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [instrForm, setInstrForm] = useState({ ...EMPTY_INSTRUMENT });
   const onInstrChange = (k: keyof typeof EMPTY_INSTRUMENT, v: string) =>
     setInstrForm(s => ({ ...s, [k]: v }));
+
+  const selectedType = types.find(type => String(type.id) === instrForm.typeId);
+  const selectedTypeVisual = selectedType
+    ? getInvestmentTypeVisual(selectedType.code, selectedType.name)
+    : null;
 
   // ── platform form ─────────────────────────────────────────────────────────
   const [platForm, setPlatForm] = useState({ ...EMPTY_PLATFORM });
@@ -260,9 +276,23 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 >
                   <option value="">-- Select type --</option>
                   {types.map(t => (
-                    <option key={t.id} value={t.id}>{t.name} ({t.code})</option>
+                    <option key={t.id} value={t.id}>{getTypeLabel(t)}</option>
                   ))}
                 </select>
+                {selectedType && selectedTypeVisual && (
+                  <div
+                    className="ict-type-preview"
+                    style={{
+                      color: selectedTypeVisual.color,
+                      background: selectedTypeVisual.background,
+                      borderColor: selectedTypeVisual.background,
+                    }}
+                  >
+                    <span className="ict-type-preview__emoji">{selectedTypeVisual.emoji}</span>
+                    <span>{selectedType.name}</span>
+                    <span className="ict-type-preview__code">{selectedType.code}</span>
+                  </div>
+                )}
               </div>
               <div className="modal-row">
                 <label>Code *</label>
@@ -296,23 +326,28 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
               </div>
               <div className="modal-row">
                 <label>Market</label>
-                <input
-                  maxLength={80}
-                  placeholder="e.g. NASDAQ"
+                <select
+                  className="modal-select"
                   value={instrForm.market}
                   onChange={e => onInstrChange('market', e.target.value)}
-                />
+                >
+                  {INVESTMENT_MARKET_OPTIONS.map(option => (
+                    <option key={option.value || 'empty-market'} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="modal-row">
                 <label>Currency *</label>
-                <input
+                <select
                   required
-                  maxLength={3}
-                  minLength={3}
-                  placeholder="EUR"
+                  className="modal-select"
                   value={instrForm.currency}
-                  onChange={e => onInstrChange('currency', e.target.value.toUpperCase())}
-                />
+                  onChange={e => onInstrChange('currency', e.target.value)}
+                >
+                  {INVESTMENT_CURRENCY_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="modal-row">
                 <label>Last price</label>
@@ -327,12 +362,15 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
               </div>
               <div className="modal-row">
                 <label>Price source</label>
-                <input
-                  maxLength={50}
-                  placeholder="e.g. Yahoo"
+                <select
+                  className="modal-select"
                   value={instrForm.lastPriceSource}
                   onChange={e => onInstrChange('lastPriceSource', e.target.value)}
-                />
+                >
+                  {INVESTMENT_PRICE_SOURCE_OPTIONS.map(option => (
+                    <option key={option.value || 'empty-source'} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="modal-row">
                 <label>Price date</label>
@@ -443,13 +481,27 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 <tr><td colSpan={10} className="ict-empty">No instruments found. Add one to get started.</td></tr>
               )}
               {instruments.map(instr => {
-                const typeName = types.find(t => t.id === instr.typeId)?.name ?? String(instr.typeId);
+                const type = types.find(t => t.id === instr.typeId);
+                const typeName = type?.name ?? String(instr.typeId);
+                const typeVisual = getInvestmentTypeVisual(type?.code, type?.name);
                 return (
                   <tr key={instr.id} className="ict-row">
                     <td className="ict-td"><span className="ict-code">{instr.code}</span></td>
                     <td className="ict-td"><span className="ict-name">{instr.name}</span></td>
                     <td className="ict-td"><span className="ict-symbol">{instr.symbol}</span></td>
-                    <td className="ict-td"><span className="ict-badge">{typeName}</span></td>
+                    <td className="ict-td">
+                      <span
+                        className="ict-badge ict-badge--type"
+                        style={{
+                          color: typeVisual.color,
+                          background: typeVisual.background,
+                          borderColor: typeVisual.background,
+                        }}
+                      >
+                        <span className="ict-badge__emoji">{typeVisual.emoji}</span>
+                        {typeName}
+                      </span>
+                    </td>
                     <td className="ict-td"><span className="ict-muted">{instr.market ?? '—'}</span></td>
                     <td className="ict-td"><span className="ict-badge" style={{ background: '#f5f3ff', color: '#5b21b6', borderColor: '#ddd6fe' }}>{instr.currency}</span></td>
                     <td className="ict-td ict-td--right"><span className="ict-price">{fmtPrice(instr.lastPrice)}</span></td>
