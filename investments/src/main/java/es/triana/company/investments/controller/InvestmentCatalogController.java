@@ -43,7 +43,7 @@ public class InvestmentCatalogController {
     }
 
     @GetMapping("/instruments/{id}")
-    public ResponseEntity<ApiResponse<InvestmentInstrumentDTO>> getInstrumentById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<InvestmentInstrumentDTO>> getInstrumentById(@PathVariable("id") Long id) {
         InvestmentInstrumentDTO data = investmentCatalogService.getInstrumentById(id);
         return ResponseEntity.ok(new ApiResponse<>(200, "Instrument retrieved successfully", data));
     }
@@ -55,13 +55,13 @@ public class InvestmentCatalogController {
     }
 
     @PutMapping("/instruments/{id}")
-    public ResponseEntity<ApiResponse<InvestmentInstrumentDTO>> updateInstrument(@PathVariable Long id, @Valid @RequestBody InvestmentInstrumentDTO request) {
+    public ResponseEntity<ApiResponse<InvestmentInstrumentDTO>> updateInstrument(@PathVariable("id") Long id, @Valid @RequestBody InvestmentInstrumentDTO request) {
         InvestmentInstrumentDTO data = investmentCatalogService.updateInstrument(id, request);
         return ResponseEntity.ok(new ApiResponse<>(200, "Instrument updated successfully", data));
     }
 
     @DeleteMapping("/instruments/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteInstrument(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteInstrument(@PathVariable("id") Long id) {
         investmentCatalogService.deleteInstrument(id);
         return ResponseEntity.ok(new ApiResponse<>(200, "Instrument deleted successfully", null));
     }
@@ -73,7 +73,7 @@ public class InvestmentCatalogController {
     }
 
     @GetMapping("/platforms/{id}")
-    public ResponseEntity<ApiResponse<InvestmentPlatformDTO>> getPlatformById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<InvestmentPlatformDTO>> getPlatformById(@PathVariable("id") Long id) {
         InvestmentPlatformDTO data = investmentCatalogService.getPlatformById(id);
         return ResponseEntity.ok(new ApiResponse<>(200, "Platform retrieved successfully", data));
     }
@@ -85,13 +85,13 @@ public class InvestmentCatalogController {
     }
 
     @PutMapping("/platforms/{id}")
-    public ResponseEntity<ApiResponse<InvestmentPlatformDTO>> updatePlatform(@PathVariable Long id, @Valid @RequestBody InvestmentPlatformDTO request) {
+    public ResponseEntity<ApiResponse<InvestmentPlatformDTO>> updatePlatform(@PathVariable("id") Long id, @Valid @RequestBody InvestmentPlatformDTO request) {
         InvestmentPlatformDTO data = investmentCatalogService.updatePlatform(id, request);
         return ResponseEntity.ok(new ApiResponse<>(200, "Platform updated successfully", data));
     }
 
     @DeleteMapping("/platforms/{id}")
-    public ResponseEntity<ApiResponse<Void>> deletePlatform(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deletePlatform(@PathVariable("id") Long id) {
         investmentCatalogService.deletePlatform(id);
         return ResponseEntity.ok(new ApiResponse<>(200, "Platform deleted successfully", null));
     }
