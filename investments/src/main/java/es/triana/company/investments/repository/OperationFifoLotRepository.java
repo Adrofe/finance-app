@@ -25,6 +25,9 @@ public interface OperationFifoLotRepository extends JpaRepository<OperationFifoL
     @Modifying
     void deleteBySellOperationIdIn(java.util.Collection<Long> sellOperationIds);
 
+    @Modifying
+    void deleteBySellOperationId(Long sellOperationId);
+
     /** Total gain/loss in EUR for a given sell operation (sum of all matched lots) */
     @Query("SELECT COALESCE(SUM(l.gainLossEur), 0) FROM OperationFifoLot l WHERE l.sellOperationId = :sellId")
     java.math.BigDecimal sumGainLossBySellOperation(@Param("sellId") Long sellId);

@@ -8,19 +8,30 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 @Builder
 public class CreateOperationRequest {
 
-    @NotNull(message = "investmentId is required")
+    /**
+     * Optional. If provided, operation is linked directly to this position.
+     * If absent, backend will resolve/create a position from instrumentId/platformId.
+     */
     private Long investmentId;
+
+    /** Optional. Used when investmentId is not provided. */
+    private Long instrumentId;
+
+    /** Optional. Used with instrumentId to resolve/create the target position. */
+    private Long platformId;
+
+    /** Optional display name for auto-created positions. */
+    @Size(max = 150)
+    private String positionName;
 
     /** Tenant ID will be extracted from Keycloak token if not provided */
     private Long tenantId;
@@ -52,8 +63,59 @@ public class CreateOperationRequest {
     @Size(max = 500)
     private String notes;
 
+    public CreateOperationRequest(
+            Long investmentId,
+            Long tenantId,
+            es.triana.company.investments.model.db.OperationType type,
+            LocalDate operationDate,
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            BigDecimal fees,
+            String currency,
+            String notes) {
+        this.investmentId = investmentId;
+        this.tenantId = tenantId;
+        this.type = type;
+        this.operationDate = operationDate;
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+        this.fees = fees;
+        this.currency = currency;
+        this.notes = notes;
+    }
+
+    public CreateOperationRequest(
+            Long investmentId,
+            Long instrumentId,
+            Long platformId,
+            String positionName,
+            Long tenantId,
+            es.triana.company.investments.model.db.OperationType type,
+            LocalDate operationDate,
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            BigDecimal fees,
+            String currency,
+            String notes) {
+        this.investmentId = investmentId;
+        this.instrumentId = instrumentId;
+        this.platformId = platformId;
+        this.positionName = positionName;
+        this.tenantId = tenantId;
+        this.type = type;
+        this.operationDate = operationDate;
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+        this.fees = fees;
+        this.currency = currency;
+        this.notes = notes;
+    }
+
     public CreateOperationRequest(CreateOperationRequest request, Long tenantId) {
         this.investmentId = request.getInvestmentId();
+        this.instrumentId = request.getInstrumentId();
+        this.platformId = request.getPlatformId();
+        this.positionName = request.getPositionName();
         this.tenantId = tenantId;
         this.type = request.getType();
         this.operationDate = request.getOperationDate();

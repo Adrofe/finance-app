@@ -12,6 +12,8 @@ import jakarta.persistence.LockModeType;
 
 public interface InvestmentOperationRepository extends JpaRepository<InvestmentOperation, Long> {
 
+        java.util.Optional<InvestmentOperation> findByIdAndTenantId(Long id, Long tenantId);
+
     List<InvestmentOperation> findByInvestmentIdOrderByOperationDateAscIdAsc(Long investmentId);
 
     List<InvestmentOperation> findByTenantIdOrderByOperationDateDescIdDesc(Long tenantId);
