@@ -7,15 +7,20 @@ type Props = {
   onUnauthorized?: (message: string) => void;
 };
 
-const fmtMoney = (value: number, currency = 'EUR') =>
-  value.toLocaleString('es-ES', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const safeNumber = (value: number | null | undefined) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
-const fmtPct = (value: number) => `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+const fmtMoney = (value: number | null | undefined, currency = 'EUR') =>
+  safeNumber(value).toLocaleString('es-ES', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const fmtQty = (value: number) =>
-  value.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+const fmtPct = (value: number | null | undefined) => {
+  const amount = safeNumber(value);
+  return `${amount >= 0 ? '+' : ''}${amount.toFixed(2)}%`;
+};
 
-const pnlClass = (value: number) => value >= 0 ? 'io-positive' : 'io-negative';
+const fmtQty = (value: number | null | undefined) =>
+  safeNumber(value).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+
+const pnlClass = (value: number | null | undefined) => safeNumber(value) >= 0 ? 'io-positive' : 'io-negative';
 
 export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorized }) => {
   const { summary, positions, byInstrument, loading, error, clearError } = useInvestmentsOverview(token, onUnauthorized);

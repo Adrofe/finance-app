@@ -30,11 +30,13 @@ const EMPTY_FORM = {
   notes: '',
 };
 
-const fmtMoney = (value: number, currency = 'EUR') =>
-  value.toLocaleString('es-ES', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const safeNumber = (value: number | null | undefined) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
-const fmtNumber = (value: number) =>
-  value.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+const fmtMoney = (value: number | null | undefined, currency = 'EUR') =>
+  safeNumber(value).toLocaleString('es-ES', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+const fmtNumber = (value: number | null | undefined) =>
+  safeNumber(value).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 8 });
 
 const fmtDate = (value: string) => {
   const date = new Date(value);

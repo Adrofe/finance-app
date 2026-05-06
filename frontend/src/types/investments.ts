@@ -110,6 +110,27 @@ export type InvestmentOperationDraft = {
   notes?: string;
 };
 
+export type InvestmentTaxByInstrument = {
+  instrumentId: number;
+  code?: string;
+  symbol?: string;
+  name?: string;
+  gainLossEur: number;
+};
+
+export type InvestmentTaxByCurrency = {
+  currency: string;
+  gainLossEur: number;
+};
+
+export type InvestmentTaxSummary = {
+  tenantId: number;
+  year: number;
+  totalGainLossEur: number;
+  byInstrument: InvestmentTaxByInstrument[];
+  byCurrency: InvestmentTaxByCurrency[];
+};
+
 export type PriceRefreshResult = {
   updatedInstruments: number;
   recalculatedPositions: number;

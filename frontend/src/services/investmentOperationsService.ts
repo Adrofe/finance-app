@@ -1,6 +1,12 @@
 import axios from 'axios';
 import type { ApiResponse } from '../types/api';
-import type { InvestmentOperation, InvestmentOperationDraft, InvestmentPosition, InvestmentSummary } from '../types/investments';
+import type {
+  InvestmentOperation,
+  InvestmentOperationDraft,
+  InvestmentPosition,
+  InvestmentSummary,
+  InvestmentTaxSummary,
+} from '../types/investments';
 
 const OPERATIONS_BASE = '/v1/api/investments/operations';
 const INVESTMENTS_BASE = '/v1/api/investments';
@@ -20,6 +26,14 @@ export async function fetchInvestmentSummary(token: string): Promise<InvestmentS
 export async function fetchOperations(token: string): Promise<InvestmentOperation[]> {
   const res = await axios.get<ApiResponse<InvestmentOperation[]>>(OPERATIONS_BASE, { headers: headers(token) });
   return res.data.data ?? [];
+}
+
+export async function fetchTaxSummary(token: string, year: number): Promise<InvestmentTaxSummary> {
+  const res = await axios.get<ApiResponse<InvestmentTaxSummary>>(`${OPERATIONS_BASE}/tax-summary`, {
+    headers: headers(token),
+    params: { year },
+  });
+  return res.data.data;
 }
 
 export async function createOperation(token: string, payload: InvestmentOperationDraft): Promise<InvestmentOperation> {

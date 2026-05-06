@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { BankingSubTabs } from './components/BankingSubTabs';
 import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
 import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
+import { InvestmentsDashboard } from './components/InvestmentsDashboard';
 import { InvestmentsOverviewTable } from './components/InvestmentsOverviewTable';
 import { InvestmentOperationsTable } from './components/InvestmentOperationsTable';
 import { LoginForm } from './components/LoginForm';
@@ -121,10 +122,12 @@ function App() {
           <InvestmentsSubTabs activeTab={investmentsSubTab} onSelectTab={setInvestmentsSubTab} />
 
           {investmentsSubTab === 'dashboard' && (
-            <article className="sheet inv-placeholder">
-              <div className="inv-placeholder-icon">📊</div>
-              <h3>Portfolio Dashboard</h3>
-              <p>Summary of your portfolio performance, unrealised gains, and key metrics will appear here.</p>
+            <article className="sheet">
+              <div className="sheet-header">
+                <h3>Portfolio Dashboard</h3>
+                <span>Resumen global, fiscal y composicion de cartera</span>
+              </div>
+              <InvestmentsDashboard token={accessToken} onUnauthorized={handleUnauthorized} />
             </article>
           )}
 
