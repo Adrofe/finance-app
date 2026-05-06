@@ -263,80 +263,89 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
             </div>
 
             <form className="modal-body iot-form" onSubmit={submit}>
-              <div className="modal-row">
-                <label>Instrumento</label>
-                <select required value={form.instrumentId} onChange={(event) => onChange('instrumentId', event.target.value)}>
-                  <option value="">Selecciona un instrumento</option>
-                  {instruments.map((instrument) => (
-                    <option key={instrument.id} value={instrument.id}>
-                      {instrument.name} · {instrument.symbol}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <div className="iot-form-row iot-form-row--pair">
+                <div className="modal-row">
+                  <label>Instrumento</label>
+                  <select className="iot-select" required value={form.instrumentId} onChange={(event) => onChange('instrumentId', event.target.value)}>
+                    <option value="">Selecciona un instrumento</option>
+                    {instruments.map((instrument) => (
+                      <option key={instrument.id} value={instrument.id}>
+                        {instrument.name} · {instrument.symbol}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div className="modal-row">
-                <label>Plataforma</label>
-                <select value={form.platformId} onChange={(event) => onChange('platformId', event.target.value)}>
-                  <option value="">Sin plataforma</option>
-                  {platforms.map((platform) => (
-                    <option key={platform.id} value={platform.id}>{platform.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="modal-row">
-                <label>Nombre de la posición (opcional)</label>
-                <input
-                  type="text"
-                  maxLength={150}
-                  placeholder="Ej: Cartera principal SP500"
-                  value={form.positionName}
-                  onChange={(event) => onChange('positionName', event.target.value)}
-                />
-              </div>
-
-              <div className="iot-type-row">
-                <label>Tipo</label>
-                <div className="iot-type-toggle">
-                  <button type="button" className={`iot-type-btn${form.type === 'BUY' ? ' active buy' : ''}`} onClick={() => onChange('type', 'BUY')}>
-                    Compra
-                  </button>
-                  <button type="button" className={`iot-type-btn${form.type === 'SELL' ? ' active sell' : ''}`} onClick={() => onChange('type', 'SELL')}>
-                    Venta
-                  </button>
-                </div>
-              </div>
-
-              <div className="iot-form-grid">
                 <div className="modal-row">
-                  <label>Fecha</label>
-                  <input required type="date" value={form.operationDate} onChange={(event) => onChange('operationDate', event.target.value)} />
-                </div>
-                <div className="modal-row">
-                  <label>Cantidad</label>
-                  <input required type="number" min="0.00000001" step="0.00000001" value={form.quantity} onChange={(event) => onChange('quantity', event.target.value)} />
-                </div>
-                <div className="modal-row">
-                  <label>Precio unitario</label>
-                  <input required type="number" min="0.00000001" step="0.00000001" value={form.unitPrice} onChange={(event) => onChange('unitPrice', event.target.value)} />
-                </div>
-                <div className="modal-row">
-                  <label>Fees</label>
-                  <input type="number" min="0" step="0.01" value={form.fees} onChange={(event) => onChange('fees', event.target.value)} />
-                </div>
-                <div className="modal-row">
-                  <label>Divisa</label>
-                  <select value={form.currency} onChange={(event) => onChange('currency', event.target.value)}>
-                    {INVESTMENT_CURRENCY_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                  <label>Plataforma</label>
+                  <select className="iot-select" value={form.platformId} onChange={(event) => onChange('platformId', event.target.value)}>
+                    <option value="">Sin plataforma</option>
+                    {platforms.map((platform) => (
+                      <option key={platform.id} value={platform.id}>{platform.name}</option>
                     ))}
                   </select>
                 </div>
               </div>
 
+              <div className="iot-form-row">
+                <div className="modal-row">
+                  <label>Nombre de la posición (opcional)</label>
+                  <input
+                    className="iot-input"
+                    type="text"
+                    maxLength={150}
+                    placeholder="Ej: Cartera principal SP500"
+                    value={form.positionName}
+                    onChange={(event) => onChange('positionName', event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="iot-form-row iot-form-row--triple">
+                <div className="modal-row">
+                  <label>Divisa</label>
+                  <select className="iot-select" value={form.currency} onChange={(event) => onChange('currency', event.target.value)}>
+                    {INVESTMENT_CURRENCY_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="modal-row">
+                  <label>Fecha</label>
+                  <input className="iot-input" required type="date" value={form.operationDate} onChange={(event) => onChange('operationDate', event.target.value)} />
+                </div>
+
+                <div className="iot-type-row iot-type-row--compact">
+                  <label>Tipo</label>
+                  <div className="iot-type-toggle">
+                    <button type="button" className={`iot-type-btn${form.type === 'BUY' ? ' active buy' : ''}`} onClick={() => onChange('type', 'BUY')}>
+                      Compra
+                    </button>
+                    <button type="button" className={`iot-type-btn${form.type === 'SELL' ? ' active sell' : ''}`} onClick={() => onChange('type', 'SELL')}>
+                      Venta
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="iot-form-row iot-form-row--triple">
+                <div className="modal-row">
+                  <label>Cantidad</label>
+                  <input className="iot-input" required type="number" min="0.00000001" step="0.00000001" value={form.quantity} onChange={(event) => onChange('quantity', event.target.value)} />
+                </div>
+                <div className="modal-row">
+                  <label>Precio unitario</label>
+                  <input className="iot-input" required type="number" min="0.00000001" step="0.00000001" value={form.unitPrice} onChange={(event) => onChange('unitPrice', event.target.value)} />
+                </div>
+                <div className="modal-row">
+                  <label>Fees</label>
+                  <input className="iot-input" type="number" min="0" step="0.01" value={form.fees} onChange={(event) => onChange('fees', event.target.value)} />
+                </div>
+              </div>
+
               {selectedInstrument && (
-                <div className="iot-selected-investment">
+                <div className="iot-selected-investment iot-field--full">
                   <span className="iot-selected-investment-title">
                     {selectedInvestment ? 'Se usará la posición existente' : 'Se creará una nueva posición automáticamente'}
                   </span>
@@ -350,9 +359,9 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
 
               {catalogError && <p className="modal-error">{catalogError}</p>}
 
-              <div className="modal-row">
+              <div className="modal-row iot-field--full">
                 <label>Notas</label>
-                <textarea rows={4} placeholder="Comentario opcional de la operación" value={form.notes} onChange={(event) => onChange('notes', event.target.value)} />
+                <textarea className="iot-textarea" rows={4} placeholder="Comentario opcional de la operación" value={form.notes} onChange={(event) => onChange('notes', event.target.value)} />
               </div>
 
               {formError && <p className="modal-error">{formError}</p>}
