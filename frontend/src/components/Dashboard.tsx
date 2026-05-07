@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 
 import type { Transaction } from '../types/banking';
+import { FINANCE_EVENTS } from '../events/financeEvents';
 import type { DashboardSummary, SpendingByCategory, TimeSeriesPoint, DashboardPreset } from '../types/dashboard';
 import { fetchDashboardSummary, fetchSpendingByCategory, fetchTimeSeries } from '../services/dashboardService';
 import { getCategoryVisual } from '../constants/visualConfig';
@@ -240,6 +241,17 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const handleTransactionsUpdated = () => {
+      loadData();
+    };
+
+    window.addEventListener(FINANCE_EVENTS.TRANSACTIONS_UPDATED, handleTransactionsUpdated);
+    return () => {
+      window.removeEventListener(FINANCE_EVENTS.TRANSACTIONS_UPDATED, handleTransactionsUpdated);
+    };
   }, [loadData]);
 
   const toTimestamp = useCallback((input?: string): number => {

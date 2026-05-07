@@ -1,28 +1,56 @@
 ﻿import { useState, useEffect, useRef } from 'react';
+import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import axios from 'axios';
-import type { CreateTransactionRequest } from '../types/banking';
+import type { CreateTransactionRequest, Transaction } from '../types/banking';
 import { CatalogService, Account, Tag, Merchant, TransactionCategory, TransactionStatus, TransactionType } from '../services/catalogService';
 import { getCategoryVisual, getMerchantLogo, getInstitutionLogo } from '../constants/visualConfig';
 import './CreateTransactionModal.css';
 
+type TransactionModalInitialValues = Partial<CreateTransactionRequest>;
+
 type CreateTransactionModalProps = {
   accessToken: string;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (transaction?: Transaction) => void;
+  initialValues?: TransactionModalInitialValues;
+  title?: string;
+  submitLabel?: string;
+  hideDestinationAccount?: boolean;
+  lockAmount?: boolean;
+  lockBookingDate?: boolean;
+  lockValueDate?: boolean;
+  onSubmitTransaction?: (createdTransaction: Transaction, payload: CreateTransactionRequest) => Promise<void>;
 };
 
-export function CreateTransactionModal({ accessToken, onClose, onSuccess }: CreateTransactionModalProps) {
+const toInputDate = (value?: string) => {
+  if (!value) return '';
+  return value.includes('T') ? value.slice(0, 10) : value;
+};
+
+export function CreateTransactionModal({
+  accessToken,
+  onClose,
+  onSuccess,
+  initialValues,
+  title,
+  submitLabel,
+  hideDestinationAccount = false,
+  lockAmount = false,
+  lockBookingDate = false,
+  lockValueDate = false,
+  onSubmitTransaction,
+}: CreateTransactionModalProps) {
   // Form state
-  const [sourceAccountId, setSourceAccountId] = useState<number | undefined>();
-  const [destinationAccountId, setDestinationAccountId] = useState<number | undefined>();
-  const [amount, setAmount] = useState<string>('');
-  const [bookingDate, setBookingDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [valueDate, setValueDate] = useState<string>('');
-  const [description, setDescription] = useState<string>('');
-  const [categoryId, setCategoryId] = useState<number | undefined>();
-  const [merchantId, setMerchantId] = useState<number | undefined>();
+  const [sourceAccountId, setSourceAccountId] = useState<number | undefined>(initialValues?.sourceAccountId);
+  const [destinationAccountId, setDestinationAccountId] = useState<number | undefined>(initialValues?.destinationAccountId);
+  const [amount, setAmount] = useState<string>(initialValues?.amount != null ? String(initialValues.amount) : '');
+  const [bookingDate, setBookingDate] = useState<string>(toInputDate(initialValues?.bookingDate) || new Date().toISOString().split('T')[0]);
+  const [valueDate, setValueDate] = useState<string>(toInputDate(initialValues?.valueDate));
+  const [description, setDescription] = useState<string>(initialValues?.description || '');
+  const [categoryId, setCategoryId] = useState<number | undefined>(initialValues?.categoryId);
+  const [merchantId, setMerchantId] = useState<number | undefined>(initialValues?.merchantId);
   const [statusId, setStatusId] = useState<number | undefined>();
-  const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const [selectedTags, setSelectedTags] = useState<number[]>(initialValues?.tagIds || []);
 
   // Catalogs
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -76,10 +104,15 @@ export function CreateTransactionModal({ accessToken, onClose, onSuccess }: Crea
       setTypes(typs);
       setTags(tgs);
       setMerchants(merch);
-      const bookedStatus = stats.find(s => s.code === 'BOOKED');
-      if (bookedStatus) setStatusId(bookedStatus.id);
+      const initialStatus = initialValues?.statusId;
+      if (initialStatus) {
+        setStatusId(initialStatus);
+      } else {
+        const bookedStatus = stats.find(s => s.code === 'BOOKED');
+        if (bookedStatus) setStatusId(bookedStatus.id);
+      }
     }).finally(() => setCatalogsLoading(false));
-  }, [accessToken]);
+  }, [accessToken, initialValues?.statusId]);
 
   // Close dropdowns/picker on outside click
   useEffect(() => {
@@ -258,8 +291,12 @@ export function CreateTransactionModal({ accessToken, onClose, onSuccess }: Crea
       };
 
       const { createTransaction } = await import('../services/transactionsService');
-      await createTransaction(accessToken, transaction);
-      onSuccess();
+      const createdTransaction = await createTransaction(accessToken, transaction);
+      if (onSubmitTransaction) {
+        await onSubmitTransaction(createdTransaction, transaction);
+      }
+      dispatchFinanceEvent(FINANCE_EVENTS.TRANSACTIONS_UPDATED);
+      onSuccess(createdTransaction);
       onClose();
     } catch (error) {
       console.error('Error creating transaction:', error);
@@ -290,7 +327,7 @@ export function CreateTransactionModal({ accessToken, onClose, onSuccess }: Crea
     <div className="transaction-modal-backdrop" onClick={onClose}>
       <div className="transaction-modal" onClick={e => e.stopPropagation()}>
         <div className="transaction-modal-header">
-          <h2>💳 Nueva Transacción</h2>
+          <h2>{title || '💳 Nueva Transacción'}</h2>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -344,60 +381,62 @@ export function CreateTransactionModal({ accessToken, onClose, onSuccess }: Crea
                 </div>
               </div>
 
-              <div className="form-group">
-                <label htmlFor="destinationAccount" className="form-label">Cuenta Destino</label>
-                <div className="searchable-dropdown" ref={destinationAccountRef}>
-                  <button
-                    id="destinationAccount"
-                    type="button"
-                    className={'form-input account-select-trigger' + (destinationAccountOpen ? ' active' : '')}
-                    onClick={() => setDestinationAccountOpen(v => !v)}
-                  >
-                    {selectedDestinationAccount ? (
-                      <span className="account-option">
-                        <span className="account-logo">{renderInstitutionLogo(selectedDestinationAccount.institutionName)}</span>
-                        <span className="account-info">
-                          <span className="account-name">{selectedDestinationAccount.name}</span>
-                          <span className="account-bank">{selectedDestinationAccount.institutionName || 'Sin banco'}</span>
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="category-trigger-placeholder">Sin cuenta destino</span>
-                    )}
-                    <span className="category-trigger-arrow">{destinationAccountOpen ? '▲' : '▼'}</span>
-                  </button>
-
-                  {destinationAccountOpen && (
-                    <div className="dropdown-results">
-                      <div
-                        className={'dropdown-item' + (!destinationAccountId ? ' selected' : '')}
-                        onMouseDown={e => e.preventDefault()}
-                        onClick={() => { setDestinationAccountId(undefined); setDestinationAccountOpen(false); }}
-                      >
-                        <span className="account-logo">🏦</span>
-                        <span className="account-info">
-                          <span className="account-name">Sin cuenta destino</span>
-                          <span className="account-bank">Opcional</span>
-                        </span>
-                      </div>
-                      {accounts.map(acc => (
-                        <div
-                          key={acc.id}
-                          className={'dropdown-item' + (destinationAccountId === acc.id ? ' selected' : '')}
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => { setDestinationAccountId(acc.id); setDestinationAccountOpen(false); }}
-                        >
-                          <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
+              {!hideDestinationAccount && (
+                <div className="form-group">
+                  <label htmlFor="destinationAccount" className="form-label">Cuenta Destino</label>
+                  <div className="searchable-dropdown" ref={destinationAccountRef}>
+                    <button
+                      id="destinationAccount"
+                      type="button"
+                      className={'form-input account-select-trigger' + (destinationAccountOpen ? ' active' : '')}
+                      onClick={() => setDestinationAccountOpen(v => !v)}
+                    >
+                      {selectedDestinationAccount ? (
+                        <span className="account-option">
+                          <span className="account-logo">{renderInstitutionLogo(selectedDestinationAccount.institutionName)}</span>
                           <span className="account-info">
-                            <span className="account-name">{acc.name}</span>
-                            <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
+                            <span className="account-name">{selectedDestinationAccount.name}</span>
+                            <span className="account-bank">{selectedDestinationAccount.institutionName || 'Sin banco'}</span>
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="category-trigger-placeholder">Sin cuenta destino</span>
+                      )}
+                      <span className="category-trigger-arrow">{destinationAccountOpen ? '▲' : '▼'}</span>
+                    </button>
+
+                    {destinationAccountOpen && (
+                      <div className="dropdown-results">
+                        <div
+                          className={'dropdown-item' + (!destinationAccountId ? ' selected' : '')}
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setDestinationAccountId(undefined); setDestinationAccountOpen(false); }}
+                        >
+                          <span className="account-logo">🏦</span>
+                          <span className="account-info">
+                            <span className="account-name">Sin cuenta destino</span>
+                            <span className="account-bank">Opcional</span>
                           </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        {accounts.map(acc => (
+                          <div
+                            key={acc.id}
+                            className={'dropdown-item' + (destinationAccountId === acc.id ? ' selected' : '')}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => { setDestinationAccountId(acc.id); setDestinationAccountOpen(false); }}
+                          >
+                            <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
+                            <span className="account-info">
+                              <span className="account-name">{acc.name}</span>
+                              <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Amount + Status */}
               <div className="form-group">
@@ -413,6 +452,7 @@ export function CreateTransactionModal({ accessToken, onClose, onSuccess }: Crea
                   onChange={e => setAmount(e.target.value)}
                   placeholder="100.00"
                   required
+                  disabled={lockAmount}
                 />
                 {currency && <span className="currency-badge">{currency}</span>}
               </div>
@@ -443,6 +483,7 @@ export function CreateTransactionModal({ accessToken, onClose, onSuccess }: Crea
                   value={bookingDate}
                   onChange={e => setBookingDate(e.target.value)}
                   required
+                  disabled={lockBookingDate}
                 />
               </div>
 
@@ -454,6 +495,7 @@ export function CreateTransactionModal({ accessToken, onClose, onSuccess }: Crea
                   className="form-input"
                   value={valueDate}
                   onChange={e => setValueDate(e.target.value)}
+                  disabled={lockValueDate}
                 />
                 <small className="form-hint">Por defecto se usa la fecha de reserva</small>
               </div>
@@ -719,7 +761,7 @@ export function CreateTransactionModal({ accessToken, onClose, onSuccess }: Crea
               disabled={loading || !sourceAccountId || !amount || !bookingDate}
             >
               {loading && <span className="loading-spinner" />}
-              {loading ? 'Creando...' : 'Crear Transacción'}
+              {loading ? 'Creando...' : (submitLabel || 'Crear Transacción')}
             </button>
           </div>
         </form>

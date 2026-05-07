@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import axios from 'axios';
 import type { InvestmentOperation, InvestmentOperationDraft, InvestmentPosition } from '../types/investments';
 import {
@@ -60,18 +61,21 @@ export function useInvestmentOperations(token: string, onUnauthorized?: (message
   const addOperation = useCallback(async (payload: InvestmentOperationDraft) => {
     const created = await createOperation(token, payload);
     await load();
+    dispatchFinanceEvent(FINANCE_EVENTS.INVESTMENTS_UPDATED);
     return created;
   }, [token, load]);
 
   const editOperation = useCallback(async (id: number, payload: InvestmentOperationDraft) => {
     const updated = await updateOperation(token, id, payload);
     await load();
+    dispatchFinanceEvent(FINANCE_EVENTS.INVESTMENTS_UPDATED);
     return updated;
   }, [token, load]);
 
   const removeOperation = useCallback(async (id: number) => {
     await deleteOperation(token, id);
     await load();
+    dispatchFinanceEvent(FINANCE_EVENTS.INVESTMENTS_UPDATED);
   }, [token, load]);
 
   return {

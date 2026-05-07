@@ -89,6 +89,8 @@ export type InvestmentOperation = {
   fees: number;
   totalAmount: number;
   currency: string;
+  linkedAccountId?: number;
+  linkedTransactionId?: number;
   eurExchangeRate: number;
   totalAmountEur: number;
   notes?: string;
@@ -107,6 +109,8 @@ export type InvestmentOperationDraft = {
   unitPrice: number;
   fees?: number;
   currency: string;
+  linkedAccountId?: number;
+  linkedTransactionId?: number;
   notes?: string;
 };
 

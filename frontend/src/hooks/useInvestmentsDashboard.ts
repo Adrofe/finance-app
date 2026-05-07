@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FINANCE_EVENTS } from '../events/financeEvents';
 import axios from 'axios';
 import type {
   InvestmentOperation,
@@ -125,6 +126,18 @@ export function useInvestmentsDashboard(token: string, onUnauthorized?: (message
   useEffect(() => {
     loadTaxSummary();
   }, [loadTaxSummary]);
+
+  useEffect(() => {
+    const handleInvestmentsUpdated = () => {
+      loadCore();
+      loadTaxSummary();
+    };
+
+    window.addEventListener(FINANCE_EVENTS.INVESTMENTS_UPDATED, handleInvestmentsUpdated);
+    return () => {
+      window.removeEventListener(FINANCE_EVENTS.INVESTMENTS_UPDATED, handleInvestmentsUpdated);
+    };
+  }, [loadCore, loadTaxSummary]);
 
   const clearError = useCallback(() => setError(null), []);
 

@@ -1,7 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
 import { INVESTMENT_CURRENCY_OPTIONS, getInvestmentTypeVisual } from '../constants/visualConfig';
+import { CreateTransactionModal } from './CreateTransactionModal';
 import { useInvestmentOperations } from '../hooks/useInvestmentOperations';
 import { fetchInstruments, fetchPlatforms } from '../services/investmentCatalogService';
+import { deleteTransaction } from '../services/transactionsService';
+import type { CreateTransactionRequest, Transaction } from '../types/banking';
 import type {
   InvestmentInstrument,
   InvestmentOperation,
@@ -73,6 +77,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
   const [platforms, setPlatforms] = useState<InvestmentPlatform[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [showIntegratedTransactionModal, setShowIntegratedTransactionModal] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -111,6 +116,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     setForm({ ...EMPTY_FORM });
     setEditingId(null);
     setFormError(null);
+    setShowIntegratedTransactionModal(false);
   };
 
   const closeForm = () => {
@@ -146,25 +152,113 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     setForm((current) => ({ ...current, [key]: value }));
   };
 
+  const getOperationDraft = (link?: { linkedAccountId?: number; linkedTransactionId?: number }): { payload?: InvestmentOperationDraft; error?: string } => {
+    const instrumentId = Number(form.instrumentId);
+    const quantity = Number(form.quantity);
+    const unitPrice = Number(form.unitPrice);
+    const fees = form.fees !== '' ? Number(form.fees) : 0;
+
+    if (!Number.isFinite(instrumentId) || instrumentId <= 0) {
+      return { error: 'Selecciona un instrumento válido para continuar.' };
+    }
+
+    if (!form.operationDate) {
+      return { error: 'La fecha de la operación es obligatoria.' };
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return { error: 'La cantidad debe ser mayor que cero.' };
+    }
+
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+      return { error: 'El precio unitario debe ser mayor que cero.' };
+    }
+
+    if (!form.currency || form.currency.trim().length !== 3) {
+      return { error: 'La divisa debe ser un código ISO de 3 letras.' };
+    }
+
+    return {
+      payload: {
+        instrumentId,
+        platformId: form.platformId ? Number(form.platformId) : undefined,
+        positionName: form.positionName.trim() || undefined,
+        type: form.type,
+        operationDate: form.operationDate,
+        quantity,
+        unitPrice,
+        fees,
+        currency: form.currency,
+        linkedAccountId: link?.linkedAccountId,
+        linkedTransactionId: link?.linkedTransactionId,
+        notes: form.notes.trim() || undefined,
+      },
+    };
+  };
+
+  const buildOperationDraft = (link?: { linkedAccountId?: number; linkedTransactionId?: number }): InvestmentOperationDraft | null => {
+    const { payload, error: draftError } = getOperationDraft(link);
+    if (!payload) {
+      setFormError(draftError || 'La operación no es válida.');
+      return null;
+    }
+    return payload;
+  };
+
+  const integratedCashAmount = useMemo(() => {
+    const { payload } = getOperationDraft();
+    if (!payload) return null;
+    const grossAmount = payload.quantity * payload.unitPrice;
+    return payload.type === 'BUY'
+      ? -(grossAmount + (payload.fees ?? 0))
+      : grossAmount - (payload.fees ?? 0);
+  }, [form]);
+
+  const openIntegratedTransactionModal = () => {
+    if (editingId) return;
+    setFormError(null);
+    if (!buildOperationDraft()) {
+      return;
+    }
+    setShowIntegratedTransactionModal(true);
+  };
+
+  const handleIntegratedTransactionSubmit = async (createdTransaction: Transaction, _transactionPayload: CreateTransactionRequest) => {
+    const operationPayload = buildOperationDraft({
+      linkedAccountId: createdTransaction.sourceAccountId,
+      linkedTransactionId: createdTransaction.id,
+    });
+
+    if (!operationPayload) {
+      throw new Error('La operación ya no es válida para completar la integración.');
+    }
+
+    try {
+      await addOperation(operationPayload);
+      closeForm();
+    } catch (err) {
+      if (createdTransaction.id) {
+        try {
+          await deleteTransaction(token, createdTransaction.id);
+        } catch (rollbackError) {
+          const rollbackMessage = axios.isAxiosError(rollbackError)
+            ? (rollbackError.response?.data?.message || rollbackError.message)
+            : 'No se pudo revertir la transacción bancaria creada';
+          throw new Error(`${(err as { message?: string })?.message || 'Error creando la operación'}; además ${rollbackMessage}.`);
+        }
+      }
+      throw err;
+    }
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setSubmitting(true);
     setFormError(null);
 
     try {
-      const parsedInstrumentId = Number(form.instrumentId);
-      const payload: InvestmentOperationDraft = {
-        instrumentId: parsedInstrumentId,
-        platformId: form.platformId ? Number(form.platformId) : undefined,
-        positionName: form.positionName.trim() || undefined,
-        type: form.type,
-        operationDate: form.operationDate,
-        quantity: Number(form.quantity),
-        unitPrice: Number(form.unitPrice),
-        fees: form.fees !== '' ? Number(form.fees) : 0,
-        currency: form.currency,
-        notes: form.notes.trim() || undefined,
-      };
+      const payload = buildOperationDraft();
+      if (!payload) return;
 
       if (editingId) {
         await editOperation(editingId, payload);
@@ -189,6 +283,17 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
   const selectedPlatform = selectedPlatformId
     ? platforms.find((platform) => platform.id === selectedPlatformId)
     : undefined;
+
+  const integratedTransactionTitle = form.type === 'BUY'
+    ? '💳 Compra enlazada a cuenta'
+    : '💳 Venta enlazada a cuenta';
+
+  const integratedTransactionDescription = useMemo(() => {
+    const label = selectedInstrument?.symbol || selectedInstrument?.name || form.positionName.trim() || 'inversión';
+    return form.type === 'BUY'
+      ? `Compra de ${label}`
+      : `Venta de ${label}`;
+  }, [form.positionName, form.type, selectedInstrument]);
 
   const selectedInvestment = selectedInstrumentId
     ? investments.find((investment) => {
@@ -257,6 +362,17 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
       {showForm && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal iot-modal">
+            {!editingId && (
+              <button
+                className="iot-integrated-trigger"
+                type="button"
+                onClick={openIntegratedTransactionModal}
+                disabled={submitting || catalogLoading}
+                title="Abrir creación integrada con una transacción bancaria"
+              >
+                Integrada
+              </button>
+            )}
             <div className="modal-header">
               <h4>{editingId ? 'Editar operación' : 'Añadir operación'}</h4>
               <button className="modal-close" type="button" onClick={closeForm}>✕</button>
@@ -373,6 +489,28 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
             </form>
           </div>
         </div>
+      )}
+
+      {showIntegratedTransactionModal && !editingId && (
+        <CreateTransactionModal
+          accessToken={token}
+          onClose={() => setShowIntegratedTransactionModal(false)}
+          onSuccess={() => undefined}
+          title={integratedTransactionTitle}
+          submitLabel="Crear transacción y operación"
+          hideDestinationAccount
+          lockAmount
+          lockBookingDate
+          lockValueDate
+          initialValues={{
+            amount: integratedCashAmount ?? undefined,
+            bookingDate: form.operationDate,
+            valueDate: form.operationDate,
+            currency: form.currency,
+            description: integratedTransactionDescription,
+          }}
+          onSubmitTransaction={handleIntegratedTransactionSubmit}
+        />
       )}
 
       {confirmDelete && (
