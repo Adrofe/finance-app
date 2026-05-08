@@ -64,7 +64,7 @@ function App() {
         <section className="panel" aria-label="Banking tab">
           <div className="section-header">
             <h2>Banking</h2>
-            <p>Review balance, accounts, transactions and tags in one place.</p>
+            <p>Review balance, accounts and transactions in one place.</p>
           </div>
 
           <BankingSubTabs activeTab={bankingSubTab} onSelectTab={setBankingSubTab} />
@@ -96,19 +96,7 @@ function App() {
             </article>
           )}
 
-          {bankingSubTab === 'tags' && (
-            <article className="sheet">
-              <h3>Tags</h3>
-              <p className="state">Tags management panel will be added in the next commit.</p>
-            </article>
-          )}
 
-          {bankingSubTab === 'budgets' && (
-            <article className="sheet">
-              <h3>Budgets</h3>
-              <p className="state">Budgets preview placeholder to plan future monthly targets.</p>
-            </article>
-          )}
         </section>
       )}
 

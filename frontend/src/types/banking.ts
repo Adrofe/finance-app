@@ -33,4 +33,4 @@ export type CreateTransactionRequest = {
 };
 
 export type AppTab = 'banking' | 'investments' | 'insights';
-export type BankingSubTab = 'dashboard' | 'accounts' | 'transactions' | 'tags' | 'budgets';
+export type BankingSubTab = 'dashboard' | 'accounts' | 'transactions';

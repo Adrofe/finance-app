@@ -5,24 +5,26 @@ type BankingSubTabsProps = {
   onSelectTab: (tab: BankingSubTab) => void;
 };
 
+const TABS: { id: BankingSubTab; label: string; icon: string }[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: '📈' },
+  { id: 'accounts', label: 'Accounts', icon: '🏛️' },
+  { id: 'transactions', label: 'Transactions', icon: '🧾' },
+];
+
 export function BankingSubTabs({ activeTab, onSelectTab }: BankingSubTabsProps) {
   return (
-    <nav className="subtabs" aria-label="Banking sections">
-      <button type="button" className={`subtab ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => onSelectTab('dashboard')}>
-        Dashboard
-      </button>
-      <button type="button" className={`subtab ${activeTab === 'accounts' ? 'active' : ''}`} onClick={() => onSelectTab('accounts')}>
-        Accounts
-      </button>
-      <button type="button" className={`subtab ${activeTab === 'transactions' ? 'active' : ''}`} onClick={() => onSelectTab('transactions')}>
-        Transactions
-      </button>
-      <button type="button" className={`subtab ${activeTab === 'tags' ? 'active' : ''}`} onClick={() => onSelectTab('tags')}>
-        Tags
-      </button>
-      <button type="button" className={`subtab ${activeTab === 'budgets' ? 'active' : ''}`} onClick={() => onSelectTab('budgets')}>
-        Budgets
-      </button>
+    <nav className="inv-subtabs" aria-label="Banking sections">
+      {TABS.map(({ id, label, icon }) => (
+        <button
+          key={id}
+          type="button"
+          className={`inv-subtab${activeTab === id ? ' active' : ''}`}
+          onClick={() => onSelectTab(id)}
+        >
+          <span className="inv-subtab-icon">{icon}</span>
+          {label}
+        </button>
+      ))}
     </nav>
   );
 }
