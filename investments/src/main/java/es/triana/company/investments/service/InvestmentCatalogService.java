@@ -3,6 +3,8 @@ package es.triana.company.investments.service;
 import java.util.List;
 import java.util.Locale;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +12,7 @@ import es.triana.company.investments.model.api.InvestmentInstrumentDTO;
 import es.triana.company.investments.model.api.InvestmentPlatformDTO;
 import es.triana.company.investments.model.db.InvestmentInstrument;
 import es.triana.company.investments.model.db.InvestmentPlatform;
+import es.triana.company.investments.model.db.InvestmentTypeCatalog;
 import es.triana.company.investments.repository.InvestmentInstrumentRepository;
 import es.triana.company.investments.repository.InvestmentPlatformRepository;
 import es.triana.company.investments.repository.InvestmentTypeCatalogRepository;
@@ -18,6 +21,8 @@ import es.triana.company.investments.service.exception.InvestmentValidationExcep
 
 @Service
 public class InvestmentCatalogService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(InvestmentCatalogService.class);
 
     private final InvestmentInstrumentRepository investmentInstrumentRepository;
     private final InvestmentPlatformRepository investmentPlatformRepository;
@@ -36,51 +41,77 @@ public class InvestmentCatalogService {
                 .toList();
     }
 
+    public List<InvestmentTypeCatalog> getAllTypes() {
+        return investmentTypeCatalogRepository.findAll();
+    }
+
     public InvestmentInstrumentDTO getInstrumentById(Long id) {
         return toInstrumentDto(findInstrument(id));
     }
 
     public InvestmentInstrumentDTO createInstrument(InvestmentInstrumentDTO request) {
-        validateInstrumentRequest(request);
-        String code = normalizeCode(request.getCode());
-        if (investmentInstrumentRepository.existsByCodeIgnoreCase(code)) {
-            throw new InvestmentValidationException("Instrument code already exists: " + code);
+        LOG.info("Creating instrument: {}", summarizeInstrumentRequest(request));
+        try {
+            validateInstrumentRequest(request);
+            String code = normalizeCode(request.getCode());
+            if (investmentInstrumentRepository.existsByCodeIgnoreCase(code)) {
+                throw new InvestmentValidationException("Instrument code already exists: " + code);
+            }
+
+            InvestmentInstrument instrument = InvestmentInstrument.builder()
+                    .typeId(request.getTypeId())
+                    .code(code)
+                    .symbol(normalizeSymbol(request.getSymbol()))
+                    .name(trimRequired(request.getName(), "name"))
+                    .market(trimToNull(request.getMarket()))
+                    .currency(normalizeCurrency(request.getCurrency()))
+                    .lastPrice(request.getLastPrice())
+                    .lastPriceSource(trimToNull(request.getLastPriceSource()))
+                    .lastPriceAt(request.getLastPriceAt())
+                    .build();
+
+            InvestmentInstrumentDTO savedInstrument = toInstrumentDto(investmentInstrumentRepository.save(instrument));
+            LOG.info("Instrument created successfully. id={} code={} symbol={}",
+                    savedInstrument.getId(),
+                    savedInstrument.getCode(),
+                    savedInstrument.getSymbol());
+            return savedInstrument;
+        } catch (RuntimeException ex) {
+            LOG.error("Instrument creation failed: {}", summarizeInstrumentRequest(request), ex);
+            throw ex;
         }
-
-        InvestmentInstrument instrument = InvestmentInstrument.builder()
-                .typeId(request.getTypeId())
-                .code(code)
-                .symbol(normalizeSymbol(request.getSymbol()))
-                .name(trimRequired(request.getName(), "name"))
-                .market(trimToNull(request.getMarket()))
-                .currency(normalizeCurrency(request.getCurrency()))
-                .lastPrice(request.getLastPrice())
-                .lastPriceSource(trimToNull(request.getLastPriceSource()))
-                .lastPriceAt(request.getLastPriceAt())
-                .build();
-
-        return toInstrumentDto(investmentInstrumentRepository.save(instrument));
     }
 
     public InvestmentInstrumentDTO updateInstrument(Long id, InvestmentInstrumentDTO request) {
-        validateInstrumentRequest(request);
-        String code = normalizeCode(request.getCode());
-        if (investmentInstrumentRepository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
-            throw new InvestmentValidationException("Instrument code already exists: " + code);
+        LOG.info("Updating instrument id={} with payload: {}", id, summarizeInstrumentRequest(request));
+        try {
+            validateInstrumentRequest(request);
+            String code = normalizeCode(request.getCode());
+            if (investmentInstrumentRepository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
+                throw new InvestmentValidationException("Instrument code already exists: " + code);
+            }
+
+            InvestmentInstrument instrument = findInstrument(id);
+            instrument.setTypeId(request.getTypeId());
+            instrument.setCode(code);
+            instrument.setSymbol(normalizeSymbol(request.getSymbol()));
+            instrument.setName(trimRequired(request.getName(), "name"));
+            instrument.setMarket(trimToNull(request.getMarket()));
+            instrument.setCurrency(normalizeCurrency(request.getCurrency()));
+            instrument.setLastPrice(request.getLastPrice());
+            instrument.setLastPriceSource(trimToNull(request.getLastPriceSource()));
+            instrument.setLastPriceAt(request.getLastPriceAt());
+
+            InvestmentInstrumentDTO updatedInstrument = toInstrumentDto(investmentInstrumentRepository.save(instrument));
+            LOG.info("Instrument updated successfully. id={} code={} symbol={}",
+                    updatedInstrument.getId(),
+                    updatedInstrument.getCode(),
+                    updatedInstrument.getSymbol());
+            return updatedInstrument;
+        } catch (RuntimeException ex) {
+            LOG.error("Instrument update failed. id={} payload={}", id, summarizeInstrumentRequest(request), ex);
+            throw ex;
         }
-
-        InvestmentInstrument instrument = findInstrument(id);
-        instrument.setTypeId(request.getTypeId());
-        instrument.setCode(code);
-        instrument.setSymbol(normalizeSymbol(request.getSymbol()));
-        instrument.setName(trimRequired(request.getName(), "name"));
-        instrument.setMarket(trimToNull(request.getMarket()));
-        instrument.setCurrency(normalizeCurrency(request.getCurrency()));
-        instrument.setLastPrice(request.getLastPrice());
-        instrument.setLastPriceSource(trimToNull(request.getLastPriceSource()));
-        instrument.setLastPriceAt(request.getLastPriceAt());
-
-        return toInstrumentDto(investmentInstrumentRepository.save(instrument));
     }
 
     public void deleteInstrument(Long id) {
@@ -232,5 +263,22 @@ public class InvestmentCatalogService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String summarizeInstrumentRequest(InvestmentInstrumentDTO request) {
+        if (request == null) {
+            return "request=null";
+        }
+        return String.format(
+                "typeId=%s, code=%s, symbol=%s, name=%s, market=%s, currency=%s, lastPrice=%s, lastPriceSource=%s, lastPriceAt=%s",
+                request.getTypeId(),
+                request.getCode(),
+                request.getSymbol(),
+                request.getName(),
+                request.getMarket(),
+                request.getCurrency(),
+                request.getLastPrice(),
+                request.getLastPriceSource(),
+                request.getLastPriceAt());
     }
 }

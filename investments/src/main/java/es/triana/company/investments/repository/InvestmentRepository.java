@@ -33,4 +33,12 @@ public interface InvestmentRepository extends JpaRepository<Investment, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Investment i WHERE i.id = :id AND i.tenantId = :tenantId")
     Optional<Investment> findByIdAndTenantIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("SELECT i FROM Investment i WHERE i.tenantId = :tenantId AND i.instrumentId = :instrumentId "
+            + "AND ((:platformId IS NULL AND i.platformId IS NULL) OR i.platformId = :platformId)")
+        Optional<Investment> findByTenantIdAndInstrumentIdAndPlatformIdForUpdate(
+            @Param("tenantId") Long tenantId,
+            @Param("instrumentId") Long instrumentId,
+            @Param("platformId") Long platformId);
 }

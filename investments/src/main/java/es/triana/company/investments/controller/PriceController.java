@@ -42,7 +42,7 @@ public class PriceController {
     }
 
     @PostMapping("/forex/refresh-day")
-    public ResponseEntity<ApiResponse<Integer>> refreshForexForDay(@RequestParam LocalDate asOf) {
+    public ResponseEntity<ApiResponse<Integer>> refreshForexForDay(@RequestParam("asOf") LocalDate asOf) {
         int saved = exchangeRateRefreshService.refreshRatesForDate(asOf);
         return ResponseEntity.ok(new ApiResponse<>(200, "Forex rates refresh executed for day " + asOf, saved));
     }

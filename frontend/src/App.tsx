@@ -1,13 +1,19 @@
 import { useCallback, useState } from 'react';
 
 import { BankingSubTabs } from './components/BankingSubTabs';
+import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
+import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
+import { InvestmentsDashboard } from './components/InvestmentsDashboard';
+import { InvestmentsOverviewTable } from './components/InvestmentsOverviewTable';
+import { InvestmentOperationsTable } from './components/InvestmentOperationsTable';
 import { LoginForm } from './components/LoginForm';
-import { TabsNav } from './components/TabsNav';
+import { AppHeader } from './components/AppHeader';
 import { TransactionsTable } from './components/TransactionsTable';
 import { KEYCLOAK_REALM } from './config/env';
 import { useAuth } from './hooks/useAuth';
 import { useTransactions } from './hooks/useTransactions';
 import type { AppTab, BankingSubTab } from './types/banking';
+import type { InvestmentsSubTab } from './types/investments';
 import { AccountsTable } from './components/AccountsTable';
 import { Dashboard } from './components/Dashboard';
 
@@ -20,6 +26,7 @@ function App() {
   const { items, loading, error, refresh } = useTransactions(accessToken, handleUnauthorized);
   const [activeTab, setActiveTab] = useState<AppTab>('banking');
   const [bankingSubTab, setBankingSubTab] = useState<BankingSubTab>('dashboard');
+  const [investmentsSubTab, setInvestmentsSubTab] = useState<InvestmentsSubTab>('dashboard');
 
   if (!accessToken) {
     return <LoginForm loading={authLoading} error={authError} realm={KEYCLOAK_REALM} onSubmit={login} />;
@@ -43,21 +50,13 @@ function App() {
           </div>
         </div>
       )}
-      <header className="header">
-        <h1>Finance App</h1>
-        <p>Control center for your personal finances</p>
-        <button className="btn secondary" onClick={() => logout('Logged out successfully.')} type="button">
-          Logout
-        </button>
-      </header>
-
-      <TabsNav activeTab={activeTab} onSelectTab={setActiveTab} />
+      <AppHeader activeTab={activeTab} onSelectTab={setActiveTab} onLogout={() => logout('Logged out successfully.')} />
 
       {activeTab === 'banking' && (
         <section className="panel" aria-label="Banking tab">
           <div className="section-header">
             <h2>Banking</h2>
-            <p>Review balance, accounts, transactions and tags in one place.</p>
+            <p>Review balance, accounts and transactions in one place.</p>
           </div>
 
           <BankingSubTabs activeTab={bankingSubTab} onSelectTab={setBankingSubTab} />
@@ -89,33 +88,56 @@ function App() {
             </article>
           )}
 
-          {bankingSubTab === 'tags' && (
-            <article className="sheet">
-              <h3>Tags</h3>
-              <p className="state">Tags management panel will be added in the next commit.</p>
-            </article>
-          )}
 
-          {bankingSubTab === 'budgets' && (
-            <article className="sheet">
-              <h3>Budgets</h3>
-              <p className="state">Budgets preview placeholder to plan future monthly targets.</p>
-            </article>
-          )}
         </section>
       )}
 
-      {activeTab === 'insights' && (
-        <section className="panel" aria-label="Insights tab">
+      {activeTab === 'investments' && (
+        <section className="panel" aria-label="Investments tab">
           <div className="section-header">
-            <h2>Insights</h2>
-            <p>Space reserved for reports and trends.</p>
+            <h2>Investments</h2>
+            <p>Track your portfolio, operations and available assets.</p>
           </div>
-          <article className="sheet">
-            <p className="state">Insights module is ready to be implemented in upcoming commits.</p>
-          </article>
+
+          <InvestmentsSubTabs activeTab={investmentsSubTab} onSelectTab={setInvestmentsSubTab} />
+
+          {investmentsSubTab === 'dashboard' && (
+            <article className="sheet">
+              <div className="sheet-header">
+                <h3>Portfolio Dashboard</h3>
+                <span>Resumen global, fiscal y composicion de cartera</span>
+              </div>
+              <InvestmentsDashboard token={accessToken} onUnauthorized={handleUnauthorized} />
+            </article>
+          )}
+
+          {investmentsSubTab === 'investments' && (
+            <article className="sheet">
+              <div className="sheet-header">
+                <h3>Investments</h3>
+                <span>Resumen por instrumento y métricas de cartera</span>
+              </div>
+              <InvestmentsOverviewTable token={accessToken} onUnauthorized={handleUnauthorized} />
+            </article>
+          )}
+
+          {investmentsSubTab === 'fifo' && (
+            <article className="sheet">
+              <div className="sheet-header">
+                <h3>Operations</h3>
+                <span>CRUD de compras y ventas con recalculo FIFO</span>
+              </div>
+              <InvestmentOperationsTable token={accessToken} onUnauthorized={handleUnauthorized} />
+            </article>
+          )}
+
+          {investmentsSubTab === 'catalog' && (
+            <InvestmentCatalogTable token={accessToken} onUnauthorized={handleUnauthorized} />
+          )}
         </section>
       )}
+
+
     </div>
   );
 }

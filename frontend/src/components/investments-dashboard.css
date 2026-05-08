@@ -1,0 +1,200 @@
+.idb-wrapper {
+  display: grid;
+  gap: 14px;
+}
+
+.idb-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.idb-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.idb-metric-highlight {
+  background: linear-gradient(140deg, #f3f9ff 0%, #e8f3ff 100%);
+  border: 1px solid #c7ddf1;
+}
+
+.idb-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.idb-grid-2 {
+  align-items: stretch;
+}
+
+.idb-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  display: grid;
+  gap: 10px;
+}
+
+.idb-empty {
+  color: var(--muted);
+  padding: 14px;
+  text-align: center;
+}
+
+.idb-positive {
+  color: #166534;
+}
+
+.idb-negative {
+  color: #b91c1c;
+}
+
+.idb-pie-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(210px, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.idb-legend {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.idb-legend li {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e4ebf3;
+  border-radius: 10px;
+  padding: 7px 9px;
+  background: #fbfdff;
+}
+
+.idb-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.idb-legend-name {
+  font-size: 0.88rem;
+  color: #2f4459;
+}
+
+.idb-tax-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.idb-year-select {
+  display: grid;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.idb-year-select select {
+  min-width: 110px;
+  border: 1px solid #c7d5e4;
+  border-radius: 10px;
+  padding: 7px 9px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.idb-tax-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #dce7f2;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #f8fbff;
+}
+
+.idb-tax-total span {
+  color: #526779;
+  font-size: 0.88rem;
+}
+
+.idb-tax-total strong {
+  font-size: 1.02rem;
+}
+
+.idb-tax-currency-wrap {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.idb-tax-currency {
+  border-radius: 999px;
+  border: 1px solid #d9e6f3;
+  background: #f8fbff;
+  font-size: 0.8rem;
+  padding: 5px 10px;
+}
+
+.idb-tax-table-wrap {
+  max-height: 270px;
+  overflow: auto;
+}
+
+.idb-tax-table {
+  min-width: 100%;
+}
+
+.idb-instrument-cell {
+  display: grid;
+  gap: 2px;
+}
+
+.idb-instrument-cell span {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.idb-right {
+  text-align: right;
+}
+
+@media (max-width: 1360px) {
+  .idb-metrics-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .idb-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .idb-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .idb-pie-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .idb-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}

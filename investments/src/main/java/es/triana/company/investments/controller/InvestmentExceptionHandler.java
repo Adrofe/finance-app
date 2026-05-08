@@ -2,6 +2,8 @@ package es.triana.company.investments.controller;
 
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -19,6 +21,8 @@ import es.triana.company.investments.service.exception.InvestmentValidationExcep
     PriceController.class,
     InvestmentCatalogController.class })
 public class InvestmentExceptionHandler {
+
+    private static final Logger LOG = LoggerFactory.getLogger(InvestmentExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException exception) {
@@ -52,6 +56,7 @@ public class InvestmentExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnhandledException(Exception exception) {
+        LOG.error("Unhandled exception in investments API", exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ApiResponse<>(500, "Internal server error", null));
     }

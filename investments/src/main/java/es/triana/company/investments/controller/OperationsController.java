@@ -4,8 +4,11 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -45,9 +48,24 @@ public class OperationsController {
         return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(201, "Operation registered successfully", result));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<OperationDTO>> update(@PathVariable("id") Long id, @Valid @RequestBody CreateOperationRequest request) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        CreateOperationRequest securedRequest = new CreateOperationRequest(request, tenantId);
+        OperationDTO result = operationService.updateOperation(id, securedRequest);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Operation updated successfully", result));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable("id") Long id) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        operationService.deleteOperation(id, tenantId);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Operation deleted successfully", null));
+    }
+
     /** List all operations for a specific investment position */
     @GetMapping("/by-investment")
-    public ResponseEntity<ApiResponse<List<OperationDTO>>> getByInvestment(@RequestParam Long investmentId) {
+    public ResponseEntity<ApiResponse<List<OperationDTO>>> getByInvestment(@RequestParam("investmentId") Long investmentId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         List<OperationDTO> data = operationService.getByInvestment(investmentId, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Operations retrieved successfully", data));
@@ -66,7 +84,7 @@ public class OperationsController {
      * Includes totals and breakdowns by instrument and currency.
      */
     @GetMapping("/tax-summary")
-    public ResponseEntity<ApiResponse<TaxSummaryDTO>> getTaxSummary(@RequestParam int year) {
+    public ResponseEntity<ApiResponse<TaxSummaryDTO>> getTaxSummary(@RequestParam("year") int year) {
         Long tenantId = tenantContext.getCurrentTenantId();
         TaxSummaryDTO data = operationService.getTaxSummary(tenantId, year);
         return ResponseEntity.ok(new ApiResponse<>(200, "Tax summary retrieved successfully", data));
@@ -77,7 +95,7 @@ public class OperationsController {
      * Useful when backdated operations were inserted and prior matching is stale.
      */
     @PostMapping("/rebuild-fifo")
-    public ResponseEntity<ApiResponse<FifoRebuildResultDTO>> rebuildFifo(@RequestParam Long instrumentId) {
+    public ResponseEntity<ApiResponse<FifoRebuildResultDTO>> rebuildFifo(@RequestParam("instrumentId") Long instrumentId) {
         Long tenantId = tenantContext.getCurrentTenantId();
         FifoRebuildResultDTO data = operationService.rebuildFifoForInstrumentTenant(instrumentId, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "FIFO rebuilt successfully", data));

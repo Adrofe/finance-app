@@ -18,6 +18,8 @@ public record OperationDTO(
         BigDecimal fees,
         BigDecimal totalAmount,
         String currency,
+        Long linkedAccountId,
+        Long linkedTransactionId,
         BigDecimal eurExchangeRate,
         BigDecimal totalAmountEur,
         String notes,

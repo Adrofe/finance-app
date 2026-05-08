@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
+import { FINANCE_EVENTS } from '../events/financeEvents';
 
 import { fetchTransactions } from '../services/transactionsService';
 import type { Transaction } from '../types/banking';
@@ -44,6 +45,17 @@ export function useTransactions(accessToken: string, onUnauthorized: (message: s
       })
       .finally(() => setLoading(false));
   }, [accessToken, onUnauthorized, refreshTrigger]);
+
+  useEffect(() => {
+    const handleTransactionsUpdated = () => {
+      setRefreshTrigger((prev) => prev + 1);
+    };
+
+    window.addEventListener(FINANCE_EVENTS.TRANSACTIONS_UPDATED, handleTransactionsUpdated);
+    return () => {
+      window.removeEventListener(FINANCE_EVENTS.TRANSACTIONS_UPDATED, handleTransactionsUpdated);
+    };
+  }, []);
 
   return {
     items,

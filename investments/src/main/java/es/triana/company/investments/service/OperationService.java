@@ -24,7 +24,9 @@ import es.triana.company.investments.model.db.InvestmentOperation;
 import es.triana.company.investments.model.db.OperationType;
 import es.triana.company.investments.model.db.OperationFifoLot;
 import es.triana.company.investments.repository.ExchangeRateRepository;
+import es.triana.company.investments.repository.InvestmentInstrumentRepository;
 import es.triana.company.investments.repository.InvestmentOperationRepository;
+import es.triana.company.investments.repository.InvestmentPlatformRepository;
 import es.triana.company.investments.repository.InvestmentRepository;
 import es.triana.company.investments.repository.OperationFifoLotRepository;
 import es.triana.company.investments.service.exception.InvestmentValidationException;
@@ -40,13 +42,23 @@ public class OperationService {
     private final InvestmentOperationRepository operationRepository;
     private final OperationFifoLotRepository fifoLotRepository;
     private final InvestmentRepository investmentRepository;
+    private final InvestmentInstrumentRepository investmentInstrumentRepository;
+    private final InvestmentPlatformRepository investmentPlatformRepository;
     private final ExchangeRateRepository exchangeRateRepository;
     private final es.triana.company.investments.service.mapper.OperationMapper operationMapper;
 
-        public OperationService(InvestmentOperationRepository operationRepository, OperationFifoLotRepository fifoLotRepository, InvestmentRepository investmentRepository, ExchangeRateRepository exchangeRateRepository, es.triana.company.investments.service.mapper.OperationMapper operationMapper) {
+        public OperationService(InvestmentOperationRepository operationRepository,
+            OperationFifoLotRepository fifoLotRepository,
+            InvestmentRepository investmentRepository,
+            InvestmentInstrumentRepository investmentInstrumentRepository,
+            InvestmentPlatformRepository investmentPlatformRepository,
+            ExchangeRateRepository exchangeRateRepository,
+            es.triana.company.investments.service.mapper.OperationMapper operationMapper) {
                 this.operationRepository = operationRepository;
                 this.fifoLotRepository = fifoLotRepository;
                 this.investmentRepository = investmentRepository;
+            this.investmentInstrumentRepository = investmentInstrumentRepository;
+            this.investmentPlatformRepository = investmentPlatformRepository;
                 this.exchangeRateRepository = exchangeRateRepository;
                 this.operationMapper = operationMapper;
         }
@@ -59,10 +71,12 @@ public class OperationService {
     public OperationDTO registerOperation(CreateOperationRequest req) {
         // Validate operation quantities before any other work
         validateOperationQuantities(req);
+    validateOperationTarget(req);
 
         // Lock the Investment row for update to serialise concurrent position changes
         // (BUY+BUY, BUY+SELL, or SELL+SELL on the same investment).
-        Investment investment = findAndLockInvestment(req.getInvestmentId(), req.getTenantId());
+    Investment investment = resolveOrCreateInvestment(req);
+    req.setInvestmentId(investment.getId());
 
         // For SELL: validate FIFO coverage BEFORE any other work so nothing is
         // persisted and no external calls are made if stock is insufficient.
@@ -91,6 +105,77 @@ public class OperationService {
         updateInvestmentPosition(investment, req.getType(), req.getQuantity(), totalAmount);
 
         return operationMapper.toDto(op, lots);
+    }
+
+    @Transactional
+    public OperationDTO updateOperation(Long operationId, CreateOperationRequest req) {
+        validateOperationQuantities(req);
+    validateOperationTarget(req);
+
+        InvestmentOperation existing = findOperation(operationId, req.getTenantId());
+        Investment previousInvestment = findAndLockInvestment(existing.getInvestmentId(), req.getTenantId());
+    Investment targetInvestment = resolveTargetInvestmentForUpdate(req, previousInvestment);
+
+        Long previousInstrumentId = previousInvestment.getInstrumentId();
+        Long targetInstrumentId = targetInvestment.getInstrumentId();
+
+        if (OperationType.SELL.equals(existing.getType())) {
+            fifoLotRepository.deleteBySellOperationId(existing.getId());
+        }
+
+        BigDecimal fees = req.getFees() != null ? req.getFees() : BigDecimal.ZERO;
+        BigDecimal totalAmount = computeTotalAmount(req.getType(), req.getQuantity(), req.getUnitPrice(), fees);
+        BigDecimal eurRate = resolveEurRate(req.getCurrency(), req.getOperationDate());
+        BigDecimal totalAmountEur = totalAmount.divide(eurRate, 4, RoundingMode.HALF_UP);
+
+        existing.setInvestmentId(targetInvestment.getId());
+        existing.setTenantId(req.getTenantId());
+        existing.setType(req.getType());
+        existing.setOperationDate(req.getOperationDate());
+        existing.setQuantity(req.getQuantity());
+        existing.setUnitPrice(req.getUnitPrice());
+        existing.setFees(fees);
+        existing.setTotalAmount(totalAmount);
+        existing.setCurrency(req.getCurrency().toUpperCase());
+        if (req.getLinkedAccountId() != null || req.getLinkedTransactionId() != null) {
+            existing.setLinkedAccountId(req.getLinkedAccountId());
+            existing.setLinkedTransactionId(req.getLinkedTransactionId());
+        }
+        existing.setEurExchangeRate(eurRate);
+        existing.setTotalAmountEur(totalAmountEur);
+        existing.setNotes(req.getNotes());
+        existing.setUpdatedAt(LocalDateTime.now());
+
+        InvestmentOperation saved = operationRepository.save(existing);
+
+        rebuildInstrumentState(previousInstrumentId, req.getTenantId());
+        if (!previousInstrumentId.equals(targetInstrumentId)) {
+            rebuildInstrumentState(targetInstrumentId, req.getTenantId());
+        }
+
+        recalculateInvestmentPosition(previousInvestment.getId(), req.getTenantId());
+        if (!previousInvestment.getId().equals(targetInvestment.getId())) {
+            recalculateInvestmentPosition(targetInvestment.getId(), req.getTenantId());
+        }
+
+        return operationMapper.toDto(saved, fifoLotRepository.findBySellOperationId(saved.getId()));
+    }
+
+    @Transactional
+    public void deleteOperation(Long operationId, Long tenantId) {
+        InvestmentOperation existing = findOperation(operationId, tenantId);
+        Investment investment = findAndLockInvestment(existing.getInvestmentId(), tenantId);
+        Long instrumentId = investment.getInstrumentId();
+
+        // Remove FIFO links from both sides before deleting the operation row.
+        fifoLotRepository.deleteBySellOperationId(existing.getId());
+        fifoLotRepository.deleteByBuyOperationId(existing.getId());
+        fifoLotRepository.flush();
+
+        operationRepository.delete(existing);
+
+        rebuildInstrumentState(instrumentId, tenantId);
+        recalculateInvestmentPosition(investment.getId(), tenantId);
     }
 
     public List<OperationDTO> getByInvestment(Long investmentId, Long tenantId) {
@@ -130,6 +215,24 @@ public class OperationService {
             if (year < 1900 || year > 3000) {
                     throw new InvestmentValidationException("year is required and must be between 1900 and 3000");
             }
+    }
+
+    private void validateOperationTarget(CreateOperationRequest req) {
+        if (req.getInvestmentId() == null && req.getInstrumentId() == null) {
+            throw new InvestmentValidationException("Either investmentId or instrumentId is required");
+        }
+
+        if (req.getInvestmentId() != null && req.getInvestmentId() <= 0) {
+            throw new InvestmentValidationException("investmentId must be > 0");
+        }
+
+        if (req.getInstrumentId() != null && req.getInstrumentId() <= 0) {
+            throw new InvestmentValidationException("instrumentId must be > 0");
+        }
+
+        if (req.getPlatformId() != null && req.getPlatformId() <= 0) {
+            throw new InvestmentValidationException("platformId must be > 0");
+        }
     }
 
     private void validateOperationQuantities(CreateOperationRequest req) {
@@ -230,6 +333,7 @@ public class OperationService {
 
         if (!sellIds.isEmpty()) {
             fifoLotRepository.deleteBySellOperationIdIn(sellIds);
+            fifoLotRepository.flush();
         }
     }
 
@@ -470,6 +574,36 @@ public class OperationService {
         investmentRepository.save(inv);
     }
 
+    private void rebuildInstrumentState(Long instrumentId, Long tenantId) {
+        rebuildFifoForInstrumentTenant(instrumentId, tenantId);
+    }
+
+    private void recalculateInvestmentPosition(Long investmentId, Long tenantId) {
+        Investment investment = findAndLockInvestment(investmentId, tenantId);
+        List<InvestmentOperation> operations = operationRepository.findByInvestmentIdOrderByOperationDateAscIdAsc(investmentId);
+
+        BigDecimal quantity = BigDecimal.ZERO;
+        BigDecimal investedAmount = BigDecimal.ZERO;
+
+        for (InvestmentOperation operation : operations) {
+            if (OperationType.BUY.equals(operation.getType())) {
+                quantity = quantity.add(operation.getQuantity());
+                investedAmount = investedAmount.add(operation.getTotalAmount());
+            } else if (OperationType.SELL.equals(operation.getType())) {
+                quantity = quantity.subtract(operation.getQuantity());
+            }
+        }
+
+        if (quantity.compareTo(BigDecimal.ZERO) < 0) {
+            quantity = BigDecimal.ZERO;
+        }
+
+        investment.setQuantity(quantity);
+        investment.setInvestedAmount(investedAmount.setScale(2, RoundingMode.HALF_UP));
+        investment.setUpdatedAt(LocalDateTime.now());
+        investmentRepository.save(investment);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -530,6 +664,92 @@ public class OperationService {
         return investmentRepository.findByIdAndTenantIdForUpdate(investmentId, tenantId)
                 .orElseThrow(() -> new InvestmentValidationException(
                         "Investment " + investmentId + " not found for tenant " + tenantId));
+    }
+
+    private InvestmentOperation findOperation(Long operationId, Long tenantId) {
+        return operationRepository.findByIdAndTenantId(operationId, tenantId)
+                .orElseThrow(() -> new InvestmentValidationException(
+                        "Operation " + operationId + " not found for tenant " + tenantId));
+    }
+    private Investment resolveTargetInvestmentForUpdate(CreateOperationRequest req, Investment previousInvestment) {
+        if (req.getInvestmentId() != null) {
+            return previousInvestment.getId().equals(req.getInvestmentId())
+                    ? previousInvestment
+                    : findAndLockInvestment(req.getInvestmentId(), req.getTenantId());
+        }
+        return resolveOrCreateInvestment(req);
+    }
+
+    private Investment resolveOrCreateInvestment(CreateOperationRequest req) {
+        if (req.getInvestmentId() != null) {
+            return findAndLockInvestment(req.getInvestmentId(), req.getTenantId());
+        }
+
+        Long instrumentId = req.getInstrumentId();
+        if (instrumentId == null) {
+            throw new InvestmentValidationException("instrumentId is required when investmentId is not provided");
+        }
+
+        Long platformId = req.getPlatformId();
+        Investment instrumentAnchor = investmentRepository
+                .findByTenantIdAndInstrumentIdAndPlatformIdForUpdate(req.getTenantId(), instrumentId, platformId)
+                .orElse(null);
+
+        if (instrumentAnchor != null) {
+            return instrumentAnchor;
+        }
+
+        es.triana.company.investments.model.db.InvestmentInstrument instrument = investmentInstrumentRepository.findById(instrumentId)
+                .orElseThrow(() -> new InvestmentValidationException("Unknown instrumentId: " + instrumentId));
+
+        if (platformId != null) {
+            investmentPlatformRepository.findById(platformId)
+                    .orElseThrow(() -> new InvestmentValidationException("Unknown platformId: " + platformId));
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Investment created = Investment.builder()
+                .tenantId(req.getTenantId())
+                .typeId(instrument.getTypeId())
+                .name(buildPositionName(req, instrument, platformId))
+                .instrumentId(instrument.getId())
+                .platformId(platformId)
+                .currency(instrument.getCurrency())
+                .investedAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP))
+                .quantity(BigDecimal.ZERO)
+                .openedAt(req.getOperationDate())
+                .notes(null)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+
+        Investment saved = investmentRepository.save(created);
+        LOG.info("Auto-created investment position id={} tenant={} instrument={} platform={} from operation",
+                saved.getId(), saved.getTenantId(), saved.getInstrumentId(), saved.getPlatformId());
+        return saved;
+    }
+
+    private String buildPositionName(CreateOperationRequest req,
+            es.triana.company.investments.model.db.InvestmentInstrument instrument,
+            Long platformId) {
+
+        if (req.getPositionName() != null && !req.getPositionName().isBlank()) {
+            return req.getPositionName().trim();
+        }
+
+        String base = instrument.getSymbol() != null && !instrument.getSymbol().isBlank()
+                ? instrument.getSymbol().trim()
+                : instrument.getName();
+
+        if (platformId == null) {
+            return base;
+        }
+
+        String platformName = investmentPlatformRepository.findById(platformId)
+                .map(p -> p.getName())
+                .orElse("Platform " + platformId);
+
+        return base + " @ " + platformName;
     }
 
 }

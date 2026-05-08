@@ -59,6 +59,12 @@ public class InvestmentOperation {
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;
 
+    @Column(name = "linked_account_id")
+    private Long linkedAccountId;
+
+    @Column(name = "linked_transaction_id")
+    private Long linkedTransactionId;
+
     /** ECB EUR→currency rate on operation_date. Denormalised for fiscal records. */
     @Column(name = "eur_exchange_rate", nullable = false, precision = 18, scale = 10)
     private BigDecimal eurExchangeRate;
