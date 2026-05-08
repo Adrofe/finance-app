@@ -7,7 +7,7 @@ import { InvestmentsDashboard } from './components/InvestmentsDashboard';
 import { InvestmentsOverviewTable } from './components/InvestmentsOverviewTable';
 import { InvestmentOperationsTable } from './components/InvestmentOperationsTable';
 import { LoginForm } from './components/LoginForm';
-import { TabsNav } from './components/TabsNav';
+import { AppHeader } from './components/AppHeader';
 import { TransactionsTable } from './components/TransactionsTable';
 import { KEYCLOAK_REALM } from './config/env';
 import { useAuth } from './hooks/useAuth';
@@ -50,15 +50,7 @@ function App() {
           </div>
         </div>
       )}
-      <header className="header">
-        <h1>Finance App</h1>
-        <p>Control center for your personal finances</p>
-        <button className="btn secondary" onClick={() => logout('Logged out successfully.')} type="button">
-          Logout
-        </button>
-      </header>
-
-      <TabsNav activeTab={activeTab} onSelectTab={setActiveTab} />
+      <AppHeader activeTab={activeTab} onSelectTab={setActiveTab} onLogout={() => logout('Logged out successfully.')} />
 
       {activeTab === 'banking' && (
         <section className="panel" aria-label="Banking tab">
@@ -145,17 +137,7 @@ function App() {
         </section>
       )}
 
-      {activeTab === 'insights' && (
-        <section className="panel" aria-label="Insights tab">
-          <div className="section-header">
-            <h2>Insights</h2>
-            <p>Space reserved for reports and trends.</p>
-          </div>
-          <article className="sheet">
-            <p className="state">Insights module is ready to be implemented in upcoming commits.</p>
-          </article>
-        </section>
-      )}
+
     </div>
   );
 }
