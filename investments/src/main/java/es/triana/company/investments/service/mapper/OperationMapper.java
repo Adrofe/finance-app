@@ -37,6 +37,8 @@ public class OperationMapper {
                 .fees(fees)
                 .totalAmount(totalAmount)
                 .currency(req.getCurrency())
+                .linkedAccountId(req.getLinkedAccountId())
+                .linkedTransactionId(req.getLinkedTransactionId())
                 .eurExchangeRate(eurExchangeRate)
                 .totalAmountEur(totalAmountEur)
                 .notes(req.getNotes())
@@ -66,6 +68,8 @@ public class OperationMapper {
             op.getFees(),
             op.getTotalAmount(),
             op.getCurrency(),
+            op.getLinkedAccountId(),
+            op.getLinkedTransactionId(),
             op.getEurExchangeRate(),
             op.getTotalAmountEur(),
             op.getNotes(),

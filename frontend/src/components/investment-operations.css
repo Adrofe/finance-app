@@ -436,6 +436,15 @@
   gap: 16px;
 }
 
+.iot-confirm-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+}
+
 @media (max-width: 840px) {
   .iot-modal {
     width: min(100vw - 20px, 900px);

@@ -60,6 +60,12 @@ public class CreateOperationRequest {
     @Size(min = 3, max = 3, message = "currency must be exactly 3 letters")
     private String currency;
 
+    /** Optional banking account tied to the cash movement of this operation. */
+    private Long linkedAccountId;
+
+    /** Optional banking transaction created together with this operation. */
+    private Long linkedTransactionId;
+
     @Size(max = 500)
     private String notes;
 
@@ -72,6 +78,8 @@ public class CreateOperationRequest {
             BigDecimal unitPrice,
             BigDecimal fees,
             String currency,
+            Long linkedAccountId,
+            Long linkedTransactionId,
             String notes) {
         this.investmentId = investmentId;
         this.tenantId = tenantId;
@@ -81,6 +89,63 @@ public class CreateOperationRequest {
         this.unitPrice = unitPrice;
         this.fees = fees;
         this.currency = currency;
+        this.linkedAccountId = linkedAccountId;
+        this.linkedTransactionId = linkedTransactionId;
+        this.notes = notes;
+    }
+
+    public CreateOperationRequest(
+            Long investmentId,
+            Long tenantId,
+            es.triana.company.investments.model.db.OperationType type,
+            LocalDate operationDate,
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            BigDecimal fees,
+            String currency,
+            String notes) {
+        this(
+                investmentId,
+                tenantId,
+                type,
+                operationDate,
+                quantity,
+                unitPrice,
+                fees,
+                currency,
+                null,
+                null,
+                notes);
+    }
+
+    public CreateOperationRequest(
+            Long investmentId,
+            Long instrumentId,
+            Long platformId,
+            String positionName,
+            Long tenantId,
+            es.triana.company.investments.model.db.OperationType type,
+            LocalDate operationDate,
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            BigDecimal fees,
+            String currency,
+            Long linkedAccountId,
+            Long linkedTransactionId,
+            String notes) {
+        this.investmentId = investmentId;
+        this.instrumentId = instrumentId;
+        this.platformId = platformId;
+        this.positionName = positionName;
+        this.tenantId = tenantId;
+        this.type = type;
+        this.operationDate = operationDate;
+        this.quantity = quantity;
+        this.unitPrice = unitPrice;
+        this.fees = fees;
+        this.currency = currency;
+        this.linkedAccountId = linkedAccountId;
+        this.linkedTransactionId = linkedTransactionId;
         this.notes = notes;
     }
 
@@ -97,18 +162,21 @@ public class CreateOperationRequest {
             BigDecimal fees,
             String currency,
             String notes) {
-        this.investmentId = investmentId;
-        this.instrumentId = instrumentId;
-        this.platformId = platformId;
-        this.positionName = positionName;
-        this.tenantId = tenantId;
-        this.type = type;
-        this.operationDate = operationDate;
-        this.quantity = quantity;
-        this.unitPrice = unitPrice;
-        this.fees = fees;
-        this.currency = currency;
-        this.notes = notes;
+        this(
+                investmentId,
+                instrumentId,
+                platformId,
+                positionName,
+                tenantId,
+                type,
+                operationDate,
+                quantity,
+                unitPrice,
+                fees,
+                currency,
+                null,
+                null,
+                notes);
     }
 
     public CreateOperationRequest(CreateOperationRequest request, Long tenantId) {
@@ -123,6 +191,8 @@ public class CreateOperationRequest {
         this.unitPrice = request.getUnitPrice();
         this.fees = request.getFees();
         this.currency = request.getCurrency();
+        this.linkedAccountId = request.getLinkedAccountId();
+        this.linkedTransactionId = request.getLinkedTransactionId();
         this.notes = request.getNotes();
     }
 }

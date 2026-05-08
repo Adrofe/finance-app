@@ -483,6 +483,40 @@ class OperationServiceTest {
     // =========================================================================
 
     @Nested
+    @DisplayName("Delete operations")
+    class DeleteOperations {
+
+        @Test
+        @DisplayName("deleteOperation removes FIFO lots where operation is SELL or BUY before rebuild")
+        void deleteOperation_cleansFifoLinksBeforeRebuild() {
+            InvestmentOperation existing = savedOp(
+                    301L,
+                    OperationType.BUY,
+                    LocalDate.of(2024, 2, 15),
+                    bd("6"),
+                    bd("140"),
+                    bd("1"),
+                    bd("841.0000"),
+                    "USD",
+                    bd("1.10"),
+                    bd("764.5455"));
+
+            when(operationRepository.findByIdAndTenantId(301L, TENANT_ID)).thenReturn(Optional.of(existing));
+            when(operationRepository.findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(INSTRUMENT_ID, TENANT_ID))
+                    .thenReturn(List.of());
+            when(operationRepository.findByInvestmentIdOrderByOperationDateAscIdAsc(INVESTMENT_ID))
+                    .thenReturn(List.of());
+
+            operationService.deleteOperation(301L, TENANT_ID);
+
+            verify(fifoLotRepository).deleteBySellOperationId(301L);
+            verify(fifoLotRepository).deleteByBuyOperationId(301L);
+            verify(fifoLotRepository).flush();
+            verify(operationRepository).delete(existing);
+        }
+    }
+
+    @Nested
     @DisplayName("FIFO rebuild")
     class FifoRebuild {
 

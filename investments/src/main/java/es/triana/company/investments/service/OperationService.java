@@ -137,6 +137,10 @@ public class OperationService {
         existing.setFees(fees);
         existing.setTotalAmount(totalAmount);
         existing.setCurrency(req.getCurrency().toUpperCase());
+        if (req.getLinkedAccountId() != null || req.getLinkedTransactionId() != null) {
+            existing.setLinkedAccountId(req.getLinkedAccountId());
+            existing.setLinkedTransactionId(req.getLinkedTransactionId());
+        }
         existing.setEurExchangeRate(eurRate);
         existing.setTotalAmountEur(totalAmountEur);
         existing.setNotes(req.getNotes());
@@ -163,9 +167,10 @@ public class OperationService {
         Investment investment = findAndLockInvestment(existing.getInvestmentId(), tenantId);
         Long instrumentId = investment.getInstrumentId();
 
-        if (OperationType.SELL.equals(existing.getType())) {
-            fifoLotRepository.deleteBySellOperationId(existing.getId());
-        }
+        // Remove FIFO links from both sides before deleting the operation row.
+        fifoLotRepository.deleteBySellOperationId(existing.getId());
+        fifoLotRepository.deleteByBuyOperationId(existing.getId());
+        fifoLotRepository.flush();
 
         operationRepository.delete(existing);
 
@@ -328,6 +333,7 @@ public class OperationService {
 
         if (!sellIds.isEmpty()) {
             fifoLotRepository.deleteBySellOperationIdIn(sellIds);
+            fifoLotRepository.flush();
         }
     }
 

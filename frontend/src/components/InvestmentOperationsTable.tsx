@@ -5,6 +5,7 @@ import { CreateTransactionModal } from './CreateTransactionModal';
 import { useInvestmentOperations } from '../hooks/useInvestmentOperations';
 import { fetchInstruments, fetchPlatforms } from '../services/investmentCatalogService';
 import { deleteTransaction } from '../services/transactionsService';
+import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import type { CreateTransactionRequest, Transaction } from '../types/banking';
 import type {
   InvestmentInstrument,
@@ -70,7 +71,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
   const [editingId, setEditingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<{ id: number; label: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number; label: string; linkedTransactionId?: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [instruments, setInstruments] = useState<InvestmentInstrument[]>([]);
@@ -307,6 +308,14 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     setDeleting(true);
     try {
       await removeOperation(confirmDelete.id);
+      if (confirmDelete.linkedTransactionId != null) {
+        try {
+          await deleteTransaction(token, confirmDelete.linkedTransactionId);
+        } catch {
+          // operation already removed; swallow banking error to avoid confusing the user
+        }
+        dispatchFinanceEvent(FINANCE_EVENTS.TRANSACTIONS_UPDATED);
+      }
       setConfirmDelete(null);
     } catch (err: unknown) {
       const resolved = err as { response?: { data?: { message?: string } }; message?: string };
@@ -523,6 +532,11 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
               <p>
                 Vas a eliminar la operación <strong>{confirmDelete.label}</strong>. Esta acción recalculará FIFO y no se puede deshacer.
               </p>
+              {confirmDelete.linkedTransactionId != null && (
+                <p className="iot-confirm-warning">
+                  La <strong>transacción bancaria vinculada</strong> también se eliminará.
+                </p>
+              )}
               <div className="modal-actions">
                 <button className="btn" type="button" onClick={() => setConfirmDelete(null)} disabled={deleting}>Cancelar</button>
                 <button className="btn danger" type="button" onClick={confirmDeleteOperation} disabled={deleting}>{deleting ? 'Eliminando…' : 'Eliminar'}</button>
@@ -590,7 +604,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
                       <button
                         className="iot-btn-icon danger"
                         type="button"
-                        onClick={() => setConfirmDelete({ id: operation.id, label: `${operation.type} · ${fmtDate(operation.operationDate)}` })}
+                        onClick={() => setConfirmDelete({ id: operation.id, label: `${operation.type} · ${fmtDate(operation.operationDate)}`, linkedTransactionId: operation.linkedTransactionId })}
                         title="Eliminar operación"
                       >
                         🗑️
