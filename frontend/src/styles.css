@@ -758,6 +758,52 @@ body {
   margin-bottom: 14px;
 }
 
+.w-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.w-chart-head .w-chart-title {
+  margin-bottom: 0;
+}
+
+.w-chart-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #eef6ff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.w-chart-mode-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.w-chart-mode-btn:hover {
+  color: var(--ink);
+}
+
+.w-chart-mode-btn.active {
+  background: var(--surface);
+  color: var(--brand);
+  box-shadow: 0 2px 8px rgba(15, 107, 180, 0.18);
+}
+
 /* ── Pie legend ─────────────────────────────────────────────────────────── */
 .w-legend {
   display: flex;

@@ -49,6 +49,7 @@ const fmtShortDate = (dateStr: string) =>
 
 export function WealthDashboard({ snapshots, onRefresh, refreshing }: Props) {
   const [selectedType, setSelectedType] = useState<WealthItemType | null>(null);
+  const [evolutionMode, setEvolutionMode] = useState<'total' | 'categorized'>('total');
 
   const latest  = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
   const previous = snapshots.length > 1 ? snapshots[snapshots.length - 2] : null;
@@ -67,6 +68,18 @@ export function WealthDashboard({ snapshots, onRefresh, refreshing }: Props) {
       value: config ? ((s[config.valueKey] as number) ?? 0) : s.totalValue,
     }));
   }, [snapshots, selectedType]);
+
+  const categorizedData = useMemo(() => {
+    return snapshots.map((s) => {
+      const row: Record<string, number | string> = {
+        date: fmtShortDate(s.snapshotDate),
+      };
+      TYPE_CONFIGS.forEach((c) => {
+        row[c.type] = (s[c.valueKey] as number) ?? 0;
+      });
+      return row;
+    });
+  }, [snapshots]);
 
   const pieData = useMemo(() => {
     if (!latest) return [];
@@ -159,13 +172,33 @@ export function WealthDashboard({ snapshots, onRefresh, refreshing }: Props) {
       {/* ── Charts ── */}
       <div className="w-charts-row">
         <div className="w-chart-card">
-          <div className="w-chart-title">
-            {selectedType
-              ? `${TYPE_CONFIGS.find((c) => c.type === selectedType)?.icon} Evolución — ${TYPE_CONFIGS.find((c) => c.type === selectedType)?.label}`
-              : '📈 Evolución del patrimonio'}
+          <div className="w-chart-head">
+            <div className="w-chart-title">
+              {evolutionMode === 'categorized'
+                ? '🧩 Evolución por categorías'
+                : selectedType
+                  ? `${TYPE_CONFIGS.find((c) => c.type === selectedType)?.icon} Evolución — ${TYPE_CONFIGS.find((c) => c.type === selectedType)?.label}`
+                  : '📈 Evolución del patrimonio'}
+            </div>
+            <div className="w-chart-mode-toggle" role="group" aria-label="Modo de evolución">
+              <button
+                type="button"
+                className={`w-chart-mode-btn${evolutionMode === 'total' ? ' active' : ''}`}
+                onClick={() => setEvolutionMode('total')}
+              >
+                Total
+              </button>
+              <button
+                type="button"
+                className={`w-chart-mode-btn${evolutionMode === 'categorized' ? ' active' : ''}`}
+                onClick={() => setEvolutionMode('categorized')}
+              >
+                Categorizado
+              </button>
+            </div>
           </div>
           <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={lineData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+            <AreaChart data={evolutionMode === 'categorized' ? categorizedData : lineData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor={lineColor} stopOpacity={0.18} />
@@ -179,16 +212,38 @@ export function WealthDashboard({ snapshots, onRefresh, refreshing }: Props) {
                 tickFormatter={(v) => `${(Number(v) / 1000).toFixed(0)}k`}
                 width={52}
               />
-              <Tooltip formatter={(v) => [fmtMoney(Number(v), latest!.currency), 'Valor']} />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke={lineColor}
-                strokeWidth={2.5}
-                fill="url(#wGrad)"
-                dot={{ r: 3.5, fill: lineColor, strokeWidth: 0 }}
-                activeDot={{ r: 5 }}
+              <Tooltip
+                formatter={(v, name) => {
+                  const conf = TYPE_CONFIGS.find((c) => c.type === name);
+                  return [fmtMoney(Number(v), latest!.currency), conf ? `${conf.icon} ${conf.label}` : 'Valor'];
+                }}
               />
+              {evolutionMode === 'categorized' ? (
+                TYPE_CONFIGS.map((c) => (
+                  <Area
+                    key={c.type}
+                    type="monotone"
+                    stackId="composition"
+                    dataKey={c.type}
+                    name={c.type}
+                    stroke={c.color}
+                    strokeWidth={1.5}
+                    fill={c.color}
+                    fillOpacity={0.72}
+                    isAnimationActive
+                  />
+                ))
+              ) : (
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke={lineColor}
+                  strokeWidth={2.5}
+                  fill="url(#wGrad)"
+                  dot={{ r: 3.5, fill: lineColor, strokeWidth: 0 }}
+                  activeDot={{ r: 5 }}
+                />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         </div>
