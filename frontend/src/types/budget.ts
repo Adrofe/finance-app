@@ -11,6 +11,7 @@ export type BudgetPlanLineRequest = {
 };
 
 export type BudgetPlanRequest = {
+  id?: number;
   name: string;
   description?: string;
   period: BudgetPeriod;

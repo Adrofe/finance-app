@@ -69,6 +69,7 @@ type CreatePlanModalProps = {
   onClose: () => void;
   onSave: (req: BudgetPlanRequest) => Promise<void>;
   saving: boolean;
+  initialPlan?: BudgetPlanDTO | null;
 };
 
 const emptyLine = (lineType: BudgetLineType = 'EXPENSE'): BudgetPlanLineRequest => ({
@@ -78,14 +79,24 @@ const emptyLine = (lineType: BudgetLineType = 'EXPENSE'): BudgetPlanLineRequest 
   lineType,
 });
 
-function CreatePlanModal({ accessToken, onClose, onSave, saving }: CreatePlanModalProps) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [period, setPeriod] = useState<BudgetPeriod>('MONTHLY');
-  const [currency, setCurrency] = useState('EUR');
-  const [startDate, setStartDate] = useState(firstDayOfMonth());
-  const [endDate, setEndDate] = useState(today());
-  const [lines, setLines] = useState<BudgetPlanLineRequest[]>([emptyLine('EXPENSE')]);
+function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: CreatePlanModalProps) {
+  const [name, setName] = useState(initialPlan?.name ?? '');
+  const [description, setDescription] = useState(initialPlan?.description ?? '');
+  const [period, setPeriod] = useState<BudgetPeriod>(initialPlan?.period ?? 'MONTHLY');
+  const [currency, setCurrency] = useState(initialPlan?.currency ?? 'EUR');
+  const [startDate, setStartDate] = useState(initialPlan?.startDate ?? firstDayOfMonth());
+  const [endDate, setEndDate] = useState(initialPlan?.endDate ?? today());
+  const [lines, setLines] = useState<BudgetPlanLineRequest[]>(
+    initialPlan?.lines?.length
+      ? initialPlan.lines.map(line => ({
+          categoryId: line.categoryId,
+          categoryCode: line.categoryCode,
+          categoryName: line.categoryName,
+          budgetAmount: line.budgetAmount,
+          lineType: line.lineType,
+        }))
+      : [emptyLine('EXPENSE')]
+  );
   const [error, setError] = useState<string | null>(null);
   const [lineTab, setLineTab] = useState<BudgetLineType>('EXPENSE');
 
@@ -164,6 +175,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving }: CreatePlanMod
       return;
     }
     const req: BudgetPlanRequest = {
+      id: initialPlan?.id,
       name: name.trim(),
       description: description.trim() || undefined,
       period,
@@ -179,7 +191,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving }: CreatePlanMod
     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal" style={{ width: 640, maxHeight: '90vh', overflowY: 'auto' }}>
         <div className="modal-header">
-          <h4>Nuevo plan de presupuesto</h4>
+          <h4>{initialPlan ? 'Editar plan de presupuesto' : 'Nuevo plan de presupuesto'}</h4>
           <button type="button" className="btn icon-btn" onClick={onClose} aria-label="Cerrar">✕</button>
         </div>
         <div className="modal-body" style={{ display: 'block', padding: '20px 24px' }}>
@@ -404,7 +416,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving }: CreatePlanMod
           <div className="bdg-modal-actions">
             <button type="button" className="btn" onClick={onClose}>Cancelar</button>
             <button type="button" className="btn primary" onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Guardando…' : 'Crear plan'}
+              {saving ? 'Guardando…' : initialPlan ? 'Guardar cambios' : 'Crear plan'}
             </button>
           </div>
         </div>
@@ -463,10 +475,11 @@ type PlanDetailProps = {
   plan: BudgetPlanDTO;
   token: string;
   onBack: () => void;
+  onEdit: (plan: BudgetPlanDTO) => void;
   onUnauthorized?: (msg: string) => void;
 };
 
-function PlanDetail({ plan, token, onBack, onUnauthorized }: PlanDetailProps) {
+function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailProps) {
   const [snapshot, setSnapshot] = useState<BudgetSnapshotDTO | null>(null);
   const [loadingSnap, setLoadingSnap] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -514,6 +527,7 @@ function PlanDetail({ plan, token, onBack, onUnauthorized }: PlanDetailProps) {
     <div className="bdg-detail">
       <div className="bdg-detail-topbar">
         <button type="button" className="btn small" onClick={onBack}>← Volver</button>
+        <button type="button" className="btn small" onClick={() => onEdit(plan)}>✎ Editar plan</button>
         <div className="bdg-detail-title">
           <h3>{plan.name}</h3>
           {plan.description && <p>{plan.description}</p>}
@@ -666,11 +680,12 @@ function PlanDetail({ plan, token, onBack, onUnauthorized }: PlanDetailProps) {
 type PlansGridProps = {
   plans: BudgetPlanDTO[];
   onSelect: (plan: BudgetPlanDTO) => void;
+  onEdit: (plan: BudgetPlanDTO) => void;
   onDelete: (planId: number) => Promise<void>;
   onNew: () => void;
 };
 
-function PlansGrid({ plans, onSelect, onDelete, onNew }: PlansGridProps) {
+function PlansGrid({ plans, onSelect, onEdit, onDelete, onNew }: PlansGridProps) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const handleDelete = async (e: React.MouseEvent, planId: number) => {
@@ -678,6 +693,11 @@ function PlansGrid({ plans, onSelect, onDelete, onNew }: PlansGridProps) {
     if (!window.confirm('¿Eliminar este plan de presupuesto?')) return;
     setDeletingId(planId);
     try { await onDelete(planId); } finally { setDeletingId(null); }
+  };
+
+  const handleEdit = (e: React.MouseEvent, plan: BudgetPlanDTO) => {
+    e.stopPropagation();
+    onEdit(plan);
   };
 
   return (
@@ -734,6 +754,12 @@ function PlansGrid({ plans, onSelect, onDelete, onNew }: PlansGridProps) {
                 <span className="bdg-card-hint">Clic para analizar →</span>
                 <button
                   type="button"
+                  className="btn icon-btn small"
+                  onClick={e => handleEdit(e, plan)}
+                  aria-label="Editar plan"
+                >✎</button>
+                <button
+                  type="button"
                   className="btn icon-btn danger small"
                   onClick={e => handleDelete(e, plan.id)}
                   disabled={deletingId === plan.id}
@@ -760,6 +786,7 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<BudgetPlanDTO | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<BudgetPlanDTO | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadPlans = useCallback(async () => {
@@ -781,11 +808,15 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
 
-  const handleCreate = async (req: BudgetPlanRequest) => {
+  const handleSavePlan = async (req: BudgetPlanRequest) => {
     setSaving(true);
     try {
-      await createBudgetPlan(token, req);
+      const saved = await createBudgetPlan(token, req);
       setShowCreate(false);
+      setEditingPlan(null);
+      if (selectedPlan?.id === saved.id) {
+        setSelectedPlan(saved);
+      }
       await loadPlans();
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
@@ -808,6 +839,11 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
     }
   };
 
+  const handleEditPlan = (plan: BudgetPlanDTO) => {
+    setEditingPlan(plan);
+    setShowCreate(true);
+  };
+
   return (
     <article className="sheet bdg-panel">
       <div className="sheet-header">
@@ -824,14 +860,16 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
             plan={selectedPlan}
             token={token}
             onBack={() => setSelectedPlan(null)}
+            onEdit={handleEditPlan}
             onUnauthorized={onUnauthorized}
           />
         ) : (
           <PlansGrid
             plans={plans}
             onSelect={setSelectedPlan}
+            onEdit={handleEditPlan}
             onDelete={handleDelete}
-            onNew={() => setShowCreate(true)}
+            onNew={() => { setEditingPlan(null); setShowCreate(true); }}
           />
         )
       )}
@@ -839,8 +877,9 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
       {showCreate && (
         <CreatePlanModal
           accessToken={token}
-          onClose={() => setShowCreate(false)}
-          onSave={handleCreate}
+          initialPlan={editingPlan}
+          onClose={() => { setShowCreate(false); setEditingPlan(null); }}
+          onSave={handleSavePlan}
           saving={saving}
         />
       )}
