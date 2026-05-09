@@ -10,7 +10,8 @@ import lombok.NoArgsConstructor;
 public class BankingAccountDTO {
     private Long id;
     private String name;
-    private Double balance;
+    private Double lastBalanceAvailable;
+    private Double lastBalanceReal;
     private String institutionName;
     private String iban;
     private String accountTypeName;

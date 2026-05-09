@@ -73,9 +73,7 @@ public class WealthIngestionService {
                 if (Boolean.FALSE.equals(account.getIsActive())) {
                     continue;
                 }
-                BigDecimal value = account.getBalance() != null
-                        ? BigDecimal.valueOf(account.getBalance())
-                        : BigDecimal.ZERO;
+                BigDecimal value = resolveAccountBalance(account);
                 String label = account.getName() != null ? account.getName() : "Account " + account.getId();
                 if (account.getInstitutionName() != null) {
                     label = label + " - " + account.getInstitutionName();
@@ -131,6 +129,15 @@ public class WealthIngestionService {
             log.error("Failed to fetch investments: {}", e.getMessage());
             return List.of();
         }
+    }
+
+    /**
+     * Picks the best available balance for a banking account:
+     * available balance > real balance > zero.
+     */
+    private BigDecimal resolveAccountBalance(BankingAccountDTO account) {
+        Double raw = account.getLastBalanceAvailable() != null ? account.getLastBalanceAvailable() : account.getLastBalanceReal();
+        return raw != null ? BigDecimal.valueOf(raw) : BigDecimal.ZERO;
     }
 
     /**

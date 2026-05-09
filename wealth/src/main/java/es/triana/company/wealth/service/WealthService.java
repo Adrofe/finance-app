@@ -58,7 +58,7 @@ public class WealthService {
         snapshot.getItems().clear();
 
         List<WealthSnapshotItem> items = buildItems(request.getItems(), snapshot, currency, now);
-        snapshot.setItems(items);
+        snapshot.getItems().addAll(items);
         
         wealthAggregator.aggregateAndSetTotals(snapshot, items);
 
