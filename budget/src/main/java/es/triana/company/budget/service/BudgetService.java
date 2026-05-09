@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import es.triana.company.budget.mapper.BudgetMapper;
 import es.triana.company.budget.model.BudgetLineType;
 import es.triana.company.budget.model.api.BankingCategoryDTO;
 import es.triana.company.budget.model.api.BankingTransactionDTO;
@@ -42,11 +43,13 @@ public class BudgetService {
     private final BudgetPlanRepository planRepository;
     private final BudgetSnapshotRepository snapshotRepository;
     private final BankingApiClient bankingApiClient;
+    private final BudgetMapper budgetMapper;
 
-    public BudgetService(BudgetPlanRepository planRepository, BudgetSnapshotRepository snapshotRepository, BankingApiClient bankingApiClient) {
+    public BudgetService(BudgetPlanRepository planRepository, BudgetSnapshotRepository snapshotRepository, BankingApiClient bankingApiClient, BudgetMapper budgetMapper) {
         this.planRepository = planRepository;
         this.snapshotRepository = snapshotRepository;
         this.bankingApiClient = bankingApiClient;
+        this.budgetMapper = budgetMapper;
     }
 
     @Transactional
@@ -98,7 +101,7 @@ public class BudgetService {
         }
 
         BudgetPlan saved = planRepository.save(plan);
-        return toPlanDto(saved);
+        return budgetMapper.toPlanDto(saved);
     }
 
     @Transactional(readOnly = true)
@@ -106,7 +109,7 @@ public class BudgetService {
         validateTenantId(tenantId);
         return planRepository.findAllByTenantIdOrderByNameAsc(tenantId)
                 .stream()
-                .map(this::toPlanDto)
+                .map(budgetMapper::toPlanDto)
                 .toList();
     }
 
@@ -115,7 +118,7 @@ public class BudgetService {
         validateTenantId(tenantId);
         BudgetPlan plan = planRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Budget plan not found"));
-        return toPlanDto(plan);
+        return budgetMapper.toPlanDto(plan);
     }
 
     @Transactional
@@ -267,7 +270,7 @@ public class BudgetService {
         snapshot.getLines().addAll(snapshotLines);
 
         BudgetSnapshot saved = snapshotRepository.save(snapshot);
-        return toSnapshotDto(saved);
+        return budgetMapper.toSnapshotDto(saved);
     }
 
     @Transactional(readOnly = true)
@@ -275,7 +278,7 @@ public class BudgetService {
         validateTenantId(tenantId);
         return snapshotRepository.findAllByTenantIdAndPlanIdOrderByPeriodStartDescGeneratedAtDesc(tenantId, planId)
                 .stream()
-                .map(this::toSnapshotDto)
+                .map(budgetMapper::toSnapshotDto)
                 .toList();
     }
 
@@ -284,7 +287,7 @@ public class BudgetService {
         validateTenantId(tenantId);
         BudgetSnapshot snapshot = snapshotRepository.findTopByTenantIdAndPlanIdOrderByPeriodStartDescGeneratedAtDesc(tenantId, planId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No budget snapshot found"));
-        return toSnapshotDto(snapshot);
+        return budgetMapper.toSnapshotDto(snapshot);
     }
 
     private Map<Long, BankingCategoryDTO> loadCategories(String bearerToken) {
@@ -339,66 +342,6 @@ public class BudgetService {
             }
         }
         return null;
-    }
-
-    private BudgetPlanDTO toPlanDto(BudgetPlan plan) {
-        return BudgetPlanDTO.builder()
-                .id(plan.getId())
-                .name(plan.getName())
-                .description(plan.getDescription())
-                .currency(plan.getCurrency())
-                .active(plan.getActive())
-                .lines(plan.getLines().stream()
-                        .map(this::toPlanLineDto)
-                        .toList())
-                .build();
-    }
-
-    private BudgetPlanLineDTO toPlanLineDto(BudgetPlanLine line) {
-        return BudgetPlanLineDTO.builder()
-                .id(line.getId())
-                .categoryId(line.getCategoryId())
-                .categoryCode(line.getCategoryCode())
-                .categoryName(line.getCategoryName())
-                .budgetAmount(line.getBudgetAmount())
-                .lineType(line.getLineType())
-                .build();
-    }
-
-    private BudgetSnapshotDTO toSnapshotDto(BudgetSnapshot snapshot) {
-        return BudgetSnapshotDTO.builder()
-                .id(snapshot.getId())
-                .budgetPlanId(snapshot.getPlan() != null ? snapshot.getPlan().getId() : null)
-                .periodStart(snapshot.getPeriodStart())
-                .periodEnd(snapshot.getPeriodEnd())
-                .generatedAt(snapshot.getGeneratedAt())
-                .totalBudget(snapshot.getTotalBudget())
-                .totalSpent(snapshot.getTotalSpent())
-                .variance(snapshot.getVariance())
-                .compliant(snapshot.getCompliant())
-                .totalExpectedIncome(snapshot.getTotalExpectedIncome())
-                .totalIncome(snapshot.getTotalIncome())
-                .incomeVariance(snapshot.getIncomeVariance())
-                .netBalance(snapshot.getNetBalance())
-                .lines(snapshot.getLines().stream()
-                        .map(this::toSnapshotLineDto)
-                        .toList())
-                .build();
-    }
-
-    private BudgetSnapshotLineDTO toSnapshotLineDto(BudgetSnapshotLine line) {
-        return BudgetSnapshotLineDTO.builder()
-                .id(line.getId())
-                .categoryId(line.getCategoryId())
-                .categoryCode(line.getCategoryCode())
-                .categoryName(line.getCategoryName())
-                .budgetAmount(line.getBudgetAmount())
-                .spentAmount(line.getSpentAmount())
-                .variance(line.getVariance())
-                .transactionCount(line.getTransactionCount())
-                .compliant(line.getCompliant())
-                .lineType(line.getLineType())
-                .build();
     }
 
     private static final class Accumulator {
