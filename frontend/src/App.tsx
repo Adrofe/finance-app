@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import { BankingSubTabs } from './components/BankingSubTabs';
+import { BudgetPanel } from './components/BudgetPanel';
 import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
 import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
 import { InvestmentsDashboard } from './components/InvestmentsDashboard';
@@ -89,6 +90,9 @@ function App() {
             </article>
           )}
 
+          {bankingSubTab === 'budget' && (
+            <BudgetPanel token={accessToken} onUnauthorized={handleUnauthorized} />
+          )}
 
         </section>
       )}
