@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.springframework.stereotype.Component;
 
 import es.triana.company.budget.model.BudgetLineType;
 import es.triana.company.budget.model.db.BudgetPlanLine;
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
  * Calculates snapshot lines and totals for budget snapshots.
  * Separates transaction accumulation from variance calculation.
  */
+@Component
 public class BudgetSnapshotCalculator {
 
     /**
