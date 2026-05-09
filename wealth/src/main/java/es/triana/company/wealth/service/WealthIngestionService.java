@@ -7,10 +7,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import es.triana.company.wealth.client.BankingApiClient;
@@ -63,28 +59,6 @@ public class WealthIngestionService {
         WealthSnapshotDTO result = wealthService.upsertSnapshot(tenantId, request);
         log.info("Snapshot refreshed for tenant {}: totalValue={}", tenantId, result.getTotalValue());
         return result;
-    }
-
-    /**
-     * Scheduled daily ingestion at 02:00.
-     * Runs with a system-level token — only works if the service has a client-credentials
-     * grant configured. When no JWT is available in context, this is skipped.
-     */
-    @Scheduled(cron = "${wealth.ingestion.cron:0 0 2 * * *}")
-    public void scheduledDailyRefresh() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!(auth instanceof JwtAuthenticationToken jwtAuth)) {
-            log.warn("Scheduled daily refresh skipped — no JWT in security context. " +
-                     "Use the manual /snapshots/refresh endpoint to trigger ingestion.");
-            return;
-        }
-        String token = jwtAuth.getToken().getTokenValue();
-        Long tenantId = extractTenantId(jwtAuth);
-        if (tenantId == null) {
-            log.warn("Scheduled daily refresh skipped — tenant_id not found in token.");
-            return;
-        }
-        refreshToday(tenantId, token);
     }
 
     // -------------------------------------------------------------------------
@@ -173,18 +147,4 @@ public class WealthIngestionService {
         return pos.getInvestedAmount();
     }
 
-    private Long extractTenantId(JwtAuthenticationToken jwtAuth) {
-        Object claim = jwtAuth.getToken().getClaims().get("tenant_id");
-        if (claim instanceof Number n) {
-            return n.longValue();
-        }
-        if (claim instanceof String s) {
-            try {
-                return Long.parseLong(s);
-            } catch (NumberFormatException ignored) {
-                // fall through
-            }
-        }
-        return null;
-    }
 }
