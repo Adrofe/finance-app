@@ -107,12 +107,9 @@ public class WealthService {
     @Transactional
     public void deleteSnapshot(Long tenantId, Long id) {
         wealthValidator.validateTenantId(tenantId);
-        WealthSnapshot snapshot = wealthSnapshotRepository.findById(id)
+        WealthSnapshot snapshot = wealthSnapshotRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Snapshot not found"));
-        if (!snapshot.getTenantId().equals(tenantId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied");
-        }
-        wealthSnapshotRepository.deleteById(id);
+        wealthSnapshotRepository.delete(snapshot);
     }
 
     @Transactional(readOnly = true)

@@ -81,7 +81,7 @@ public class WealthController {
     }
 
     @DeleteMapping("/snapshots/{id}")
-    public ResponseEntity<Void> deleteSnapshot(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteSnapshot(@PathVariable("id") Long id) {
         Long tenantId = tenantContext.getCurrentTenantId();
         wealthService.deleteSnapshot(tenantId, id);
         return ResponseEntity.noContent().build();

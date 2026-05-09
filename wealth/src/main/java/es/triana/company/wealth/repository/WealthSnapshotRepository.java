@@ -11,6 +11,8 @@ import es.triana.company.wealth.model.db.WealthSnapshot;
 
 public interface WealthSnapshotRepository extends JpaRepository<WealthSnapshot, Long> {
 
+    Optional<WealthSnapshot> findByIdAndTenantId(Long id, Long tenantId);
+
     @EntityGraph(attributePaths = "items")
     Optional<WealthSnapshot> findWithItemsByTenantIdAndSnapshotDate(Long tenantId, LocalDate snapshotDate);
 
