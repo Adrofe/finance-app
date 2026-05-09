@@ -21,6 +21,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import es.triana.company.budget.mapper.BudgetMapper;
 import es.triana.company.budget.model.BudgetLineType;
+import es.triana.company.budget.service.BudgetSnapshotCalculator.Accumulator;
+import es.triana.company.budget.service.BudgetSnapshotCalculator.TransactionAccumulators;
 import es.triana.company.budget.model.api.BankingCategoryDTO;
 import es.triana.company.budget.model.api.BankingTransactionDTO;
 import es.triana.company.budget.model.api.BudgetPlanDTO;
@@ -44,12 +46,16 @@ public class BudgetService {
     private final BudgetSnapshotRepository snapshotRepository;
     private final BankingApiClient bankingApiClient;
     private final BudgetMapper budgetMapper;
+    private final BudgetTransactionMatcher transactionMatcher;
+    private final BudgetSnapshotCalculator snapshotCalculator;
 
-    public BudgetService(BudgetPlanRepository planRepository, BudgetSnapshotRepository snapshotRepository, BankingApiClient bankingApiClient, BudgetMapper budgetMapper) {
+    public BudgetService(BudgetPlanRepository planRepository, BudgetSnapshotRepository snapshotRepository, BankingApiClient bankingApiClient, BudgetMapper budgetMapper, BudgetTransactionMatcher transactionMatcher, BudgetSnapshotCalculator snapshotCalculator) {
         this.planRepository = planRepository;
         this.snapshotRepository = snapshotRepository;
         this.bankingApiClient = bankingApiClient;
         this.budgetMapper = budgetMapper;
+        this.transactionMatcher = transactionMatcher;
+        this.snapshotCalculator = snapshotCalculator;
     }
 
     @Transactional
@@ -60,13 +66,7 @@ public class BudgetService {
         Map<Long, BankingCategoryDTO> categoriesById = loadCategories(bearerToken);
         LocalDateTime now = LocalDateTime.now();
 
-        BudgetPlan plan = request.getId() != null
-                ? planRepository.findByIdAndTenantId(request.getId(), tenantId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Budget plan not found"))
-                : BudgetPlan.builder()
-                    .tenantId(tenantId)
-                    .createdAt(now)
-                    .build();
+        BudgetPlan plan = loadOrCreatePlan(tenantId, request, now);
 
         plan.setUpdatedAt(now);
         plan.setName(request.getName().trim());
@@ -77,27 +77,7 @@ public class BudgetService {
         plan.getLines().clear();
         Set<String> seenKeys = new HashSet<>();
         for (BudgetPlanLineRequestDTO lineRequest : request.getLines()) {
-            BudgetLineType lineType = lineRequest.getLineType() != null ? lineRequest.getLineType() : BudgetLineType.EXPENSE;
-            String uniqueKey = lineType + ":" + lineRequest.getCategoryId();
-            if (!seenKeys.add(uniqueKey)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicated category in budget plan for type " + lineType);
-            }
-            BankingCategoryDTO category = categoriesById.get(lineRequest.getCategoryId());
-            if (category == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown category id: " + lineRequest.getCategoryId());
-            }
-            BigDecimal budgetAmount = normalizeAmount(lineRequest.getBudgetAmount());
-            BudgetPlanLine line = BudgetPlanLine.builder()
-                    .plan(plan)
-                    .categoryId(category.getId())
-                    .categoryCode(category.getCode())
-                    .categoryName(category.getName())
-                    .budgetAmount(budgetAmount)
-                    .lineType(lineType)
-                    .createdAt(now)
-                    .updatedAt(now)
-                    .build();
-            plan.getLines().add(line);
+            plan.getLines().add(buildPlanLine(plan, lineRequest, categoriesById, seenKeys, now));
         }
 
         BudgetPlan saved = planRepository.save(plan);
@@ -139,52 +119,14 @@ public class BudgetService {
         LocalDate periodEnd = endDate != null ? endDate : LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
 
-        List<BankingCategoryDTO> categories = bankingApiClient.getCategories(bearerToken);
-        Map<Long, BankingCategoryDTO> categoriesById = categories.stream()
-                .collect(LinkedHashMap::new, (map, category) -> map.put(category.getId(), category), Map::putAll);
-
+        Map<Long, BankingCategoryDTO> categoriesById = loadCategoriesMap(bearerToken);
         List<BankingTransactionDTO> transactions = bankingApiClient.getTransactions(bearerToken, periodStart, periodEnd);
 
-        // Separate plan lines by type
-        List<BudgetPlanLine> expenseLines = plan.getLines().stream()
-                .filter(l -> l.getLineType() != BudgetLineType.INCOME)
-                .toList();
-        List<BudgetPlanLine> incomeLines = plan.getLines().stream()
-                .filter(l -> l.getLineType() == BudgetLineType.INCOME)
-                .toList();
+        List<BudgetPlanLine> expenseLines = filterExpenseLines(plan.getLines());
+        List<BudgetPlanLine> incomeLines = filterIncomeLines(plan.getLines());
 
-        // Accumulators keyed by plan line id
-        Map<Long, Accumulator> expenseByLineId = new HashMap<>();
-        Map<Long, Accumulator> incomeByLineId = new HashMap<>();
-        for (BudgetPlanLine line : plan.getLines()) {
-            if (line.getLineType() == BudgetLineType.INCOME) {
-                incomeByLineId.put(line.getId(), new Accumulator());
-            } else {
-                expenseByLineId.put(line.getId(), new Accumulator());
-            }
-        }
-
-        for (BankingTransactionDTO transaction : transactions) {
-            if (transaction.getAmount() == null || transaction.getCategoryId() == null) continue;
-            BankingCategoryDTO txCategory = categoriesById.get(transaction.getCategoryId());
-            if (txCategory == null) continue;
-
-            if (transaction.getAmount() < 0) {
-                // Expense
-                BudgetPlanLine matched = matchLine(expenseLines, txCategory);
-                if (matched != null) {
-                    expenseByLineId.computeIfAbsent(matched.getId(), k -> new Accumulator())
-                            .add(BigDecimal.valueOf(transaction.getAmount()).abs());
-                }
-            } else if (transaction.getAmount() > 0) {
-                // Income
-                BudgetPlanLine matched = matchLine(incomeLines, txCategory);
-                if (matched != null) {
-                    incomeByLineId.computeIfAbsent(matched.getId(), k -> new Accumulator())
-                            .add(BigDecimal.valueOf(transaction.getAmount()));
-                }
-            }
-        }
+        TransactionAccumulators accumulators = snapshotCalculator.initializeAccumulators(plan.getLines());
+        processTransactions(transactions, categoriesById, expenseLines, incomeLines, accumulators);
 
         BudgetSnapshot snapshot = snapshotRepository
                 .findByTenantIdAndPlanIdAndPeriodStartAndPeriodEnd(tenantId, planId, periodStart, periodEnd)
@@ -200,74 +142,18 @@ public class BudgetService {
         snapshot.setUpdatedAt(now);
         snapshot.setGeneratedAt(now);
 
-        List<BudgetSnapshotLine> snapshotLines = new ArrayList<>();
-        BigDecimal totalBudget = BigDecimal.ZERO;
-        BigDecimal totalSpent = BigDecimal.ZERO;
-        BigDecimal totalExpectedIncome = BigDecimal.ZERO;
-        BigDecimal totalIncome = BigDecimal.ZERO;
+        // Calculate lines and totals
+        var expenseResult = snapshotCalculator.calculateExpenseLines(expenseLines, accumulators.expenseByLineId, snapshot, now);
+        var incomeResult = snapshotCalculator.calculateIncomeLines(incomeLines, accumulators.incomeByLineId, snapshot, now);
 
-        for (BudgetPlanLine planLine : sortedLines(expenseLines)) {
-            Accumulator acc = expenseByLineId.getOrDefault(planLine.getId(), new Accumulator());
-            BigDecimal spentAmount = acc.spent;
-            BigDecimal budgetAmount = planLine.getBudgetAmount();
-            BigDecimal variance = budgetAmount.subtract(spentAmount);
-            boolean compliant = spentAmount.compareTo(budgetAmount) <= 0;
+        List<BudgetSnapshotLine> allLines = new ArrayList<>();
+        allLines.addAll(expenseResult.lines);
+        allLines.addAll(incomeResult.lines);
 
-            totalBudget = totalBudget.add(budgetAmount);
-            totalSpent = totalSpent.add(spentAmount);
-
-            snapshotLines.add(BudgetSnapshotLine.builder()
-                    .snapshot(snapshot)
-                    .categoryId(planLine.getCategoryId())
-                    .categoryCode(planLine.getCategoryCode())
-                    .categoryName(planLine.getCategoryName())
-                    .budgetAmount(budgetAmount)
-                    .spentAmount(spentAmount)
-                    .variance(variance)
-                    .transactionCount(acc.count)
-                    .compliant(compliant)
-                    .lineType(BudgetLineType.EXPENSE)
-                    .createdAt(now)
-                    .updatedAt(now)
-                    .build());
-        }
-
-        for (BudgetPlanLine planLine : sortedLines(incomeLines)) {
-            Accumulator acc = incomeByLineId.getOrDefault(planLine.getId(), new Accumulator());
-            BigDecimal actualIncome = acc.spent;  // reuses the same accumulator field
-            BigDecimal expectedIncome = planLine.getBudgetAmount();
-            BigDecimal variance = actualIncome.subtract(expectedIncome); // positive = more than expected
-            boolean compliant = actualIncome.compareTo(expectedIncome) >= 0; // income compliant = received >= expected
-
-            totalExpectedIncome = totalExpectedIncome.add(expectedIncome);
-            totalIncome = totalIncome.add(actualIncome);
-
-            snapshotLines.add(BudgetSnapshotLine.builder()
-                    .snapshot(snapshot)
-                    .categoryId(planLine.getCategoryId())
-                    .categoryCode(planLine.getCategoryCode())
-                    .categoryName(planLine.getCategoryName())
-                    .budgetAmount(expectedIncome)
-                    .spentAmount(actualIncome)
-                    .variance(variance)
-                    .transactionCount(acc.count)
-                    .compliant(compliant)
-                    .lineType(BudgetLineType.INCOME)
-                    .createdAt(now)
-                    .updatedAt(now)
-                    .build());
-        }
-
-        snapshot.setTotalBudget(totalBudget);
-        snapshot.setTotalSpent(totalSpent);
-        snapshot.setVariance(totalBudget.subtract(totalSpent));
-        snapshot.setCompliant(totalSpent.compareTo(totalBudget) <= 0);
-        snapshot.setTotalExpectedIncome(totalExpectedIncome);
-        snapshot.setTotalIncome(totalIncome);
-        snapshot.setIncomeVariance(totalIncome.subtract(totalExpectedIncome));
-        snapshot.setNetBalance(totalIncome.subtract(totalSpent));
+        // Update snapshot totals
+        updateSnapshotTotals(snapshot, expenseResult, incomeResult);
         snapshot.getLines().clear();
-        snapshot.getLines().addAll(snapshotLines);
+        snapshot.getLines().addAll(allLines);
 
         BudgetSnapshot saved = snapshotRepository.save(snapshot);
         return budgetMapper.toSnapshotDto(saved);
@@ -295,6 +181,121 @@ public class BudgetService {
                 .collect(LinkedHashMap::new, (map, category) -> map.put(category.getId(), category), Map::putAll);
     }
 
+    private Map<Long, BankingCategoryDTO> loadCategoriesMap(String bearerToken) {
+        return loadCategories(bearerToken);
+    }
+
+    private List<BudgetPlanLine> filterExpenseLines(List<BudgetPlanLine> lines) {
+        return lines.stream()
+                .filter(l -> l.getLineType() != BudgetLineType.INCOME)
+                .toList();
+    }
+
+    private List<BudgetPlanLine> filterIncomeLines(List<BudgetPlanLine> lines) {
+        return lines.stream()
+                .filter(l -> l.getLineType() == BudgetLineType.INCOME)
+                .toList();
+    }
+
+    private void processTransactions(List<BankingTransactionDTO> transactions, Map<Long, BankingCategoryDTO> categoriesById, List<BudgetPlanLine> expenseLines, List<BudgetPlanLine> incomeLines,TransactionAccumulators accumulators) {
+        for (BankingTransactionDTO transaction : transactions) {
+            if (transaction.getAmount() == null || transaction.getCategoryId() == null) {
+                continue;
+            }
+
+            BankingCategoryDTO txCategory = categoriesById.get(transaction.getCategoryId());
+            if (txCategory == null) {
+                continue;
+            }
+
+            if (transaction.getAmount() < 0) {
+                accumulateExpense(transaction, expenseLines, accumulators.expenseByLineId, txCategory);
+            } else if (transaction.getAmount() > 0) {
+                accumulateIncome(transaction, incomeLines, accumulators.incomeByLineId, txCategory);
+            }
+        }
+    }
+
+    private void accumulateExpense(BankingTransactionDTO transaction, List<BudgetPlanLine> expenseLines,Map<Long, Accumulator> expenseByLineId, BankingCategoryDTO txCategory) {
+        BudgetPlanLine matched = transactionMatcher.findMatchingLine(expenseLines, txCategory);
+        if (matched != null) {
+            expenseByLineId.computeIfAbsent(matched.getId(), k -> new Accumulator())
+                    .add(BigDecimal.valueOf(transaction.getAmount()).abs());
+        }
+    }
+
+    private void accumulateIncome(BankingTransactionDTO transaction, List<BudgetPlanLine> incomeLines, Map<Long, Accumulator> incomeByLineId, BankingCategoryDTO txCategory) {
+        BudgetPlanLine matched = transactionMatcher.findMatchingLine(incomeLines, txCategory);
+        if (matched != null) {
+            incomeByLineId.computeIfAbsent(matched.getId(), k -> new Accumulator())
+                    .add(BigDecimal.valueOf(transaction.getAmount()));
+        }
+    }
+
+    private void updateSnapshotTotals(BudgetSnapshot snapshot, BudgetSnapshotCalculator.SnapshotCalculationResult expenseResult, BudgetSnapshotCalculator.SnapshotCalculationResult incomeResult) {
+        snapshot.setTotalBudget(expenseResult.totalBudget);
+        snapshot.setTotalSpent(expenseResult.totalSpent);
+        snapshot.setVariance(expenseResult.totalBudget.subtract(expenseResult.totalSpent));
+        snapshot.setCompliant(expenseResult.totalSpent.compareTo(expenseResult.totalBudget) <= 0);
+        snapshot.setTotalExpectedIncome(incomeResult.totalExpectedIncome);
+        snapshot.setTotalIncome(incomeResult.totalIncome);
+        snapshot.setIncomeVariance(incomeResult.totalIncome.subtract(incomeResult.totalExpectedIncome));
+        snapshot.setNetBalance(incomeResult.totalIncome.subtract(expenseResult.totalSpent));
+    }
+
+    private BudgetPlan loadOrCreatePlan(Long tenantId, BudgetPlanRequestDTO request, LocalDateTime now) {
+        if (request.getId() != null) {
+            return planRepository.findByIdAndTenantId(request.getId(), tenantId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Budget plan not found"));
+        }
+
+        return BudgetPlan.builder()
+                .tenantId(tenantId)
+                .createdAt(now)
+                .build();
+    }
+
+    private BudgetPlanLine buildPlanLine(BudgetPlan plan, BudgetPlanLineRequestDTO lineRequest, Map<Long, BankingCategoryDTO> categoriesById, Set<String> seenKeys,LocalDateTime now) {
+        BudgetLineType lineType = resolveLineType(lineRequest);
+        validateUniqueLineCategory(lineRequest, seenKeys, lineType);
+        BankingCategoryDTO category = getCategoryOrThrow(categoriesById, lineRequest.getCategoryId());
+
+        return createPlanLine(plan, lineRequest, category, lineType, now);
+    }
+
+    private BudgetPlanLine createPlanLine(BudgetPlan plan, BudgetPlanLineRequestDTO lineRequest, BankingCategoryDTO category, BudgetLineType lineType, LocalDateTime now) {
+        return BudgetPlanLine.builder()
+                .plan(plan)
+                .categoryId(category.getId())
+                .categoryCode(category.getCode())
+                .categoryName(category.getName())
+                .budgetAmount(normalizeAmount(lineRequest.getBudgetAmount()))
+                .lineType(lineType)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+    }
+
+    private BudgetLineType resolveLineType(BudgetPlanLineRequestDTO lineRequest) {
+        return lineRequest.getLineType() != null ? lineRequest.getLineType() : BudgetLineType.EXPENSE;
+    }
+
+    private void validateUniqueLineCategory(BudgetPlanLineRequestDTO lineRequest, Set<String> seenKeys, BudgetLineType lineType) {
+        String uniqueKey = lineType + ":" + lineRequest.getCategoryId();
+        if (!seenKeys.add(uniqueKey)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Duplicated category in budget plan for type " + lineType);
+        }
+    }
+
+    private BankingCategoryDTO getCategoryOrThrow(Map<Long, BankingCategoryDTO> categoriesById, Long categoryId) {
+        BankingCategoryDTO category = categoriesById.get(categoryId);
+        if (category == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown category id: " + categoryId);
+        }
+
+        return category;
+    }
+
     private void validateTenantId(Long tenantId) {
         if (tenantId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tenant id is required");
@@ -316,41 +317,5 @@ public class BudgetService {
             return BigDecimal.ZERO;
         }
         return amount.abs().setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private List<BudgetPlanLine> sortedLines(List<BudgetPlanLine> lines) {
-        return lines.stream()
-                .sorted(Comparator.comparingInt((BudgetPlanLine line) -> line.getCategoryCode() != null ? line.getCategoryCode().length() : 0).reversed())
-                .toList();
-    }
-
-    private BudgetPlanLine matchLine(List<BudgetPlanLine> lines, BankingCategoryDTO transactionCategory) {
-        List<BudgetPlanLine> sorted = sortedLines(lines);
-        for (BudgetPlanLine line : sorted) {
-            if (line.getCategoryId().equals(transactionCategory.getId())) {
-                return line;
-            }
-        }
-        String txCode = transactionCategory.getCode();
-        if (txCode == null || txCode.isBlank()) {
-            return null;
-        }
-        for (BudgetPlanLine line : sorted) {
-            String lineCode = line.getCategoryCode();
-            if (lineCode != null && (txCode.equals(lineCode) || txCode.startsWith(lineCode + "."))) {
-                return line;
-            }
-        }
-        return null;
-    }
-
-    private static final class Accumulator {
-        private BigDecimal spent = BigDecimal.ZERO;
-        private long count = 0;
-
-        private void add(BigDecimal amount) {
-            this.spent = this.spent.add(amount);
-            this.count += 1;
-        }
     }
 }
