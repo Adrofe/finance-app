@@ -6,6 +6,9 @@ import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,6 +20,7 @@ import es.triana.company.wealth.model.api.ApiResponse;
 import es.triana.company.wealth.model.api.WealthSnapshotCreateRequestDTO;
 import es.triana.company.wealth.model.api.WealthSnapshotDTO;
 import es.triana.company.wealth.security.TenantContext;
+import es.triana.company.wealth.service.WealthIngestionService;
 import es.triana.company.wealth.service.WealthService;
 import jakarta.validation.Valid;
 
@@ -25,10 +29,14 @@ import jakarta.validation.Valid;
 public class WealthController {
 
     private final WealthService wealthService;
+    private final WealthIngestionService wealthIngestionService;
     private final TenantContext tenantContext;
 
-    public WealthController(WealthService wealthService, TenantContext tenantContext) {
+    public WealthController(WealthService wealthService,
+                            WealthIngestionService wealthIngestionService,
+                            TenantContext tenantContext) {
         this.wealthService = wealthService;
+        this.wealthIngestionService = wealthIngestionService;
         this.tenantContext = tenantContext;
     }
 
@@ -54,5 +62,27 @@ public class WealthController {
         WealthSnapshotDTO snapshot = wealthService.getLatest(tenantId, includeItems);
         ApiResponse<WealthSnapshotDTO> response = new ApiResponse<>(200, "Latest wealth snapshot retrieved", snapshot);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Forces re-ingestion from Banking and Investments for today.
+     * The underlying upsert guarantees only one snapshot exists per tenant per day —
+     * repeated calls on the same day simply overwrite the existing snapshot.
+     */
+    @PostMapping("/snapshots/refresh")
+    public ResponseEntity<ApiResponse<WealthSnapshotDTO>> refreshToday() {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        String bearerToken = extractBearerToken();
+        WealthSnapshotDTO snapshot = wealthIngestionService.refreshToday(tenantId, bearerToken);
+        ApiResponse<WealthSnapshotDTO> response = new ApiResponse<>(200, "Wealth snapshot refreshed from Banking + Investments", snapshot);
+        return ResponseEntity.ok(response);
+    }
+
+    private String extractBearerToken() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof JwtAuthenticationToken jwtAuth) {
+            return jwtAuth.getToken().getTokenValue();
+        }
+        throw new IllegalStateException("No JWT token found in security context");
     }
 }
