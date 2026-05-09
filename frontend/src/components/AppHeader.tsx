@@ -3,6 +3,7 @@ import type { AppTab } from '../types/banking';
 const TABS: { id: AppTab; label: string; icon: string; description: string }[] = [
   { id: 'banking', label: 'Banking', icon: '🏦', description: 'Accounts & transactions' },
   { id: 'investments', label: 'Investments', icon: '📊', description: 'Portfolio & operations' },
+  { id: 'wealth', label: 'Wealth', icon: '💎', description: 'Net worth & patrimony' },
 ];
 
 type AppHeaderProps = {

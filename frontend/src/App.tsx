@@ -9,6 +9,7 @@ import { InvestmentOperationsTable } from './components/InvestmentOperationsTabl
 import { LoginForm } from './components/LoginForm';
 import { AppHeader } from './components/AppHeader';
 import { TransactionsTable } from './components/TransactionsTable';
+import { WealthPanel } from './components/WealthPanel';
 import { KEYCLOAK_REALM } from './config/env';
 import { useAuth } from './hooks/useAuth';
 import { useTransactions } from './hooks/useTransactions';
@@ -135,6 +136,10 @@ function App() {
             <InvestmentCatalogTable token={accessToken} onUnauthorized={handleUnauthorized} />
           )}
         </section>
+      )}
+
+      {activeTab === 'wealth' && (
+        <WealthPanel token={accessToken} onUnauthorized={handleUnauthorized} />
       )}
 
 
