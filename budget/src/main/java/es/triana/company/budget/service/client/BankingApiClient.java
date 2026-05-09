@@ -27,7 +27,7 @@ public class BankingApiClient {
     public List<BankingCategoryDTO> getCategories(String bearerToken) {
         BankingApiResponse<List<BankingCategoryDTO>> response = restClient.get()
                 .uri("/v1/api/categories")
-                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .header(HttpHeaders.AUTHORIZATION, normalizeAuthorizationHeader(bearerToken))
                 .retrieve()
                 .body(new ParameterizedTypeReference<BankingApiResponse<List<BankingCategoryDTO>>>() {});
         return response != null && response.getData() != null ? response.getData() : List.of();
@@ -36,10 +36,17 @@ public class BankingApiClient {
     public List<BankingTransactionDTO> getTransactions(String bearerToken, LocalDate startDate, LocalDate endDate) {
         BankingApiResponse<List<BankingTransactionDTO>> response = restClient.get()
             .uri(uriBuilder -> buildTransactionsDateRangeUri(uriBuilder, startDate, endDate))
-            .header(HttpHeaders.AUTHORIZATION, bearerToken)
+            .header(HttpHeaders.AUTHORIZATION, normalizeAuthorizationHeader(bearerToken))
             .retrieve()
             .body(new ParameterizedTypeReference<BankingApiResponse<List<BankingTransactionDTO>>>() {});
         return response != null && response.getData() != null ? response.getData() : List.of();
+    }
+
+    private String normalizeAuthorizationHeader(String bearerToken) {
+        if (bearerToken == null || bearerToken.isBlank()) {
+            return bearerToken;
+        }
+        return bearerToken.startsWith("Bearer ") ? bearerToken : "Bearer " + bearerToken;
     }
 
         private URI buildTransactionsDateRangeUri(UriBuilder uriBuilder, LocalDate startDate, LocalDate endDate) {
