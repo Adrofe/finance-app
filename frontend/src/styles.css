@@ -1730,9 +1730,12 @@ body {
 .bdg-lines-table { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .bdg-lines-row {
   display: grid;
-  grid-template-columns: 1fr 1.5fr 120px 36px;
+  grid-template-columns: minmax(320px, 1fr) 96px 36px;
   gap: 8px;
   align-items: center;
+}
+.bdg-cat-trigger {
+  width: 100%;
 }
 .bdg-lines-head {
   font-size: 0.75rem;
@@ -1757,7 +1760,7 @@ body {
   .bdg-snap-summary         { grid-template-columns: 1fr 1fr; }
   .bdg-plans-header         { flex-direction: column; }
   .bdg-detail-topbar        { flex-direction: column; }
-  .bdg-lines-row            { grid-template-columns: 1fr 1fr; }
+  .bdg-lines-row            { grid-template-columns: minmax(0, 1fr) 88px 36px; }
   .bdg-lines-head           { display: none; }
   .bdg-snap-line-header     { flex-direction: column; align-items: flex-start; }
   .bdg-refresh-bar          { flex-direction: column; align-items: stretch; }
