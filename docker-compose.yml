@@ -21,6 +21,17 @@ services:
     networks:
       - finance-net
 
+  wealth:
+    build:
+      context: .
+      dockerfile: wealth/Dockerfile
+    env_file:
+      - ./wealth/.env
+    ports:
+      - "8083:8083"
+    networks:
+      - finance-net
+
   frontend:
     build:
       context: ./frontend
@@ -32,6 +43,7 @@ services:
     depends_on:
       - banking
       - investments
+      - wealth
     ports:
       - "${FRONTEND_PORT:-5173}:80"
     networks:
