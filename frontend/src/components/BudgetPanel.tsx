@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createBudgetPlan,
   deleteBudgetPlan,
@@ -7,6 +7,9 @@ import {
   fetchLatestSnapshot,
   refreshBudgetSnapshot,
 } from '../services/budgetService';
+import { CatalogService } from '../services/catalogService';
+import type { TransactionCategory } from '../services/catalogService';
+import { getCategoryVisual } from '../constants/visualConfig';
 import type {
   BudgetLineType,
   BudgetPeriod,
@@ -62,6 +65,7 @@ function firstDayOfMonth(): string {
 
 /* ── Plan creation modal ─────────────────────────────────────────────────── */
 type CreatePlanModalProps = {
+  accessToken: string;
   onClose: () => void;
   onSave: (req: BudgetPlanRequest) => Promise<void>;
   saving: boolean;
@@ -74,7 +78,7 @@ const emptyLine = (lineType: BudgetLineType = 'EXPENSE'): BudgetPlanLineRequest 
   lineType,
 });
 
-function CreatePlanModal({ onClose, onSave, saving }: CreatePlanModalProps) {
+function CreatePlanModal({ accessToken, onClose, onSave, saving }: CreatePlanModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [period, setPeriod] = useState<BudgetPeriod>('MONTHLY');
@@ -84,6 +88,65 @@ function CreatePlanModal({ onClose, onSave, saving }: CreatePlanModalProps) {
   const [lines, setLines] = useState<BudgetPlanLineRequest[]>([emptyLine('EXPENSE')]);
   const [error, setError] = useState<string | null>(null);
   const [lineTab, setLineTab] = useState<BudgetLineType>('EXPENSE');
+
+  // Category picker
+  const [categories, setCategories] = useState<TransactionCategory[]>([]);
+  const [activePickerIdx, setActivePickerIdx] = useState<number | null>(null);
+  const [categorySearch, setCategorySearch] = useState('');
+  const pickerDialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    CatalogService.fetchCategories(accessToken).then(setCategories).catch(() => {});
+  }, [accessToken]);
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (activePickerIdx === null) return;
+    const handle = (e: MouseEvent) => {
+      if (pickerDialogRef.current && !pickerDialogRef.current.contains(e.target as Node)) {
+        setActivePickerIdx(null);
+        setCategorySearch('');
+      }
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [activePickerIdx]);
+
+  const parentCategories = categories.filter(c => !c.parentId);
+  const childCategoriesMap = categories.reduce<Record<number, TransactionCategory[]>>((acc, cat) => {
+    if (cat.parentId) {
+      if (!acc[cat.parentId]) acc[cat.parentId] = [];
+      acc[cat.parentId].push(cat);
+    }
+    return acc;
+  }, {});
+
+  const filteredParents = parentCategories.filter(p => {
+    if (!categorySearch.trim()) return true;
+    const q = categorySearch.toLowerCase();
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.code?.toLowerCase().includes(q) ||
+      (childCategoriesMap[p.id] || []).some(c => c.name.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q))
+    );
+  });
+
+  const getVisibleChildren = (parentId: number): TransactionCategory[] => {
+    const children = childCategoriesMap[parentId] || [];
+    if (!categorySearch.trim()) return children;
+    const q = categorySearch.toLowerCase();
+    return children.filter(c => c.name.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q));
+  };
+
+  const pickCategory = (lineIdx: number, cat: TransactionCategory | null) => {
+    setLines(prev => prev.map((l, i) =>
+      i === lineIdx
+        ? { ...l, categoryId: cat?.id, categoryCode: cat?.code ?? '', categoryName: cat?.name ?? '' }
+        : l
+    ));
+    setActivePickerIdx(null);
+    setCategorySearch('');
+  };
 
   const updateLine = (i: number, field: keyof BudgetPlanLineRequest, value: string | number) => {
     setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [field]: value } : l));
@@ -189,8 +252,7 @@ function CreatePlanModal({ onClose, onSave, saving }: CreatePlanModalProps) {
 
           <div className="bdg-lines-table">
             <div className="bdg-lines-row bdg-lines-head">
-              <span>Código categoría</span>
-              <span>Nombre</span>
+              <span>Categoría</span>
               <span>{lineTab === 'INCOME' ? 'Ingreso esperado' : 'Importe'}</span>
               <span />
             </div>
@@ -199,40 +261,143 @@ function CreatePlanModal({ onClose, onSave, saving }: CreatePlanModalProps) {
                 <span>Sin líneas de {lineTab === 'INCOME' ? 'ingresos' : 'gastos'}. Pulsa "+ Añadir línea".</span>
               </div>
             )}
-            {visibleLines.map((line) => (
-              <div key={line._idx} className="bdg-lines-row">
-                <input
-                  type="text"
-                  className="bdg-input small"
-                  placeholder={lineTab === 'INCOME' ? 'SALARY' : 'FOOD'}
-                  value={line.categoryCode}
-                  onChange={e => updateLine(line._idx, 'categoryCode', e.target.value.toUpperCase())}
-                />
-                <input
-                  type="text"
-                  className="bdg-input small"
-                  placeholder={lineTab === 'INCOME' ? 'Salario' : 'Alimentación'}
-                  value={line.categoryName}
-                  onChange={e => updateLine(line._idx, 'categoryName', e.target.value)}
-                />
-                <input
-                  type="number"
-                  className="bdg-input small"
-                  min={0}
-                  step={10}
-                  placeholder="0"
-                  value={line.budgetAmount || ''}
-                  onChange={e => updateLine(line._idx, 'budgetAmount', parseFloat(e.target.value) || 0)}
-                />
-                <button
-                  type="button"
-                  className="btn icon-btn danger"
-                  onClick={() => removeLine(line._idx)}
-                  aria-label="Eliminar línea"
-                >✕</button>
-              </div>
-            ))}
+            {visibleLines.map((line) => {
+              const selectedCat = categories.find(c => c.id === line.categoryId);
+              const isPickerOpen = activePickerIdx === line._idx;
+              return (
+                <div key={line._idx} className="bdg-lines-row">
+                  {/* Category picker trigger */}
+                  <button
+                    type="button"
+                    className={'category-trigger bdg-cat-trigger' + (isPickerOpen ? ' active' : '')}
+                    onClick={() => {
+                      setActivePickerIdx(isPickerOpen ? null : line._idx);
+                      setCategorySearch('');
+                    }}
+                  >
+                    {selectedCat ? (
+                      <span className="category-trigger-value">
+                        <span>{getCategoryVisual(selectedCat.code || selectedCat.name).emoji}</span>
+                        <span>
+                          {selectedCat.parentName
+                            ? selectedCat.parentName + ' › ' + selectedCat.name
+                            : selectedCat.name}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="category-trigger-placeholder">
+                        {lineTab === 'INCOME' ? 'Ej: Salario' : 'Ej: Alimentación'}
+                      </span>
+                    )}
+                    <span className="category-trigger-arrow">{isPickerOpen ? '▲' : '▼'}</span>
+                  </button>
+
+                  <input
+                    type="number"
+                    className="bdg-input small"
+                    min={0}
+                    step={10}
+                    placeholder="0"
+                    value={line.budgetAmount || ''}
+                    onChange={e => updateLine(line._idx, 'budgetAmount', parseFloat(e.target.value) || 0)}
+                  />
+                  <button
+                    type="button"
+                    className="btn icon-btn danger"
+                    onClick={() => removeLine(line._idx)}
+                    aria-label="Eliminar línea"
+                  >✕</button>
+                </div>
+              );
+            })}
           </div>
+
+          {/* Category picker floating dialog — rendered once, outside the lines table */}
+          {activePickerIdx !== null && (
+            <div
+              className="category-picker-overlay"
+              onClick={() => { setActivePickerIdx(null); setCategorySearch(''); }}
+            >
+              <div
+                ref={pickerDialogRef}
+                className="category-picker-dialog"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="category-picker-header">
+                  <span>Seleccionar categoría</span>
+                  <button
+                    type="button"
+                    className="category-picker-close"
+                    onClick={() => { setActivePickerIdx(null); setCategorySearch(''); }}
+                  >×</button>
+                </div>
+
+                <div className="category-picker-search-bar">
+                  <span className="category-search-icon">🔍</span>
+                  <input
+                    className="category-search-input"
+                    placeholder="Filtrar categorías..."
+                    value={categorySearch}
+                    onChange={e => setCategorySearch(e.target.value)}
+                    autoFocus
+                  />
+                  {categorySearch && (
+                    <button type="button" className="category-search-clear" onClick={() => setCategorySearch('')}>×</button>
+                  )}
+                </div>
+
+                <div className="category-picker-list">
+                  <div
+                    className={'category-none-item' + (!lines[activePickerIdx]?.categoryId ? ' selected' : '')}
+                    onClick={() => pickCategory(activePickerIdx, null)}
+                  >
+                    Sin categoría
+                  </div>
+
+                  <div className="category-picker-grid">
+                    {filteredParents.map(parent => {
+                      const pv = getCategoryVisual(parent.code || parent.name);
+                      const children = getVisibleChildren(parent.id);
+                      const totalChildren = (childCategoriesMap[parent.id] || []).length;
+                      return (
+                        <div key={parent.id} className="category-group">
+                          <div
+                            className={'category-parent-row' + (lines[activePickerIdx]?.categoryId === parent.id ? ' selected' : '')}
+                            onClick={() => pickCategory(activePickerIdx, parent)}
+                          >
+                            <span className="cat-emoji">{pv.emoji}</span>
+                            <span className="cat-name">{parent.name}</span>
+                            {totalChildren > 0 && (
+                              <span className="cat-count">{totalChildren}</span>
+                            )}
+                          </div>
+                          {children.map(child => {
+                            const cv = getCategoryVisual(child.code || child.name);
+                            return (
+                              <div
+                                key={child.id}
+                                className={'category-child-row' + (lines[activePickerIdx]?.categoryId === child.id ? ' selected' : '')}
+                                onClick={() => pickCategory(activePickerIdx, child)}
+                              >
+                                <span className="cat-emoji">{cv.emoji}</span>
+                                <span className="cat-name">{child.name}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {filteredParents.length === 0 && (
+                    <div className="category-no-results">
+                      Sin resultados para "{categorySearch}"
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {error && <p className="bdg-form-error">{error}</p>}
 
@@ -673,6 +838,7 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
 
       {showCreate && (
         <CreatePlanModal
+          accessToken={token}
           onClose={() => setShowCreate(false)}
           onSave={handleCreate}
           saving={saving}
