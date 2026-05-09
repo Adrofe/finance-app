@@ -32,5 +32,5 @@ export type CreateTransactionRequest = {
   typeId?: number;
 };
 
-export type AppTab = 'banking' | 'investments';
+export type AppTab = 'banking' | 'investments' | 'wealth';
 export type BankingSubTab = 'dashboard' | 'accounts' | 'transactions';
