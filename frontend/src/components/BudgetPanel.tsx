@@ -1,5 +1,8 @@
 import axios from 'axios';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
 import {
   createBudgetPlan,
   deleteBudgetPlan,
@@ -61,6 +64,37 @@ function firstDayOfMonth(): string {
   const d = new Date();
   d.setDate(1);
   return d.toISOString().slice(0, 10);
+}
+
+const toISO = (d: Date) => d.toISOString().slice(0, 10);
+
+type BudgetPreset = 'this-month' | 'last-month' | '3-months' | '6-months' | 'this-year' | 'custom';
+
+const BUDGET_PRESET_LABELS: Record<BudgetPreset, string> = {
+  'this-month':  'Este mes',
+  'last-month':  'Mes anterior',
+  '3-months':    'Últimos 3m',
+  '6-months':    'Últimos 6m',
+  'this-year':   'Este año',
+  'custom':      'Personalizado',
+};
+
+const BUDGET_PRESETS: BudgetPreset[] = [
+  'this-month', 'last-month', '3-months', '6-months', 'this-year', 'custom',
+];
+
+function getBudgetPresetDates(p: BudgetPreset): { start: string; end: string } {
+  const t = new Date();
+  const y = t.getFullYear();
+  const m = t.getMonth();
+  switch (p) {
+    case 'this-month':  return { start: toISO(new Date(y, m, 1)),     end: toISO(t) };
+    case 'last-month':  return { start: toISO(new Date(y, m - 1, 1)), end: toISO(new Date(y, m, 0)) };
+    case '3-months':    return { start: toISO(new Date(y, m - 2, 1)), end: toISO(t) };
+    case '6-months':    return { start: toISO(new Date(y, m - 5, 1)), end: toISO(t) };
+    case 'this-year':   return { start: toISO(new Date(y, 0, 1)),     end: toISO(t) };
+    default:            return { start: '', end: '' };
+  }
 }
 
 /* ── Plan creation modal ─────────────────────────────────────────────────── */
@@ -484,8 +518,10 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
   const [loadingSnap, setLoadingSnap] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [startDate, setStartDate] = useState(firstDayOfMonth());
-  const [endDate, setEndDate] = useState(today());
+  const [preset, setPreset] = useState<BudgetPreset>('this-month');
+  const [startDate, setStartDate] = useState(() => getBudgetPresetDates('this-month').start);
+  const [endDate, setEndDate] = useState(() => getBudgetPresetDates('this-month').end);
+  const [chartView, setChartView] = useState<'subcategory' | 'parent'>('subcategory');
 
   const loadSnapshot = useCallback(async () => {
     try {
@@ -503,12 +539,21 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
 
   useEffect(() => { loadSnapshot(); }, [loadSnapshot]);
 
-  const handleRefresh = async () => {
+  // Re-run refresh whenever the plan object is replaced (e.g. after editing)
+  const prevPlanRef = useRef(plan);
+  useEffect(() => {
+    if (prevPlanRef.current !== plan) {
+      prevPlanRef.current = plan;
+      doRefresh(startDate, endDate);
+    }
+  });
+
+  const doRefresh = useCallback(async (start: string, end: string) => {
     setError(null);
-    if (!startDate || !endDate) { setError('Selecciona un rango de fechas'); return; }
+    if (!start || !end) { setError('Selecciona un rango de fechas'); return; }
     try {
       setRefreshing(true);
-      const snap = await refreshBudgetSnapshot(token, plan.id, startDate, endDate);
+      const snap = await refreshBudgetSnapshot(token, plan.id, start, end);
       setSnapshot(snap);
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
@@ -519,9 +564,49 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
     } finally {
       setRefreshing(false);
     }
+  }, [token, plan.id, onUnauthorized]);
+
+  const handleRefresh = () => doRefresh(startDate, endDate);
+
+  const handlePreset = (p: BudgetPreset) => {
+    setPreset(p);
+    if (p !== 'custom') {
+      const { start, end } = getBudgetPresetDates(p);
+      setStartDate(start);
+      setEndDate(end);
+      doRefresh(start, end);
+    }
   };
 
   const totalProgress = snapshot ? pct(snapshot.totalSpent, snapshot.totalBudget) : 0;
+
+  const expenseChartData = useMemo(() => {
+    if (!snapshot) return [];
+    const expenseLines = snapshot.lines.filter(l => l.lineType !== 'INCOME');
+    if (chartView === 'subcategory') {
+      return expenseLines.map(l => ({
+        name: l.categoryName || l.categoryCode,
+        Presupuesto: Number(l.budgetAmount) || 0,
+        Gastado: Number(l.spentAmount) || 0,
+      }));
+    }
+    const map = new Map<string, { name: string; Presupuesto: number; Gastado: number }>();
+    for (const l of expenseLines) {
+      const parent = l.categoryCode ? l.categoryCode.split('.')[0] : (l.categoryName || 'OTRO');
+      const existing = map.get(parent);
+      if (existing) {
+        existing.Presupuesto += Number(l.budgetAmount) || 0;
+        existing.Gastado += Number(l.spentAmount) || 0;
+      } else {
+        map.set(parent, {
+          name: getCategoryEmoji(parent) + ' ' + parent,
+          Presupuesto: Number(l.budgetAmount) || 0,
+          Gastado: Number(l.spentAmount) || 0,
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [snapshot, chartView]);
 
   return (
     <div className="bdg-detail">
@@ -535,24 +620,44 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
         <span className="bdg-period-pill">{PERIOD_LABELS[plan.period]}</span>
       </div>
 
-      {/* Date range + refresh */}
+      {/* Period preset buttons + date range + refresh */}
       <div className="bdg-refresh-bar">
-        <div className="bdg-date-group">
-          <label>Desde</label>
-          <input type="date" className="bdg-input small" value={startDate} onChange={e => setStartDate(e.target.value)} />
+        <div className="bdg-presets">
+          {BUDGET_PRESETS.map(p => (
+            <button
+              key={p}
+              type="button"
+              className={`bdg-preset-btn${preset === p ? ' active' : ''}`}
+              onClick={() => handlePreset(p)}
+              disabled={refreshing}
+            >
+              {BUDGET_PRESET_LABELS[p]}
+            </button>
+          ))}
         </div>
-        <div className="bdg-date-group">
-          <label>Hasta</label>
-          <input type="date" className="bdg-input small" value={endDate} onChange={e => setEndDate(e.target.value)} />
-        </div>
-        <button
-          type="button"
-          className="btn primary"
-          onClick={handleRefresh}
-          disabled={refreshing}
-        >
-          {refreshing ? '⟳ Calculando…' : '⟳ Calcular'}
-        </button>
+        {preset === 'custom' && (
+          <>
+            <div className="bdg-date-group">
+              <label>Desde</label>
+              <input type="date" className="bdg-input small" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </div>
+            <div className="bdg-date-group">
+              <label>Hasta</label>
+              <input type="date" className="bdg-input small" value={endDate} onChange={e => setEndDate(e.target.value)} />
+            </div>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              {refreshing ? '⟳ Calculando…' : '⟳ Calcular'}
+            </button>
+          </>
+        )}
+        {refreshing && preset !== 'custom' && (
+          <span className="bdg-loading-hint">⟳ Calculando…</span>
+        )}
       </div>
       {error && <p className="bdg-error">{error}</p>}
 
@@ -579,8 +684,8 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
             </div>
             <div className="bdg-snap-kpi">
               <span className="bdg-kpi-label">Restante</span>
-              <span className={`bdg-kpi-value ${snapshot.totalVariance < 0 ? 'bdg-over' : 'bdg-ok'}`}>
-                {fmt(snapshot.totalVariance, plan.currency)}
+              <span className={`bdg-kpi-value ${(snapshot.variance ?? 0) < 0 ? 'bdg-over' : 'bdg-ok'}`}>
+                {fmt(snapshot.variance ?? 0, plan.currency)}
               </span>
             </div>
             <div className="bdg-snap-kpi">
@@ -628,6 +733,61 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
             Período analizado: <strong>{snapshot.startDate}</strong> — <strong>{snapshot.endDate}</strong>
             &nbsp;·&nbsp; Calculado el {new Date(snapshot.computedAt).toLocaleString('es-ES')}
           </div>
+
+          {/* Budget vs spent chart */}
+          {expenseChartData.length > 0 && (
+            <div className="bdg-chart-section">
+              <div className="bdg-chart-header">
+                <span className="bdg-chart-title">📊 Presupuesto vs Gasto por categoría</span>
+                <div className="bdg-chart-toggle">
+                  <button
+                    type="button"
+                    className={`bdg-preset-btn small${chartView === 'subcategory' ? ' active' : ''}`}
+                    onClick={() => setChartView('subcategory')}
+                  >Subcategoría</button>
+                  <button
+                    type="button"
+                    className={`bdg-preset-btn small${chartView === 'parent' ? ' active' : ''}`}
+                    onClick={() => setChartView('parent')}
+                  >Categoría padre</button>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={expenseChartData} margin={{ top: 8, right: 16, left: 16, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: 'var(--muted)' }}
+                    angle={-35}
+                    textAnchor="end"
+                    interval={0}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: 'var(--muted)' }}
+                    tickFormatter={v => new Intl.NumberFormat('es-ES', { notation: 'compact', maximumFractionDigits: 1 }).format(v)}
+                  />
+                  <Tooltip
+                    formatter={(value, name) => [
+                      typeof value === 'number'
+                        ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: plan.currency }).format(value)
+                        : String(value),
+                      name,
+                    ]}
+                    contentStyle={{ fontSize: '0.85rem', borderRadius: '8px', border: '1px solid var(--line)' }}
+                  />
+                  <Legend verticalAlign="top" wrapperStyle={{ fontSize: '0.85rem', paddingBottom: '8px' }} />
+                  <Bar dataKey="Presupuesto" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  <Bar
+                    dataKey="Gastado"
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={48}
+                    fill="#ef4444"
+                    label={false}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           {/* Per-category lines split by type */}
           {(() => {

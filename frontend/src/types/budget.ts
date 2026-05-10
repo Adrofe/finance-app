@@ -64,7 +64,7 @@ export type BudgetSnapshotDTO = {
   endDate: string;
   totalBudget: number;
   totalSpent: number;
-  totalVariance: number;
+  variance: number;
   compliant: boolean;
   computedAt: string;
   totalExpectedIncome: number;

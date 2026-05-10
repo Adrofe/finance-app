@@ -1548,7 +1548,7 @@ body {
 /* ── Refresh bar ────────────────────────────────────────────────────────── */
 .bdg-refresh-bar {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
   background: var(--surface-2);
@@ -1557,6 +1557,50 @@ body {
   padding: 14px 18px;
   margin-bottom: 20px;
 }
+
+/* ── Preset period buttons (budget) ─────────────────────────────────────── */
+.bdg-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bdg-preset-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--pill, #eef4fb);
+  color: #30506a;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.87rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.bdg-preset-btn.small { padding: 4px 11px; font-size: 0.82rem; }
+.bdg-preset-btn:hover:not(:disabled) { background: #dceeff; border-color: #aac8e8; }
+.bdg-preset-btn.active { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 4px 12px rgba(15,107,180,0.28); }
+.bdg-preset-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.bdg-loading-hint { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+
+/* ── Budget chart section ────────────────────────────────────────────────── */
+.bdg-chart-section {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+.bdg-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.bdg-chart-title { font-size: 0.95rem; font-weight: 700; color: var(--ink); }
+.bdg-chart-toggle { display: flex; gap: 6px; }
+
 .bdg-date-group {
   display: flex;
   flex-direction: column;
