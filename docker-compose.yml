@@ -32,6 +32,19 @@ services:
     networks:
       - finance-net
 
+  budget:
+    build:
+      context: .
+      dockerfile: budget/Dockerfile
+    env_file:
+      - ./budget/.env
+    depends_on:
+      - banking
+    ports:
+      - "8084:8084"
+    networks:
+      - finance-net
+
   frontend:
     build:
       context: ./frontend
@@ -44,6 +57,7 @@ services:
       - banking
       - investments
       - wealth
+      - budget
     ports:
       - "${FRONTEND_PORT:-5173}:80"
     networks:

@@ -10,6 +10,10 @@ export default defineConfig({
         target: process.env.VITE_WEALTH_API_TARGET || 'http://localhost:8083',
         changeOrigin: true
       },
+      '/v1/api/budget': {
+        target: process.env.VITE_BUDGET_API_TARGET || 'http://localhost:8084',
+        changeOrigin: true
+      },
       '/v1/api/investments': {
         target: process.env.VITE_INVESTMENTS_API_TARGET || 'http://localhost:8082',
         changeOrigin: true

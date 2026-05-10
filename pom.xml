@@ -17,6 +17,7 @@
         <module>banking</module>
         <module>investments</module>
         <module>wealth</module>
+        <module>budget</module>
     </modules>
     <dependencyManagement>
         <dependencies>
