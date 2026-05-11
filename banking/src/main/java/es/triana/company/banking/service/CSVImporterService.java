@@ -23,6 +23,7 @@ import es.triana.company.banking.model.db.Merchant;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.repository.MerchantRepository;
 import es.triana.company.banking.repository.TransactionRepository;
+import es.triana.company.banking.repository.TransactionTypeRepository;
 import es.triana.company.banking.service.bankcsv.BankCsvMapper;
 import es.triana.company.banking.service.bankcsv.BankFormat;
 import es.triana.company.banking.service.bankcsv.NormalizedBankRow;
@@ -36,6 +37,7 @@ public class CSVImporterService {
     private final TransactionRepository transactionRepository;
     private final TransactionService transactionService;
     private final MerchantMatcherService merchantMatcherService;
+    private final TransactionTypeRepository transactionTypeRepository;
     private final Map<BankFormat, BankCsvMapper> mappers;
 
     public CSVImporterService(
@@ -44,12 +46,14 @@ public class CSVImporterService {
             TransactionRepository transactionRepository,
             TransactionService transactionService,
             MerchantMatcherService merchantMatcherService,
+            TransactionTypeRepository transactionTypeRepository,
             List<BankCsvMapper> bankCsvMappers) {
         this.accountsRepository = accountsRepository;
         this.merchantRepository = merchantRepository;
         this.transactionRepository = transactionRepository;
         this.transactionService = transactionService;
         this.merchantMatcherService = merchantMatcherService;
+        this.transactionTypeRepository = transactionTypeRepository;
         this.mappers = new EnumMap<>(BankFormat.class);
         for (BankCsvMapper mapper : bankCsvMappers) {
             this.mappers.put(mapper.getSupportedFormat(), mapper);
@@ -72,6 +76,10 @@ public class CSVImporterService {
 
         // Pre-load merchants once for the whole batch to avoid N queries
         List<Merchant> allMerchants = merchantMatcherService.loadAll();
+
+        // Pre-load EXPENSE / INCOME type IDs for automatic assignment
+        Long expenseTypeId = transactionTypeRepository.findByName("EXPENSE").map(t -> t.getId()).orElse(null);
+        Long incomeTypeId  = transactionTypeRepository.findByName("INCOME").map(t -> t.getId()).orElse(null);
 
         CsvImportResult result = new CsvImportResult();
         result.setTotalRows(rows.size());
@@ -106,7 +114,7 @@ public class CSVImporterService {
             }
 
             try {
-                TransactionDTO transactionDTO = toTransactionDto(row, defaultAccount, tenantId, allMerchants);
+                TransactionDTO transactionDTO = toTransactionDto(row, defaultAccount, tenantId, allMerchants, expenseTypeId, incomeTypeId);
                 transactionService.createTransaction(transactionDTO, tenantId);
                 result.incrementSuccess();
             } catch (RuntimeException ex) {
@@ -197,13 +205,20 @@ public class CSVImporterService {
         return errors;
     }
 
-    private TransactionDTO toTransactionDto(NormalizedBankRow row, Account defaultAccount, Long tenantId, List<Merchant> allMerchants) {
+    private TransactionDTO toTransactionDto(NormalizedBankRow row, Account defaultAccount, Long tenantId,
+            List<Merchant> allMerchants, Long expenseTypeId, Long incomeTypeId) {
         Long merchantId = resolveMerchantId(row.merchantId(), row.merchant(), allMerchants);
         LocalDate bookingDate = LocalDate.parse(row.bookingDate());
         LocalDate valueDate = normalizeText(row.valueDate()) != null ? LocalDate.parse(row.valueDate()) : bookingDate;
         BigDecimal amount = new BigDecimal(row.amount());
 
         Account sourceAccount = resolveSourceAccount(row, defaultAccount, tenantId);
+
+        // Auto-assign type based on sign when not explicitly set in the CSV
+        Long typeId = parseLongOrNull(row.typeId());
+        if (typeId == null) {
+            typeId = amount.signum() < 0 ? expenseTypeId : incomeTypeId;
+        }
 
         return TransactionDTO.builder()
                 .sourceAccountId(sourceAccount.getId())
@@ -218,7 +233,7 @@ public class CSVImporterService {
                 .tagIds(parseTagIds(row.tagIds()))
                 .externalId(normalizeText(row.externalId()))
                 .statusId(parseLongOrNull(row.statusId()))
-                .typeId(parseLongOrNull(row.typeId()))
+                .typeId(typeId)
                 .build();
     }
 
