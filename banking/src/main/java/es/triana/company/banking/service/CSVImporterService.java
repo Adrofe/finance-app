@@ -1,22 +1,16 @@
 package es.triana.company.banking.service;
 
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -29,42 +23,61 @@ import es.triana.company.banking.model.db.Merchant;
 import es.triana.company.banking.repository.AccountsRepository;
 import es.triana.company.banking.repository.MerchantRepository;
 import es.triana.company.banking.repository.TransactionRepository;
+import es.triana.company.banking.service.bankcsv.BankCsvMapper;
+import es.triana.company.banking.service.bankcsv.BankFormat;
+import es.triana.company.banking.service.bankcsv.NormalizedBankRow;
 import es.triana.company.banking.service.exception.TransactionValidationException;
 
 @Service
 public class CSVImporterService {
 
-    private static final Set<String> REQUIRED_HEADERS = Set.of(
-            "booking_date", "amount", "currency", "merchant", "description");
-
     private final AccountsRepository accountsRepository;
     private final MerchantRepository merchantRepository;
     private final TransactionRepository transactionRepository;
     private final TransactionService transactionService;
+    private final MerchantMatcherService merchantMatcherService;
+    private final Map<BankFormat, BankCsvMapper> mappers;
 
     public CSVImporterService(
             AccountsRepository accountsRepository,
             MerchantRepository merchantRepository,
             TransactionRepository transactionRepository,
-            TransactionService transactionService) {
+            TransactionService transactionService,
+            MerchantMatcherService merchantMatcherService,
+            List<BankCsvMapper> bankCsvMappers) {
         this.accountsRepository = accountsRepository;
         this.merchantRepository = merchantRepository;
         this.transactionRepository = transactionRepository;
         this.transactionService = transactionService;
+        this.merchantMatcherService = merchantMatcherService;
+        this.mappers = new EnumMap<>(BankFormat.class);
+        for (BankCsvMapper mapper : bankCsvMappers) {
+            this.mappers.put(mapper.getSupportedFormat(), mapper);
+        }
     }
 
     public CsvImportResult importFile(CsvImportRequest request, Long tenantId) {
         validateImportRequest(request, tenantId);
-        List<CsvTransactionRow> rows = parseTransactions(request.getFile());
+
+        BankFormat format = request.getBankFormat() != null ? request.getBankFormat() : BankFormat.INTERNAL;
+        BankCsvMapper mapper = mappers.get(format);
+        if (mapper == null) {
+            throw new TransactionValidationException("Unsupported bank format: " + format);
+        }
+
+        List<NormalizedBankRow> rows = mapper.map(request.getFile());
         Account defaultAccount = request.getAccountId() != null
             ? getAndValidateAccount(request.getAccountId(), tenantId)
             : null;
 
+        // Pre-load merchants once for the whole batch to avoid N queries
+        List<Merchant> allMerchants = merchantMatcherService.loadAll();
+
         CsvImportResult result = new CsvImportResult();
         result.setTotalRows(rows.size());
 
-        Set<String> seenExternalIds = new HashSet<>();
-        for (CsvTransactionRow row : rows) {
+        HashSet<String> seenExternalIds = new HashSet<>();
+        for (NormalizedBankRow row : rows) {
             List<ImportError> rowErrors = validateRow(row, defaultAccount != null);
             if (!rowErrors.isEmpty()) {
                 rowErrors.forEach(result::addError);
@@ -93,7 +106,7 @@ public class CSVImporterService {
             }
 
             try {
-                TransactionDTO transactionDTO = toTransactionDto(row, defaultAccount, tenantId);
+                TransactionDTO transactionDTO = toTransactionDto(row, defaultAccount, tenantId, allMerchants);
                 transactionService.createTransaction(transactionDTO, tenantId);
                 result.incrementSuccess();
             } catch (RuntimeException ex) {
@@ -113,10 +126,7 @@ public class CSVImporterService {
             throw new TransactionValidationException("Import request is required");
         }
 
-        validateCsvFile(request.getFile());
-    }
-
-    private void validateCsvFile(MultipartFile file) {
+        MultipartFile file = request.getFile();
         if (file == null || file.isEmpty()) {
             throw new TransactionValidationException("CSV file is required");
         }
@@ -138,57 +148,7 @@ public class CSVImporterService {
         return account;
     }
 
-    private List<CsvTransactionRow> parseTransactions(MultipartFile file) {
-        try (Reader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8);
-             CSVParser parser = CSVFormat.DEFAULT.builder()
-                     .setHeader()
-                     .setSkipHeaderRecord(true)
-                     .setIgnoreEmptyLines(true)
-                     .setTrim(true)
-                     .build()
-                     .parse(reader)) {
-            validateHeaders(parser.getHeaderMap().keySet());
-
-            List<CsvTransactionRow> rows = new ArrayList<>();
-            for (CSVRecord record : parser) {
-                rows.add(new CsvTransactionRow(
-                        record.getRecordNumber() + 1,
-                        getValue(record, "source_account_id"),
-                        getValue(record, "booking_date"),
-                        getValue(record, "value_date"),
-                        getValue(record, "amount"),
-                        getValue(record, "currency"),
-                        getValue(record, "merchant"),
-                    getValue(record, "merchant_id"),
-                        getValue(record, "description"),
-                        getValue(record, "external_id"),
-                    getValue(record, "destination_account_id"),
-                    getValue(record, "category_id"),
-                    getValue(record, "tag_ids"),
-                    getValue(record, "status_id"),
-                    getValue(record, "type_id"),
-                        record.toString()));
-            }
-
-            return rows;
-        } catch (IOException ex) {
-            throw new TransactionValidationException("Unable to read CSV file");
-        }
-    }
-
-    private void validateHeaders(Set<String> headers) {
-        Set<String> normalizedHeaders = headers.stream()
-                .map(this::normalizeHeader)
-                .collect(java.util.stream.Collectors.toSet());
-
-        for (String requiredHeader : REQUIRED_HEADERS) {
-            if (!normalizedHeaders.contains(requiredHeader)) {
-                throw new TransactionValidationException("Missing required CSV header: " + requiredHeader);
-            }
-        }
-    }
-
-    private List<ImportError> validateRow(CsvTransactionRow row, boolean hasDefaultAccount) {
+    private List<ImportError> validateRow(NormalizedBankRow row, boolean hasDefaultAccount) {
         List<ImportError> errors = new ArrayList<>();
 
         validateOptionalLong(row.sourceAccountId(), "source_account_id", row.rowNumber(), errors);
@@ -237,8 +197,8 @@ public class CSVImporterService {
         return errors;
     }
 
-    private TransactionDTO toTransactionDto(CsvTransactionRow row, Account defaultAccount, Long tenantId) {
-        Long merchantId = resolveMerchantId(row.merchantId(), row.merchant());
+    private TransactionDTO toTransactionDto(NormalizedBankRow row, Account defaultAccount, Long tenantId, List<Merchant> allMerchants) {
+        Long merchantId = resolveMerchantId(row.merchantId(), row.merchant(), allMerchants);
         LocalDate bookingDate = LocalDate.parse(row.bookingDate());
         LocalDate valueDate = normalizeText(row.valueDate()) != null ? LocalDate.parse(row.valueDate()) : bookingDate;
         BigDecimal amount = new BigDecimal(row.amount());
@@ -262,7 +222,7 @@ public class CSVImporterService {
                 .build();
     }
 
-    private Account resolveSourceAccount(CsvTransactionRow row, Account defaultAccount, Long tenantId) {
+    private Account resolveSourceAccount(NormalizedBankRow row, Account defaultAccount, Long tenantId) {
         Long sourceAccountId = parseLongOrNull(row.sourceAccountId());
         if (sourceAccountId == null) {
             if (defaultAccount == null) {
@@ -280,7 +240,8 @@ public class CSVImporterService {
         return csvAccount;
     }
 
-    private Long resolveMerchantId(String merchantIdValue, String merchantName) {
+    private Long resolveMerchantId(String merchantIdValue, String merchantName, List<Merchant> allMerchants) {
+        // 1. Explicit numeric ID takes precedence
         Long merchantId = parseLongOrNull(merchantIdValue);
         if (merchantId != null) {
             return merchantId;
@@ -291,8 +252,16 @@ public class CSVImporterService {
             return null;
         }
 
-        Optional<Merchant> merchant = merchantRepository.findByName(normalizedMerchant);
-        return merchant.map(Merchant::getId).orElse(null);
+        // 2. Exact name match
+        Optional<Merchant> exact = merchantRepository.findByName(normalizedMerchant);
+        if (exact.isPresent()) {
+            return exact.get().getId();
+        }
+
+        // 3. Substring match: find a merchant whose name appears inside the description
+        return merchantMatcherService.match(normalizedMerchant, allMerchants)
+                .map(Merchant::getId)
+                .orElse(null);
     }
 
     private void validateOptionalDate(String value, String field, long rowNumber, List<ImportError> errors) {
@@ -365,20 +334,6 @@ public class CSVImporterService {
                 .build();
     }
 
-    private String getValue(CSVRecord record, String header) {
-        for (String currentHeader : record.toMap().keySet()) {
-            if (normalizeHeader(currentHeader).equals(header)) {
-                return record.get(currentHeader);
-            }
-        }
-
-        return null;
-    }
-
-    private String normalizeHeader(String header) {
-        return header == null ? "" : header.trim().toLowerCase();
-    }
-
     private String normalizeText(String value) {
         if (value == null) {
             return null;
@@ -386,24 +341,5 @@ public class CSVImporterService {
 
         String normalized = value.trim();
         return normalized.isEmpty() ? null : normalized;
-    }
-
-    private record CsvTransactionRow(
-            long rowNumber,
-            String sourceAccountId,
-            String bookingDate,
-            String valueDate,
-            String amount,
-            String currency,
-            String merchant,
-            String merchantId,
-            String description,
-            String externalId,
-            String destinationAccountId,
-            String categoryId,
-            String tagIds,
-            String statusId,
-            String typeId,
-            String rawLine) {
     }
 }
