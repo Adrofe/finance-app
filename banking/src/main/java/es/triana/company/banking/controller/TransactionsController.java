@@ -84,9 +84,9 @@ public class TransactionsController {
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<CsvImportResult>> importTransactions(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(required = false) Long accountId,
-            @RequestParam(defaultValue = "false") boolean skipDuplicates,
-            @RequestParam(required = false) BankFormat bankFormat) {
+            @RequestParam(name = "accountId", required = false) Long accountId,
+            @RequestParam(name = "skipDuplicates", defaultValue = "false") boolean skipDuplicates,
+            @RequestParam(name = "bankFormat", required = false) BankFormat bankFormat) {
         Long tenantId = tenantContext.getCurrentTenantId();
 
         CsvImportRequest request = CsvImportRequest.builder()
