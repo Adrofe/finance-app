@@ -88,6 +88,8 @@ export function TransactionEditableRow({
   const [catSearch, setCatSearch]   = useState('');
   const [merchantSearch, setMerchantSearch] = useState('');
   const [merchantOptions, setMerchantOptions] = useState<Merchant[]>(merchants);
+  const [tagSearch, setTagSearch] = useState('');
+  const [tagOptions, setTagOptions] = useState<Tag[]>(tags);
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [pickerPos, setPickerPos]   = useState<PickerPos | null>(null);
@@ -104,6 +106,10 @@ export function TransactionEditableRow({
   useEffect(() => {
     setMerchantOptions(merchants);
   }, [merchants]);
+
+  useEffect(() => {
+    setTagOptions(tags);
+  }, [tags]);
 
   // Close floating pickers on outside click
   useEffect(() => {
@@ -191,6 +197,7 @@ export function TransactionEditableRow({
     setActiveField(field);
     setCatSearch('');
     setMerchantSearch('');
+    setTagSearch('');
     if (field === 'tags') setDraftTagIds(draft.tagIds ?? []);
   };
 
@@ -260,6 +267,34 @@ export function TransactionEditableRow({
     }
   };
 
+  const filteredTags = tagOptions.filter(tag => {
+    const query = tagSearch.trim().toLowerCase();
+    if (!query) return true;
+    return tag.name.toLowerCase().includes(query);
+  });
+
+  const tagCanBeCreated = tagSearch.trim().length > 0
+    && !tagOptions.some(tag => tag.name.toLowerCase() === tagSearch.trim().toLowerCase());
+
+  const createTagFromPicker = async () => {
+    const name = tagSearch.trim();
+    if (!name) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const created = await CatalogService.createTag(accessToken, name);
+      setTagOptions(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, 'es')));
+      setDraftTagIds(prev => (prev.includes(created.id) ? prev : [...prev, created.id]));
+      setTagSearch('');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(e?.response?.data?.message || e?.message || 'Error creando tag');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ── Display values ─────────────────────────────────────────────────────────
 
   const catCode   = draft.categoryId != null ? (categoryCodeMap[draft.categoryId] ?? '') : '';
@@ -274,6 +309,7 @@ export function TransactionEditableRow({
 
   const srcAcc = draft.sourceAccountId      != null ? accountDetailMap[draft.sourceAccountId]      : undefined;
   const dstAcc = draft.destinationAccountId != null ? accountDetailMap[draft.destinationAccountId] : undefined;
+  const tagNameMap = Object.fromEntries(tagOptions.map(tag => [tag.id, tag.name]));
   const isNeg  = (draft.amount ?? 0) < 0;
   const { day, rest } = formatDateDisplay(draft.bookingDate);
 
@@ -456,9 +492,27 @@ export function TransactionEditableRow({
       className="tie-picker tie-tag-picker"
       style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: Math.max(pickerPos!.minWidth, 240) }}
     >
+      <div className="tie-picker-search">
+        <input
+          type="text"
+          className="tie-search-input"
+          placeholder="Buscar tag…"
+          value={tagSearch}
+          onChange={e => setTagSearch(e.target.value)}
+          autoFocus
+        />
+      </div>
+      {tagCanBeCreated && (
+        <div className="tie-tag-create-wrap">
+          <button className="tie-tag-create" onClick={createTagFromPicker} disabled={saving}>
+            <span className="tie-cat-emoji">+</span>
+            <span>Crear "{tagSearch.trim()}"</span>
+          </button>
+        </div>
+      )}
       <div className="tie-tag-list">
-        {tags.length === 0 && <span className="tie-empty-tags">No hay tags disponibles</span>}
-        {tags.map(tag => {
+        {filteredTags.length === 0 && <span className="tie-empty-tags">No hay tags que coincidan</span>}
+        {filteredTags.map(tag => {
           const isOn = draftTagIds.includes(tag.id);
           return (
             <button
@@ -685,7 +739,7 @@ export function TransactionEditableRow({
           {draftTagIds.length > 0 ? (
             <div className="tt-tags-wrap">
               {draftTagIds.map(id => (
-                <span key={id} className="tt-tag">{tagMap[id] ?? `#${id}`}</span>
+                <span key={id} className="tt-tag">{tagNameMap[id] ?? tagMap[id] ?? `#${id}`}</span>
               ))}
             </div>
           ) : <span className="tie-placeholder">+ Tags</span>}
