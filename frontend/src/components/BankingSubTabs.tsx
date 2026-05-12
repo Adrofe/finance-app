@@ -11,6 +11,7 @@ const TABS: { id: BankingSubTab; label: string; icon: string }[] = [
   { id: 'transactions', label: 'Transactions', icon: '🧾' },
   { id: 'budget', label: 'Presupuesto', icon: '💰' },
   { id: 'import', label: 'Importar', icon: '📥' },
+  { id: 'merchants', label: 'Merchants', icon: '🏪' },
 ];
 
 export function BankingSubTabs({ activeTab, onSelectTab }: BankingSubTabsProps) {

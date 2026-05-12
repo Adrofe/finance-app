@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Account, TransactionCategory, TransactionStatus, TransactionType, Tag } from '../services/catalogService';
+import type { Account, Merchant, TransactionCategory, TransactionStatus, TransactionType, Tag } from '../services/catalogService';
 import { CatalogService } from '../services/catalogService';
 
 export type TransactionCatalogMaps = {
@@ -16,6 +16,7 @@ export type TransactionCatalogMaps = {
   types: TransactionType[];
   accounts: Account[];
   tags: Tag[];
+  merchants: Merchant[];
   loading: boolean;
 };
 
@@ -33,6 +34,7 @@ export function useTransactionCatalogs(token: string): TransactionCatalogMaps {
   const [types, setTypes] = useState<TransactionType[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,12 +46,14 @@ export function useTransactionCatalogs(token: string): TransactionCatalogMaps {
       CatalogService.fetchCategories(token),
       CatalogService.fetchAccounts(token),
       CatalogService.fetchTags(token),
-    ]).then(([fetchedStatuses, fetchedTypes, fetchedCategories, fetchedAccounts, fetchedTags]) => {
+      CatalogService.fetchMerchants(token),
+    ]).then(([fetchedStatuses, fetchedTypes, fetchedCategories, fetchedAccounts, fetchedTags, fetchedMerchants]) => {
       setStatuses(fetchedStatuses);
       setTypes(fetchedTypes);
       setCategories(fetchedCategories);
       setAccounts(fetchedAccounts);
       setTags(fetchedTags);
+      setMerchants(fetchedMerchants);
       setStatusMap(Object.fromEntries(fetchedStatuses.map(s => [s.id, s.code?.trim() ? s.code : '-'])));
       setTypeMap(Object.fromEntries(fetchedTypes.map(t => [t.id, t.name?.trim() ? t.name : '-'])));
       setCategoryMap(Object.fromEntries(fetchedCategories.map(c => [c.id, c.name?.trim() ? c.name : '-'])));
@@ -61,5 +65,5 @@ export function useTransactionCatalogs(token: string): TransactionCatalogMaps {
   }, [token]);
 
   return { statusMap, typeMap, categoryMap, categoryCodeMap, accountMap, accountDetailMap, tagMap,
-           categories, statuses, types, accounts, tags, loading };
+           categories, statuses, types, accounts, tags, merchants, loading };
 }

@@ -340,9 +340,99 @@
   font-weight: 600;
 }
 
+.tie-item--active {
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 600;
+}
+
 .tie-cat-child {
   padding-left: 28px;
   font-size: 12.5px;
+}
+
+.tie-merchant-picker {
+  width: 290px;
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tie-merchant-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: #1f2937;
+  text-align: left;
+  border-radius: 7px;
+}
+
+.tie-merchant-item:hover {
+  background: #f8fafc;
+}
+
+.tie-merchant-create {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border: 1px solid #dbeafe;
+  background: linear-gradient(135deg, #eff6ff, #eef2ff);
+  color: #1d4ed8;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  border-radius: 8px;
+}
+
+.tie-merchant-create:hover {
+  background: linear-gradient(135deg, #dbeafe, #e0e7ff);
+}
+
+.tie-merchant-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tie-picker-empty {
+  padding: 10px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.tie-merchant-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+
+.tie-merchant-trigger.is-empty {
+  color: #a5b4fc;
+}
+
+.tie-merchant-trigger--active,
+.tie-merchant-trigger:hover {
+  opacity: 0.85;
+}
+
+.tie-merchant-trigger-logo {
+  flex-shrink: 0;
 }
 
 /* ─── Status picker ────────────────────────────────────────────────────────── */

@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { BankingSubTabs } from './components/BankingSubTabs';
 import { BudgetPanel } from './components/BudgetPanel';
 import { BankImportPanel } from './components/BankImportPanel';
+import { MerchantEditPanel } from './components/MerchantEditPanel';
 import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
 import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
 import { InvestmentsDashboard } from './components/InvestmentsDashboard';
@@ -97,6 +98,10 @@ function App() {
 
           {bankingSubTab === 'import' && (
             <BankImportPanel token={accessToken} onUnauthorized={handleUnauthorized} />
+          )}
+
+          {bankingSubTab === 'merchants' && (
+            <MerchantEditPanel token={accessToken} onUnauthorized={handleUnauthorized} />
           )}
 
         </section>

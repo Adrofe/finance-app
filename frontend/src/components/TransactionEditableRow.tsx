@@ -4,19 +4,21 @@ import type { Transaction } from '../types/banking';
 import type {
   TransactionCategory,
   Account,
+  Merchant,
   TransactionStatus,
   TransactionType,
   Tag,
 } from '../services/catalogService';
-import { getCategoryVisual, getInstitutionLogo } from '../constants/visualConfig';
+import { getCategoryVisual, getInstitutionLogo, getMerchantLogo } from '../constants/visualConfig';
 import { updateTransaction } from '../services/transactionsService';
+import { CatalogService } from '../services/catalogService';
 import './TransactionEditableRow.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type EditField =
   | 'date' | 'description' | 'amount'
-  | 'category' | 'status' | 'type' | 'sourceAccount' | 'tags'
+  | 'category' | 'merchant' | 'status' | 'type' | 'sourceAccount' | 'tags'
   | null;
 
 type PickerPos = { top: number; left: number; minWidth: number };
@@ -55,6 +57,7 @@ export interface TransactionEditableRowProps {
   types: TransactionType[];
   accounts: Account[];
   tags: Tag[];
+  merchants: Merchant[];
   categoryCodeMap: Record<number, string>;
   categoryMap: Record<number, string>;
   statusMap: Record<number, string>;
@@ -73,7 +76,7 @@ export interface TransactionEditableRowProps {
 
 export function TransactionEditableRow({
   tx, accessToken,
-  categories, statuses, types, accounts, tags,
+  categories, statuses, types, accounts, tags, merchants,
   categoryCodeMap, categoryMap, statusMap, typeMap, accountDetailMap, tagMap,
   selectMode, isSelected, onToggleSelect, onDelete, onRefresh, onExitEdit,
 }: TransactionEditableRowProps) {
@@ -83,6 +86,8 @@ export function TransactionEditableRow({
   const [textDraft, setTextDraft]   = useState('');
   const [draftTagIds, setDraftTagIds] = useState<number[]>(tx.tagIds ?? []);
   const [catSearch, setCatSearch]   = useState('');
+  const [merchantSearch, setMerchantSearch] = useState('');
+  const [merchantOptions, setMerchantOptions] = useState<Merchant[]>(merchants);
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [pickerPos, setPickerPos]   = useState<PickerPos | null>(null);
@@ -95,6 +100,10 @@ export function TransactionEditableRow({
     setDraft({ ...tx });
     setDraftTagIds(tx.tagIds ?? []);
   }, [tx]);
+
+  useEffect(() => {
+    setMerchantOptions(merchants);
+  }, [merchants]);
 
   // Close floating pickers on outside click
   useEffect(() => {
@@ -181,6 +190,7 @@ export function TransactionEditableRow({
     setPickerPos({ top: rect.bottom + 4, left: rect.left, minWidth: Math.max(rect.width, 220) });
     setActiveField(field);
     setCatSearch('');
+    setMerchantSearch('');
     if (field === 'tags') setDraftTagIds(draft.tagIds ?? []);
   };
 
@@ -214,6 +224,40 @@ export function TransactionEditableRow({
   const selectCategory = async (id: number | null) => {
     closePicker();
     await save({ categoryId: id ?? undefined });
+  };
+
+  const filteredMerchants = merchantOptions.filter(merchant => {
+    const query = merchantSearch.trim().toLowerCase();
+    if (!query) return true;
+    return merchant.name.toLowerCase().includes(query);
+  });
+
+  const merchantCanBeCreated = merchantSearch.trim().length > 0
+    && !merchantOptions.some(merchant => merchant.name.toLowerCase() === merchantSearch.trim().toLowerCase());
+
+  const selectMerchant = async (merchant?: Merchant) => {
+    closePicker();
+    await save({
+      merchantId: merchant?.id,
+      merchantName: merchant?.name,
+    });
+  };
+
+  const createMerchantFromPicker = async () => {
+    const name = merchantSearch.trim();
+    if (!name) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const created = await CatalogService.createMerchant(accessToken, name);
+      setMerchantOptions(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, 'es')));
+      await selectMerchant(created);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(e?.response?.data?.message || e?.message || 'Error creando merchant');
+      setSaving(false);
+    }
   };
 
   // ── Display values ─────────────────────────────────────────────────────────
@@ -317,6 +361,49 @@ export function TransactionEditableRow({
           </button>
         );
       })}
+    </div>
+  );
+
+  const renderMerchantPicker = () => (
+    <div
+      ref={pickerRef}
+      className="tie-picker tie-merchant-picker"
+      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: Math.max(pickerPos!.minWidth, 250) }}
+    >
+      <div className="tie-picker-search">
+        <input
+          type="text"
+          className="tie-search-input"
+          placeholder="Buscar merchant…"
+          value={merchantSearch}
+          onChange={e => setMerchantSearch(e.target.value)}
+          autoFocus
+        />
+      </div>
+      <div className="tie-picker-body">
+        <button className="tie-cat-clear" onClick={() => selectMerchant(undefined)}>
+          <span className="tie-cat-emoji">✕</span>
+          <span>Sin merchant</span>
+        </button>
+        {merchantCanBeCreated && (
+          <button className="tie-merchant-create" onClick={createMerchantFromPicker}>
+            <span className="tie-cat-emoji">+</span>
+            <span>Crear "{merchantSearch.trim()}"</span>
+          </button>
+        )}
+        {filteredMerchants.length === 0 ? (
+          <div className="tie-picker-empty">No hay merchants que coincidan</div>
+        ) : filteredMerchants.slice(0, 30).map(merchant => (
+          <button
+            key={merchant.id}
+            className={`tie-merchant-item${draft.merchantId === merchant.id ? ' tie-item--active' : ''}`}
+            onClick={() => selectMerchant(merchant)}
+          >
+            <span className="tie-cat-emoji">{getMerchantLogo(merchant.name)}</span>
+            <span className="tie-merchant-name">{merchant.name}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 
@@ -471,9 +558,20 @@ export function TransactionEditableRow({
               {draft.description
                 ? <span className="tt-desc-primary">{draft.description}</span>
                 : <span className="tie-placeholder">Añadir descripción…</span>}
-              {draft.merchantName && (
-                <span className="tt-desc-merchant">{draft.merchantName}</span>
-              )}
+              <button
+                type="button"
+                className={`tie-merchant-trigger${activeField === 'merchant' ? ' tie-merchant-trigger--active' : ''}${draft.merchantName ? '' : ' is-empty'}`}
+                onClick={e => openPicker(e, 'merchant')}
+              >
+                {draft.merchantName ? (
+                  <>
+                    <span className="tie-merchant-trigger-logo">{getMerchantLogo(draft.merchantName)}</span>
+                    <span className="tt-desc-merchant">{draft.merchantName}</span>
+                  </>
+                ) : (
+                  <span className="tie-placeholder">+ Merchant</span>
+                )}
+              </button>
             </div>
           )}
         </td>
@@ -628,6 +726,7 @@ export function TransactionEditableRow({
 
       {/* Portaled floating pickers */}
       {activeField === 'category'      && pickerPos && createPortal(renderCategoryPicker(), document.body)}
+      {activeField === 'merchant'      && pickerPos && createPortal(renderMerchantPicker(), document.body)}
       {activeField === 'status'        && pickerPos && createPortal(renderStatusPicker(),   document.body)}
       {activeField === 'type'          && pickerPos && createPortal(renderTypePicker(),     document.body)}
       {activeField === 'sourceAccount' && pickerPos && createPortal(renderAccountPicker(),  document.body)}
