@@ -23,10 +23,18 @@ export const MerchantEditPanel: React.FC<MerchantEditPanelProps> = ({ token, onU
   const [createValues, setCreateValues] = useState<{ name: string; categoryId: number | null }>({ name: '', categoryId: null });
   const [creating, setCreating] = useState(false);
   const [showCreateCategoryPicker, setShowCreateCategoryPicker] = useState(false);
+  const [merchantSearch, setMerchantSearch] = useState('');
 
   const sortedMerchants = useMemo(
     () => [...merchants].sort((a, b) => a.name.localeCompare(b.name, 'es')),
     [merchants]
+  );
+
+  const normalizedMerchantSearch = merchantSearch.trim().toLowerCase();
+
+  const visibleMerchants = useMemo(
+    () => sortedMerchants.filter(merchant => merchant.name.toLowerCase().includes(normalizedMerchantSearch)),
+    [sortedMerchants, normalizedMerchantSearch]
   );
 
   const selectedCategory = useMemo(
@@ -273,7 +281,28 @@ export const MerchantEditPanel: React.FC<MerchantEditPanelProps> = ({ token, onU
         </section>
 
         <section className="merchant-manager__list">
-          {sortedMerchants.map((merchant) => (
+          <div className="merchant-list-toolbar">
+            <div className="merchant-search-box">
+              <span className="merchant-search-box__icon">⌕</span>
+              <input
+                type="text"
+                value={merchantSearch}
+                onChange={e => setMerchantSearch(e.target.value)}
+                placeholder="Buscar merchant por nombre..."
+              />
+              {merchantSearch && (
+                <button type="button" className="merchant-search-box__clear" onClick={() => setMerchantSearch('')}>
+                  ×
+                </button>
+              )}
+            </div>
+            <span className="merchant-list-toolbar__count">
+              {visibleMerchants.length} de {merchants.length}
+            </span>
+          </div>
+
+          <div className="merchant-grid">
+          {visibleMerchants.map((merchant) => (
             <article key={merchant.id} className={'merchant-card' + (editingId === merchant.id ? ' merchant-card--editing' : '')}>
               <div className="merchant-card__header">
                 <div className="merchant-card__identity">
@@ -343,6 +372,14 @@ export const MerchantEditPanel: React.FC<MerchantEditPanelProps> = ({ token, onU
               </div>
             </article>
           ))}
+          </div>
+
+          {visibleMerchants.length === 0 && (
+            <div className="merchant-empty-state">
+              <strong>No hay merchants que coincidan.</strong>
+              <span>Prueba con otro nombre o limpia el buscador.</span>
+            </div>
+          )}
         </section>
       </div>
 

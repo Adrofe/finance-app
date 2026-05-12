@@ -87,6 +87,82 @@
   gap: 16px;
 }
 
+.merchant-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid rgba(214, 224, 235, 0.95);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.merchant-search-box {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.merchant-search-box input {
+  width: 100%;
+  padding: 13px 42px 13px 42px;
+  border-radius: 999px;
+  border: 1px solid #d6e0eb;
+  background: #ffffff;
+  font-size: 14px;
+  color: #10233b;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.merchant-search-box input:focus {
+  outline: none;
+  border-color: #0f6bb4;
+  box-shadow: 0 0 0 4px rgba(15, 107, 180, 0.12);
+}
+
+.merchant-search-box__icon,
+.merchant-search-box__clear {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #7b8798;
+}
+
+.merchant-search-box__icon {
+  left: 16px;
+  font-size: 15px;
+}
+
+.merchant-search-box__clear {
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 999px;
+  background: #eef4fa;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.merchant-list-toolbar__count {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7c93;
+}
+
+.merchant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
 .merchant-card {
   background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
   border: 1px solid rgba(214, 224, 235, 0.95);
@@ -283,6 +359,25 @@
   color: #94a3b8;
 }
 
+.merchant-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 180px;
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px dashed #cbd5e1;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  color: #5a6b81;
+  text-align: center;
+}
+
+.merchant-empty-state strong {
+  color: #10233b;
+}
+
 @media (max-width: 980px) {
   .merchant-manager__layout {
     grid-template-columns: 1fr;
@@ -296,6 +391,11 @@
 @media (max-width: 720px) {
   .merchant-manager__hero {
     flex-direction: column;
+  }
+
+  .merchant-list-toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .merchant-card__header {
