@@ -59,6 +59,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 	@Query("delete from Transaction t where t.tenantId = :tenantId and (t.sourceAccount.id = :accountId or t.destinationAccount.id = :accountId)")
 	void deleteAllByTenantIdAndAccountId(@Param("tenantId") Long tenantId, @Param("accountId") Long accountId);
 
+	@Modifying
+	@Transactional
+	@Query("update Transaction t set t.merchant = null where t.merchant.id = :merchantId")
+	void clearMerchantReferences(@Param("merchantId") Long merchantId);
+
 	// ── Dashboard queries ──────────────────────────────────────────────────────
 
 	@Query("""

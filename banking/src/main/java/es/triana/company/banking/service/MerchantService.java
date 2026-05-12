@@ -81,6 +81,10 @@ public class MerchantService {
     }
 
     public void deleteMerchant(Long id) {
+        if (!merchantRepository.existsById(id)) {
+            throw new TransactionValidationException("Merchant not found with id: " + id);
+        }
+        transactionRepository.clearMerchantReferences(id);
         merchantRepository.deleteById(id);
     }
 }
