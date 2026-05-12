@@ -115,11 +115,12 @@ export const CATEGORY_VISUALS: Record<string, { emoji: string; color: string }> 
   'HEALTH.OTH':   { emoji: '🏥', color: '#43A047' },
 
   // --- Transport ---
-  'TRANSP.PUBLIC': { emoji: '🚌', color: '#64B5F6' },
-  'TRANSP.TAXI':   { emoji: '🚕', color: '#42A5F5' },
-  'TRANSP.FUEL':   { emoji: '⛽', color: '#2196F3' },
-  'TRANSP.MAINT':  { emoji: '🔧', color: '#1E88E5' },
-  'TRANSP.OTH':    { emoji: '🚗', color: '#1976D2' },
+  'TRANSP.PUBLIC':  { emoji: '🚌', color: '#64B5F6' },
+  'TRANSP.TAXI':    { emoji: '🚕', color: '#42A5F5' },
+  'TRANSP.FUEL':    { emoji: '⛽', color: '#2196F3' },
+  'TRANSP.MAINT':   { emoji: '🔧', color: '#1E88E5' },
+  'TRANSP.TRAVEL':  { emoji: '✈️', color: '#0288D1' },
+  'TRANSP.OTH':     { emoji: '🚗', color: '#1976D2' },
 
   // --- Dwelling ---
   'DWELL.RENT':  { emoji: '🏠', color: '#FFCC02' },
