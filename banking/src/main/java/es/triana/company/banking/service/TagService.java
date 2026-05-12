@@ -53,6 +53,26 @@ public class TagService {
         return toDto(savedTag);
     }
 
+    public TagDTO updateTag(Long tagId, TagDTO tagDTO, Long tenantId) {
+        validateTenantId(tenantId);
+        if (tagId == null) {
+            throw new TagValidationException("Tag id is required");
+        }
+
+        Tag tag = tagRepository.findByIdAndTenantId(tagId, tenantId)
+                .orElseThrow(() -> new TagNotFoundException("Tag not found with id: " + tagId));
+
+        String normalizedName = normalizeName(tagDTO.getName());
+        if (!normalizedName.equalsIgnoreCase(tag.getName())
+                && tagRepository.existsByTenantIdAndNameIgnoreCase(tenantId, normalizedName)) {
+            throw new TagConflictException("Tag with name '" + normalizedName + "' already exists for tenant " + tenantId);
+        }
+
+        tag.setName(normalizedName);
+        tag.setUpdatedAt(java.time.OffsetDateTime.now());
+        return toDto(tagRepository.save(tag));
+    }
+
     public void deleteTag(Long tagId, Long tenantId) {
         validateTenantId(tenantId);
         if (tagId == null) {

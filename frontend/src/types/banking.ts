@@ -33,7 +33,7 @@ export type CreateTransactionRequest = {
 };
 
 export type AppTab = 'banking' | 'investments' | 'wealth';
-export type BankingSubTab = 'dashboard' | 'accounts' | 'transactions' | 'budget' | 'import' | 'merchants';
+export type BankingSubTab = 'dashboard' | 'accounts' | 'transactions' | 'budget' | 'import' | 'merchants' | 'tags';
 
 export type BankFormat = 'INTERNAL' | 'SANTANDER' | 'BBVA' | 'ING' | 'IMAGIN';
 
