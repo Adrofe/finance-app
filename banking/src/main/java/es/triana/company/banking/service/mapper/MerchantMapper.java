@@ -15,6 +15,8 @@ public class MerchantMapper {
         return MerchantDTO.builder()
                 .id(merchant.getId())
                 .name(merchant.getName())
+                .categoryId(merchant.getCategory() != null ? merchant.getCategory().getId() : null)
+                .categoryName(merchant.getCategory() != null ? merchant.getCategory().getName() : null)
                 .build();
     }
 
@@ -25,6 +27,7 @@ public class MerchantMapper {
         return Merchant.builder()
                 .id(merchantDTO.getId())
                 .name(merchantDTO.getName())
+                .category(null) // Category is set separately in the service
                 .build();
     }
 }

@@ -220,6 +220,18 @@ public class CSVImporterService {
             typeId = amount.signum() < 0 ? expenseTypeId : incomeTypeId;
         }
 
+        // Auto-assign category from merchant if not explicitly set in the CSV
+        Long categoryId = parseLongOrNull(row.categoryId());
+        if (categoryId == null && merchantId != null) {
+            // Find merchant from the list and use its category if available
+            Optional<Merchant> merchant = allMerchants.stream()
+                    .filter(m -> m.getId().equals(merchantId))
+                    .findFirst();
+            if (merchant.isPresent() && merchant.get().getCategory() != null) {
+                categoryId = merchant.get().getCategory().getId();
+            }
+        }
+
         return TransactionDTO.builder()
                 .sourceAccountId(sourceAccount.getId())
                 .destinationAccountId(parseLongOrNull(row.destinationAccountId()))
@@ -229,7 +241,7 @@ public class CSVImporterService {
                 .currency(row.currency().trim().toUpperCase())
                 .description(normalizeText(row.description()))
                 .merchantId(merchantId)
-                .categoryId(parseLongOrNull(row.categoryId()))
+                .categoryId(categoryId)
                 .tagIds(parseTagIds(row.tagIds()))
                 .externalId(normalizeText(row.externalId()))
                 .statusId(parseLongOrNull(row.statusId()))
