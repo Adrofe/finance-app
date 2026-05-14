@@ -80,6 +80,7 @@ export const CATEGORY_VISUALS: Record<string, { emoji: string; color: string }> 
   // --- Food subcategories ---
   'FOOD.SUP':  { emoji: '🛒', color: '#EF9A9A' },
   'FOOD.REST': { emoji: '🍴', color: '#E57373' },
+  'FOOD.BAR': { emoji: '🍸', color: '#D81B60' },
   'FOOD.DEL':  { emoji: '🛵', color: '#EF5350' },
   'FOOD.OTH':  { emoji: '🍱', color: '#F44336' },
 
