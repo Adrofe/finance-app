@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Account } from '../types/account';
 import { BankFormat, CsvImportResult, ImportError } from '../types/banking';
 import { fetchAccounts } from '../services/accountsService';
+import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 
 interface BankImportPanelProps {
   token: string;
@@ -75,6 +76,7 @@ export const BankImportPanel: React.FC<BankImportPanelProps> = ({ token, onUnaut
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setResult(res.data.data ?? (res.data as unknown as CsvImportResult));
+      dispatchFinanceEvent(FINANCE_EVENTS.TRANSACTIONS_UPDATED);
       // reset file input
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';

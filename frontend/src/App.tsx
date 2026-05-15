@@ -87,9 +87,9 @@ function App() {
                 <h3>Transactions</h3>
                 <span>{items.length} total</span>
               </div>
-              {loading && <p className="state">Loading transactions...</p>}
-              {!loading && error && <p className="state error">{error}</p>}
-              {!loading && !error && <TransactionsTable items={items} accessToken={accessToken} onRefresh={refresh} />}
+              {loading && items.length === 0 && <p className="state">Loading transactions...</p>}
+              {error && <p className="state error">{error}</p>}
+              {(items.length > 0 || (!loading && !error)) && <TransactionsTable items={items} accessToken={accessToken} onRefresh={refresh} />}
             </article>
           )}
 
