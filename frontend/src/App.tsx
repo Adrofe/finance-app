@@ -2,6 +2,9 @@ import { useCallback, useState } from 'react';
 
 import { BankingSubTabs } from './components/BankingSubTabs';
 import { BudgetPanel } from './components/BudgetPanel';
+import { BankImportPanel } from './components/BankImportPanel';
+import { MerchantEditPanel } from './components/MerchantEditPanel';
+import { TagsPanel } from './components/TagsPanel';
 import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
 import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
 import { InvestmentsDashboard } from './components/InvestmentsDashboard';
@@ -84,14 +87,26 @@ function App() {
                 <h3>Transactions</h3>
                 <span>{items.length} total</span>
               </div>
-              {loading && <p className="state">Loading transactions...</p>}
-              {!loading && error && <p className="state error">{error}</p>}
-              {!loading && !error && <TransactionsTable items={items} accessToken={accessToken} onRefresh={refresh} />}
+              {loading && items.length === 0 && <p className="state">Loading transactions...</p>}
+              {error && <p className="state error">{error}</p>}
+              {(items.length > 0 || (!loading && !error)) && <TransactionsTable items={items} accessToken={accessToken} onRefresh={refresh} />}
             </article>
           )}
 
           {bankingSubTab === 'budget' && (
             <BudgetPanel token={accessToken} onUnauthorized={handleUnauthorized} />
+          )}
+
+          {bankingSubTab === 'import' && (
+            <BankImportPanel token={accessToken} onUnauthorized={handleUnauthorized} />
+          )}
+
+          {bankingSubTab === 'merchants' && (
+            <MerchantEditPanel token={accessToken} onUnauthorized={handleUnauthorized} />
+          )}
+
+          {bankingSubTab === 'tags' && (
+            <TagsPanel token={accessToken} onUnauthorized={handleUnauthorized} />
           )}
 
         </section>

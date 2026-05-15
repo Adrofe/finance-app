@@ -71,6 +71,7 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
     types,
     accounts,
     tags,
+    merchants,
   } = useTransactionCatalogs(accessToken);
 
   const [showCreateModal, setShowCreateModal]   = useState(false);
@@ -314,6 +315,7 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
                     types={types}
                     accounts={accounts}
                     tags={tags}
+                    merchants={merchants}
                     categoryCodeMap={categoryCodeMap}
                     categoryMap={categoryMap}
                     statusMap={statusMap}

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,6 +45,15 @@ public class TagsController {
         TagDTO createdTag = tagService.createTag(tagDTO, tenantId);
         ApiResponse<TagDTO> response = new ApiResponse<>(201, "Tag created successfully", createdTag);
         return ResponseEntity.status(201).body(response);
+    }
+
+    @PutMapping("/{tagId}")
+    public ResponseEntity<ApiResponse<TagDTO>> updateTag(
+            @PathVariable("tagId") Long tagId,
+            @Valid @RequestBody TagDTO tagDTO) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        TagDTO updated = tagService.updateTag(tagId, tagDTO, tenantId);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Tag updated successfully", updated));
     }
 
     @DeleteMapping("/{tagId}")

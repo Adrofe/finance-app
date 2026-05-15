@@ -33,4 +33,35 @@ export type CreateTransactionRequest = {
 };
 
 export type AppTab = 'banking' | 'investments' | 'wealth';
-export type BankingSubTab = 'dashboard' | 'accounts' | 'transactions' | 'budget';
+export type BankingSubTab = 'dashboard' | 'accounts' | 'transactions' | 'budget' | 'import' | 'merchants' | 'tags';
+
+export type BankFormat = 'INTERNAL' | 'SANTANDER' | 'BBVA' | 'ING' | 'IMAGIN';
+
+export type ImportError = {
+  rowNumber: number;
+  field: string;
+  message: string;
+  rawValue: string;
+};
+
+export type CsvImportResult = {
+  totalRows: number;
+  successCount: number;
+  failedCount: number;
+  skippedCount: number;
+  errors: ImportError[];
+};
+
+export type Merchant = {
+  id: number;
+  name: string;
+  categoryId: number | null;
+  categoryName: string | null;
+};
+
+export type Category = {
+  id: number;
+  name: string;
+  code: string;
+  parentId: number | null;
+};

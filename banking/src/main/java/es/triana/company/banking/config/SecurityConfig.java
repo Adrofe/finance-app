@@ -5,6 +5,7 @@ import es.triana.company.banking.model.api.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -36,6 +37,10 @@ public class SecurityConfig {
                 .accessDeniedHandler(accessDeniedHandler())
             )
             .authorizeHttpRequests(auth -> auth
+                // Permitir preflight CORS
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Permitir endpoint interno de error para no enmascarar excepciones como 403
+                .requestMatchers("/error").permitAll()
                 // Permitir actuator health sin autenticacion
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 // Requerir autenticacion para todos los endpoints de la API

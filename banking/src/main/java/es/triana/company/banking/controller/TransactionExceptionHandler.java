@@ -2,6 +2,8 @@ package es.triana.company.banking.controller;
 
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -17,6 +19,8 @@ import es.triana.company.banking.service.exception.TransactionValidationExceptio
 
 @RestControllerAdvice(assignableTypes = TransactionsController.class)
 public class TransactionExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(TransactionExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidationException(MethodArgumentNotValidException exception) {
@@ -72,6 +76,7 @@ public class TransactionExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnhandledException(Exception exception) {
+        log.error("[TransactionController] Unhandled exception", exception);
         ApiResponse<Void> response = new ApiResponse<>(500, "Internal server error", null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }

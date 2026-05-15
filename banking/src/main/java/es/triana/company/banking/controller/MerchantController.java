@@ -43,7 +43,7 @@ public class MerchantController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<MerchantDTO>> updateMerchant(@PathVariable Long id, @Valid @RequestBody MerchantDTO merchantDTO) {
+    public ResponseEntity<ApiResponse<MerchantDTO>> updateMerchant(@PathVariable("id") Long id, @Valid @RequestBody MerchantDTO merchantDTO) {
         MerchantDTO updated = merchantService.updateMerchant(id, merchantDTO);
         if (updated == null) {
             ApiResponse<MerchantDTO> response = new ApiResponse<>(404, "Merchant not found", null);
@@ -54,7 +54,7 @@ public class MerchantController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteMerchant(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteMerchant(@PathVariable("id") Long id) {
         merchantService.deleteMerchant(id);
         ApiResponse<Void> response = new ApiResponse<>(200, "Merchant deleted successfully", null);
         return ResponseEntity.ok(response);

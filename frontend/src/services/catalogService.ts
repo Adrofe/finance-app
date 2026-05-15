@@ -64,6 +64,19 @@ export class CatalogService {
     return res.data.data;
   }
 
+  static async updateTag(token: string, id: number, name: string): Promise<Tag> {
+    const res = await axios.put<ApiResponse<Tag>>(`/v1/api/tags/${id}`, { name }, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return res.data.data;
+  }
+
+  static async deleteTag(token: string, id: number): Promise<void> {
+    await axios.delete(`/v1/api/tags/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   static async fetchMerchants(token: string): Promise<Merchant[]> {
     const res = await axios.get<ApiResponse<Merchant[]>>('/v1/api/merchants', {
       headers: { Authorization: `Bearer ${token}` }
