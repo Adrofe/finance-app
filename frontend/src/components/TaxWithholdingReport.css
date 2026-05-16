@@ -1,0 +1,281 @@
+.twr {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.twr-state {
+  padding: 40px;
+  text-align: center;
+  color: #666;
+}
+
+.twr-state--error {
+  color: #c62828;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+.twr-header {
+  margin-bottom: 24px;
+}
+
+.twr-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 6px;
+}
+
+.twr-subtitle {
+  color: #666;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* ── Filters ────────────────────────────────────────────────────────────────── */
+.twr-filters {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.twr-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.twr-filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.twr-filter-select {
+  padding: 8px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  min-width: 160px;
+}
+
+.twr-filter-select:focus {
+  outline: none;
+  border-color: #764ba2;
+}
+
+/* ── Empty ───────────────────────────────────────────────────────────────────── */
+.twr-empty {
+  text-align: center;
+  padding: 60px 24px;
+  background: #fafafa;
+  border-radius: 12px;
+  border: 2px dashed #e0e0e0;
+  color: #666;
+}
+
+.twr-empty-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.twr-empty p {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.twr-empty small {
+  font-size: 13px;
+  color: #999;
+}
+
+/* ── Summary cards ───────────────────────────────────────────────────────────── */
+.twr-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.twr-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+}
+
+.twr-card--gross {
+  background: #e8f4fd;
+  border-color: #90caf9;
+}
+
+.twr-card--tax {
+  background: #fdecea;
+  border-color: #ef9a9a;
+}
+
+.twr-card--net {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+}
+
+.twr-card--pct {
+  background: #f3e5f5;
+  border-color: #ce93d8;
+}
+
+.twr-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.twr-card-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+/* ── Sections ────────────────────────────────────────────────────────────────── */
+.twr-section {
+  margin-bottom: 28px;
+}
+
+.twr-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 14px;
+}
+
+/* ── By-type grid ────────────────────────────────────────────────────────────── */
+.twr-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.twr-type-card {
+  padding: 16px;
+  background: #fafafa;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.twr-type-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #333;
+}
+
+.twr-type-count {
+  font-size: 11px;
+  color: #999;
+}
+
+.twr-type-tax {
+  font-size: 18px;
+  font-weight: 700;
+  color: #c62828;
+  margin-top: 4px;
+}
+
+.twr-type-gross {
+  font-size: 12px;
+  color: #666;
+}
+
+/* ── Detail table ────────────────────────────────────────────────────────────── */
+.twr-table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1.5px solid #e8e8e8;
+}
+
+.twr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.twr-table thead th {
+  background: #f5f5f5;
+  padding: 11px 14px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 12px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  border-bottom: 1.5px solid #e0e0e0;
+}
+
+.twr-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.15s;
+}
+
+.twr-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.twr-table td {
+  padding: 11px 14px;
+  color: #333;
+  vertical-align: middle;
+}
+
+.twr-num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.twr-date {
+  white-space: nowrap;
+  color: #666;
+  font-size: 12px;
+}
+
+.twr-desc {
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.twr-type-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  background: #f3e5f5;
+  color: #6a1b9a;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.twr-tax {
+  color: #c62828;
+  font-weight: 600;
+}
+
+.twr-pct {
+  color: #666;
+  font-size: 12px;
+}

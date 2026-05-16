@@ -5,6 +5,7 @@ import { BudgetPanel } from './components/BudgetPanel';
 import { BankImportPanel } from './components/BankImportPanel';
 import { MerchantEditPanel } from './components/MerchantEditPanel';
 import { TagsPanel } from './components/TagsPanel';
+import { TaxWithholdingReport } from './components/TaxWithholdingReport';
 import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
 import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
 import { InvestmentsDashboard } from './components/InvestmentsDashboard';
@@ -107,6 +108,13 @@ function App() {
 
           {bankingSubTab === 'tags' && (
             <TagsPanel token={accessToken} onUnauthorized={handleUnauthorized} />
+          )}
+
+          {bankingSubTab === 'taxes' && (
+            <TaxWithholdingReport
+              token={accessToken}
+              onUnauthorized={() => handleUnauthorized('Session expired. Please log in again.')}
+            />
           )}
 
         </section>

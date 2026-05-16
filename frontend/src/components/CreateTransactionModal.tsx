@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import axios from 'axios';
-import type { CreateTransactionRequest, Transaction } from '../types/banking';
+import type { CreateTransactionRequest, Transaction, TaxType } from '../types/banking';
 import { CatalogService, Account, Tag, Merchant, TransactionCategory, TransactionStatus, TransactionType } from '../services/catalogService';
 import { getCategoryVisual, getMerchantLogo, getInstitutionLogo } from '../constants/visualConfig';
 import './CreateTransactionModal.css';
@@ -82,6 +82,14 @@ export function CreateTransactionModal({
   const [tagOpen, setTagOpen] = useState(false);
   const tagRef = useRef<HTMLDivElement>(null);
 
+  // Tax withholding state
+  const [hasTax, setHasTax] = useState(false);
+  const [taxGross, setTaxGross] = useState('');
+  const [taxAmount, setTaxAmount] = useState('');
+  const [taxTypeId, setTaxTypeId] = useState<number | undefined>();
+  const [taxNotes, setTaxNotes] = useState('');
+  const [taxTypes, setTaxTypes] = useState<TaxType[]>([]);
+
   // Loading states
   const [loading, setLoading] = useState(false);
   const [catalogsLoading, setCatalogsLoading] = useState(true);
@@ -97,13 +105,15 @@ export function CreateTransactionModal({
       CatalogService.fetchTypes(accessToken),
       CatalogService.fetchTags(accessToken),
       CatalogService.fetchMerchants(accessToken),
-    ]).then(([accs, cats, stats, typs, tgs, merch]) => {
+      CatalogService.fetchTaxTypes(accessToken),
+    ]).then(([accs, cats, stats, typs, tgs, merch, taxTypesData]) => {
       setAccounts(accs);
       setCategories(cats);
       setStatuses(stats);
       setTypes(typs);
       setTags(tgs);
       setMerchants(merch);
+      setTaxTypes(taxTypesData);
       const initialStatus = initialValues?.statusId;
       if (initialStatus) {
         setStatusId(initialStatus);
@@ -292,6 +302,17 @@ export function CreateTransactionModal({
 
       const { createTransaction } = await import('../services/transactionsService');
       const createdTransaction = await createTransaction(accessToken, transaction);
+
+      // Save tax withholding if enabled
+      if (hasTax && createdTransaction.id && taxGross && taxAmount && taxTypeId) {
+        await CatalogService.saveTransactionTax(accessToken, createdTransaction.id, {
+          grossAmount: parseFloat(taxGross),
+          taxAmount: parseFloat(taxAmount),
+          taxTypeId,
+          notes: taxNotes || undefined,
+        });
+      }
+
       if (onSubmitTransaction) {
         await onSubmitTransaction(createdTransaction, transaction);
       }
@@ -747,6 +768,89 @@ export function CreateTransactionModal({
                   rows={3}
                 />
               </div>
+
+              {/* Tax withholding section */}
+              <div className="form-group full-width">
+                <label className="form-label tax-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={hasTax}
+                    onChange={e => setHasTax(e.target.checked)}
+                    className="tax-toggle-checkbox"
+                  />
+                  Tiene retención fiscal
+                </label>
+              </div>
+
+              {hasTax && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="taxGross" className="form-label">
+                      Importe bruto <span className="required">*</span>
+                    </label>
+                    <input
+                      id="taxGross"
+                      type="number"
+                      step="0.01"
+                      className="form-input"
+                      value={taxGross}
+                      onChange={e => setTaxGross(e.target.value)}
+                      placeholder="120.00"
+                      required={hasTax}
+                    />
+                    {currency && <span className="currency-badge">{currency}</span>}
+                    <small className="form-hint">Importe antes de aplicar la retención</small>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="taxAmount" className="form-label">
+                      Retención <span className="required">*</span>
+                    </label>
+                    <input
+                      id="taxAmount"
+                      type="number"
+                      step="0.01"
+                      className="form-input"
+                      value={taxAmount}
+                      onChange={e => setTaxAmount(e.target.value)}
+                      placeholder="23.40"
+                      required={hasTax}
+                    />
+                    {currency && <span className="currency-badge">{currency}</span>}
+                    <small className="form-hint">Impuesto retenido en origen</small>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="taxType" className="form-label">
+                      Tipo de retención <span className="required">*</span>
+                    </label>
+                    <select
+                      id="taxType"
+                      className="form-input"
+                      value={taxTypeId || ''}
+                      onChange={e => setTaxTypeId(Number(e.target.value) || undefined)}
+                      required={hasTax}
+                    >
+                      <option value="">Seleccionar tipo...</option>
+                      {taxTypes.map(tt => (
+                        <option key={tt.id} value={tt.id}>{tt.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="taxNotes" className="form-label">Notas (retención)</label>
+                    <input
+                      id="taxNotes"
+                      type="text"
+                      className="form-input"
+                      value={taxNotes}
+                      onChange={e => setTaxNotes(e.target.value)}
+                      placeholder="Ej: 19% IRPF sobre dividendos Inditex"
+                    />
+                  </div>
+                </>
+              )}
 
             </div>
           </div>
