@@ -330,6 +330,42 @@ export function CreateTransactionModal({
     }
   };
 
+  const recalculateTaxFromNet = (netValue: string) => {
+    const net = parseFloat(netValue);
+    const gross = parseFloat(taxGross);
+    const tax = parseFloat(taxAmount);
+
+    if (isNaN(net)) return;
+
+    if (!isNaN(gross) && (taxAmount.trim() === '' || isNaN(tax))) {
+      setTaxAmount((gross - net).toFixed(2));
+      return;
+    }
+
+    if (!isNaN(tax) && (taxGross.trim() === '' || isNaN(gross))) {
+      setTaxGross((net + tax).toFixed(2));
+    }
+  };
+
+  const handleTaxFieldChange = (field: 'gross' | 'tax', value: string) => {
+    const net = parseFloat(amount);
+    const gross = field === 'gross' ? parseFloat(value) : parseFloat(taxGross);
+    const tax = field === 'tax' ? parseFloat(value) : parseFloat(taxAmount);
+
+    if (field === 'gross') {
+      setTaxGross(value);
+      if (!isNaN(gross) && !isNaN(net)) {
+        setTaxAmount((gross - net).toFixed(2));
+      }
+      return;
+    }
+
+    setTaxAmount(value);
+    if (!isNaN(tax) && !isNaN(net)) {
+      setTaxGross((net + tax).toFixed(2));
+    }
+  };
+
   // ── Loading screen ────────────────────────────────────────────────────────
   if (catalogsLoading) {
     return (
@@ -470,7 +506,11 @@ export function CreateTransactionModal({
                   step="0.01"
                   className="form-input"
                   value={amount}
-                  onChange={e => setAmount(e.target.value)}
+                  onChange={e => {
+                    const value = e.target.value;
+                    setAmount(value);
+                    if (hasTax) recalculateTaxFromNet(value);
+                  }}
                   placeholder="100.00"
                   required
                   disabled={lockAmount}
@@ -794,7 +834,7 @@ export function CreateTransactionModal({
                       step="0.01"
                       className="form-input"
                       value={taxGross}
-                      onChange={e => setTaxGross(e.target.value)}
+                      onChange={e => handleTaxFieldChange('gross', e.target.value)}
                       placeholder="120.00"
                       required={hasTax}
                     />
@@ -812,12 +852,12 @@ export function CreateTransactionModal({
                       step="0.01"
                       className="form-input"
                       value={taxAmount}
-                      onChange={e => setTaxAmount(e.target.value)}
+                      onChange={e => handleTaxFieldChange('tax', e.target.value)}
                       placeholder="23.40"
                       required={hasTax}
                     />
                     {currency && <span className="currency-badge">{currency}</span>}
-                    <small className="form-hint">Impuesto retenido en origen</small>
+                    <small className="form-hint">Se calcula desde bruto y cantidad (neto en cuenta)</small>
                   </div>
 
                   <div className="form-group">
@@ -836,6 +876,7 @@ export function CreateTransactionModal({
                         <option key={tt.id} value={tt.id}>{tt.name}</option>
                       ))}
                     </select>
+
                   </div>
 
                   <div className="form-group">

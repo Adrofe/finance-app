@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { TaxType, TransactionTax, TransactionTaxRequest } from '../types/banking';
 import { CatalogService } from '../services/catalogService';
+import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import './EditTransactionTaxModal.css';
 
 type Props = {
@@ -32,6 +33,7 @@ export function EditTransactionTaxModal({
   const [hasTax, setHasTax] = useState(false);
   const [taxGross, setTaxGross] = useState('');
   const [taxAmount, setTaxAmount] = useState('');
+  const [taxNet, setTaxNet] = useState('');
   const [taxTypeId, setTaxTypeId] = useState<number | ''>('');
   const [taxNotes, setTaxNotes] = useState('');
 
@@ -55,6 +57,7 @@ export function EditTransactionTaxModal({
         setHasTax(true);
         setTaxGross(existing.grossAmount.toString());
         setTaxAmount(existing.taxAmount.toString());
+        setTaxNet((existing.grossAmount - existing.taxAmount).toString());
         setTaxTypeId(existing.taxType.id);
         setTaxNotes(existing.notes || '');
       }
@@ -66,6 +69,56 @@ export function EditTransactionTaxModal({
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFieldChange = (field: 'gross' | 'tax' | 'net', value: string) => {
+    const gross = field === 'gross' ? parseFloat(value) : parseFloat(taxGross);
+    const tax = field === 'tax' ? parseFloat(value) : parseFloat(taxAmount);
+    const net = field === 'net' ? parseFloat(value) : parseFloat(taxNet);
+
+    if (field === 'gross') {
+      setTaxGross(value);
+      // If we have tax amount, calculate net
+      if (!isNaN(gross) && !isNaN(tax)) {
+        setTaxNet((gross - tax).toFixed(2));
+      }
+    } else if (field === 'tax') {
+      setTaxAmount(value);
+      // If we have gross, calculate net
+      if (!isNaN(gross) && !isNaN(tax)) {
+        setTaxNet((gross - tax).toFixed(2));
+      }
+    } else if (field === 'net') {
+      setTaxNet(value);
+      // If we have gross, calculate tax; if we have tax, calculate gross
+      if (!isNaN(gross) && isNaN(tax)) {
+        // We have gross and net, calculate tax
+        setTaxAmount((gross - net).toFixed(2));
+      } else if (!isNaN(tax) && isNaN(gross)) {
+        // We have tax and net, calculate gross
+        setTaxGross((tax + net).toFixed(2));
+      }
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!currentTax) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await CatalogService.deleteTransactionTax(token, transactionId);
+      dispatchFinanceEvent(FINANCE_EVENTS.TRANSACTIONS_UPDATED);
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        onUnauthorized();
+      } else {
+        setError('Error al eliminar retención');
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -92,6 +145,7 @@ export function EditTransactionTaxModal({
       };
 
       await CatalogService.saveTransactionTax(token, transactionId, request);
+      dispatchFinanceEvent(FINANCE_EVENTS.TRANSACTIONS_UPDATED);
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -104,32 +158,6 @@ export function EditTransactionTaxModal({
       setSaving(false);
     }
   };
-
-  const handleDelete = async () => {
-    if (!currentTax) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await CatalogService.deleteTransactionTax(token, transactionId);
-      onSuccess();
-      onClose();
-    } catch (err: any) {
-      if (err?.response?.status === 401) {
-        onUnauthorized();
-      } else {
-        setError('Error al eliminar retención');
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const netAmount = taxGross && taxAmount
-    ? (parseFloat(taxGross) - parseFloat(taxAmount)).toLocaleString('es-ES', {
-        style: 'currency',
-        currency: 'EUR',
-      })
-    : '—';
 
   if (loading) {
     return (
@@ -182,7 +210,7 @@ export function EditTransactionTaxModal({
                   min="0"
                   placeholder="0.00"
                   value={taxGross}
-                  onChange={e => setTaxGross(e.target.value)}
+                  onChange={e => handleFieldChange('gross', e.target.value)}
                   disabled={saving}
                 />
               </div>
@@ -196,13 +224,23 @@ export function EditTransactionTaxModal({
                   min="0"
                   placeholder="0.00"
                   value={taxAmount}
-                  onChange={e => setTaxAmount(e.target.value)}
+                  onChange={e => handleFieldChange('tax', e.target.value)}
                   disabled={saving}
                 />
               </div>
 
               <div className="etm-field">
-                <label>Neto: <strong>{netAmount}</strong></label>
+                <label htmlFor="taxNet">Neto (€)</label>
+                <input
+                  id="taxNet"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={taxNet}
+                  onChange={e => handleFieldChange('net', e.target.value)}
+                  disabled={saving}
+                />
               </div>
 
               <div className="etm-field">
@@ -255,6 +293,7 @@ export function EditTransactionTaxModal({
             className="etm-btn etm-btn-save"
             onClick={handleSave}
             disabled={saving}
+            title="Introduce al menos dos de los tres importes (bruto, retención, neto) para que se calcule el tercero automáticamente"
           >
             {saving ? 'Guardando…' : '💾 Guardar'}
           </button>
