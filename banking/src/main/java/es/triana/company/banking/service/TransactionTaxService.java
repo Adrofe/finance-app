@@ -17,6 +17,7 @@ import es.triana.company.banking.repository.TransactionTaxRepository;
 import es.triana.company.banking.service.exception.TransactionNotFoundException;
 import es.triana.company.banking.service.exception.TransactionTaxNotFoundException;
 import es.triana.company.banking.service.exception.TransactionTaxValidationException;
+import java.math.BigDecimal;
 
 @Service
 public class TransactionTaxService {
@@ -24,11 +25,13 @@ public class TransactionTaxService {
     private final TransactionTaxRepository transactionTaxRepository;
     private final TransactionRepository transactionRepository;
     private final TaxTypeRepository taxTypeRepository;
+    private final TransactionService transactionService;
 
-    public TransactionTaxService(TransactionTaxRepository transactionTaxRepository, TransactionRepository transactionRepository, TaxTypeRepository taxTypeRepository) {
+    public TransactionTaxService(TransactionTaxRepository transactionTaxRepository, TransactionRepository transactionRepository, TaxTypeRepository taxTypeRepository, TransactionService transactionService) {
         this.transactionTaxRepository = transactionTaxRepository;
         this.transactionRepository = transactionRepository;
         this.taxTypeRepository = taxTypeRepository;
+        this.transactionService = transactionService;
     }
 
     // ── Tax types catalog ─────────────────────────────────────────────────────
@@ -96,7 +99,12 @@ public class TransactionTaxService {
             tax.setUpdatedAt(now);
         }
 
-        return toDto(transactionTaxRepository.save(tax));
+        TransactionTax savedTax = transactionTaxRepository.save(tax);
+
+        BigDecimal netAmount = request.getGrossAmount().subtract(request.getTaxAmount());
+        transactionService.updateTransactionAmount(transactionId, netAmount, tenantId);
+
+        return toDto(savedTax);
     }
 
     public void deleteTaxForTransaction(Long transactionId, Long tenantId) {
