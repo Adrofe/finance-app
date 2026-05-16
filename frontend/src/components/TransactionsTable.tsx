@@ -4,6 +4,7 @@ import type { Transaction } from '../types/banking';
 import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
 import { CreateTransactionModal } from './CreateTransactionModal';
 import { EditTransactionTaxModal } from './EditTransactionTaxModal';
+import { BatchTransactionModal } from './BatchTransactionModal';
 import { getCategoryVisual, getInstitutionLogo, getMerchantLogo } from '../constants/visualConfig';
 import { deleteTransaction } from '../services/transactionsService';
 import { TransactionEditableRow } from './TransactionEditableRow';
@@ -76,6 +77,7 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
   } = useTransactionCatalogs(accessToken);
 
   const [showCreateModal, setShowCreateModal]   = useState(false);
+  const [showBatchModal,  setShowBatchModal]    = useState(false);
   const [selectMode,      setSelectMode]        = useState(false);
   const [selected,        setSelected]          = useState<Set<number>>(new Set());
   const [confirm,         setConfirm]           = useState<ConfirmState | null>(null);
@@ -157,6 +159,14 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
           accessToken={accessToken}
           onClose={() => setShowCreateModal(false)}
           onSuccess={handleSuccess}
+        />
+      )}
+
+      {/* ── Batch assistant modal ── */}
+      {showBatchModal && (
+        <BatchTransactionModal
+          accessToken={accessToken}
+          onClose={() => setShowBatchModal(false)}
         />
       )}
 
@@ -259,6 +269,9 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
           )}
           <button className="btn primary" onClick={() => setShowCreateModal(true)}>
             + Nueva Transacción
+          </button>
+          <button className="btn primary" onClick={() => setShowBatchModal(true)} title="Entrada en lote">
+            📋 Lote
           </button>
         </div>
       </div>
