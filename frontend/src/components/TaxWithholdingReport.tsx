@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { CatalogService } from '../services/catalogService';
 import type { TransactionTax } from '../types/banking';
+import { EditTransactionTaxModal } from './EditTransactionTaxModal';
 import './TaxWithholdingReport.css';
 
 type Props = {
@@ -14,6 +15,7 @@ export function TaxWithholdingReport({ token, onUnauthorized }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [editingTaxId, setEditingTaxId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -30,6 +32,18 @@ export function TaxWithholdingReport({ token, onUnauthorized }: Props) {
       })
       .finally(() => setLoading(false));
   }, [token, onUnauthorized]);
+
+  const handleRefresh = () => {
+    setLoading(true);
+    CatalogService.fetchTaxReport(token)
+      .then(setRecords)
+      .catch(err => {
+        if (err?.response?.status !== 401) {
+          setError('Error al cargar el informe de retenciones');
+        }
+      })
+      .finally(() => setLoading(false));
+  };
 
   // Available years from the data
   const availableYears = useMemo(() => {
@@ -93,6 +107,17 @@ export function TaxWithholdingReport({ token, onUnauthorized }: Props) {
 
   return (
     <div className="twr">
+      {/* Edit tax modal */}
+      {editingTaxId != null && (
+        <EditTransactionTaxModal
+          transactionId={editingTaxId}
+          transactionDesc={records.find(r => r.transactionId === editingTaxId)?.transactionDescription}
+          token={token}
+          onClose={() => setEditingTaxId(null)}
+          onSuccess={handleRefresh}
+          onUnauthorized={onUnauthorized}
+        />
+      )}
       <div className="twr-header">
         <h2 className="twr-title">Informe de retenciones fiscales</h2>
         <p className="twr-subtitle">
@@ -194,6 +219,7 @@ export function TaxWithholdingReport({ token, onUnauthorized }: Props) {
                     <th className="twr-num">Retención</th>
                     <th className="twr-num">Neto</th>
                     <th className="twr-num">%</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -213,9 +239,18 @@ export function TaxWithholdingReport({ token, onUnauthorized }: Props) {
                         <td className="twr-num twr-tax">{fmt(r.taxAmount, r.currency)}</td>
                         <td className="twr-num">{fmt(net, r.currency)}</td>
                         <td className="twr-num twr-pct">{pct}</td>
+                        <td className="twr-actions">
+                          <button
+                            className="twr-btn-edit"
+                            title="Editar retención"
+                            onClick={() => setEditingTaxId(r.transactionId)}
+                          >
+                            ✏️
+                          </button>
+                        </td>
                       </tr>
                     );
-                  })}
+                  })};
                 </tbody>
               </table>
             </div>

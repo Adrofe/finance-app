@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { Transaction } from '../types/banking';
 import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
 import { CreateTransactionModal } from './CreateTransactionModal';
+import { EditTransactionTaxModal } from './EditTransactionTaxModal';
 import { getCategoryVisual, getInstitutionLogo, getMerchantLogo } from '../constants/visualConfig';
 import { deleteTransaction } from '../services/transactionsService';
 import { TransactionEditableRow } from './TransactionEditableRow';
@@ -82,6 +83,7 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
   const [showFilters,     setShowFilters]       = useState(false);
   const [filters,         setFilters]           = useState<TransactionFilters>(EMPTY_FILTERS);
   const [editingId,       setEditingId]         = useState<number | null>(null);
+  const [editingTaxId,    setEditingTaxId]      = useState<number | null>(null);
 
   const filteredItems  = applyFilters(items, filters, categories);
   const activeFilters  = countActiveFilters(filters);
@@ -155,6 +157,18 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
           accessToken={accessToken}
           onClose={() => setShowCreateModal(false)}
           onSuccess={handleSuccess}
+        />
+      )}
+
+      {/* Edit tax modal ── */}
+      {editingTaxId != null && (
+        <EditTransactionTaxModal
+          transactionId={editingTaxId}
+          transactionDesc={items.find(t => t.id === editingTaxId)?.description}
+          token={accessToken}
+          onClose={() => setEditingTaxId(null)}
+          onSuccess={handleSuccess}
+          onUnauthorized={() => {}}
         />
       )}
 
@@ -484,7 +498,7 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
                     ) : <span className="tt-empty-cell">—</span>}
                   </td>
 
-                  {/* Actions: edit + delete */}
+                  {/* Actions: edit + taxes + delete */}
                   <td className="tt-td tt-td-actions">
                     <div className="tt-action-btns">
                       {txId != null && (
@@ -494,6 +508,15 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
                           onClick={() => setEditingId(txId)}
                         >
                           ✏️
+                        </button>
+                      )}
+                      {txId != null && (
+                        <button
+                          className="tt-btn-tax"
+                          title="Editar retención"
+                          onClick={() => setEditingTaxId(txId)}
+                        >
+                          💰
                         </button>
                       )}
                       {txId != null && (

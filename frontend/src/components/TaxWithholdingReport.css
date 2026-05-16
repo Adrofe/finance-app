@@ -279,3 +279,33 @@
   color: #666;
   font-size: 12px;
 }
+
+.twr-actions {
+  text-align: center;
+  position: sticky;
+  right: 0;
+  background: white;
+  z-index: 10;
+  width: 60px;
+  padding: 11px 14px;
+}
+
+.twr-table tbody tr:hover .twr-actions {
+  background: #fafafa;
+}
+
+.twr-btn-edit {
+  background: none;
+  border: none;
+  color: #764ba2;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.twr-btn-edit:hover {
+  background: #f3e5f5;
+  color: #6a1b9a;
+}
