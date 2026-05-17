@@ -89,7 +89,11 @@ export function CreateTransactionModal({
   const [taxTypeId, setTaxTypeId] = useState<number | undefined>();
   const [taxNotes, setTaxNotes] = useState('');
   const [taxTypes, setTaxTypes] = useState<TaxType[]>([]);
-
+  // Rounding state
+  const [roundingEnabled, setRoundingEnabled] = useState(false);
+  const [roundingAccountId, setRoundingAccountId] = useState<number | undefined>();
+  const [roundingAccountOpen, setRoundingAccountOpen] = useState(false);
+  const roundingAccountRef = useRef<HTMLDivElement>(null);
   // Loading states
   const [loading, setLoading] = useState(false);
   const [catalogsLoading, setCatalogsLoading] = useState(true);
@@ -140,6 +144,9 @@ export function CreateTransactionModal({
       }
       if (destinationAccountRef.current && !destinationAccountRef.current.contains(e.target as Node)) {
         setDestinationAccountOpen(false);
+      }
+      if (roundingAccountRef.current && !roundingAccountRef.current.contains(e.target as Node)) {
+        setRoundingAccountOpen(false);
       }
 
       const clickedCategoryTrigger = categoryPickerRef.current?.contains(target);
@@ -311,6 +318,24 @@ export function CreateTransactionModal({
           taxTypeId,
           notes: taxNotes || undefined,
         });
+      }
+
+      // Rounding transfer
+      if (roundingEnabled && roundingAccountId) {
+        const absAmount = Math.abs(amountNum);
+        const roundUp = parseFloat((Math.ceil(absAmount) - absAmount).toFixed(2));
+        if (roundUp >= 0.01) {
+          const transferTypeId = types.find(t => t.name.toLowerCase().includes('transfer') || t.name.toLowerCase().includes('transferencia'))?.id;
+          await (await import('../services/transactionsService')).createTransaction(accessToken, {
+            sourceAccountId,
+            destinationAccountId: roundingAccountId,
+            amount: -roundUp,
+            bookingDate: `${bookingDate}T00:00:00`,
+            currency,
+            typeId: transferTypeId,
+            description: 'Redondeo automático',
+          });
+        }
       }
 
       if (onSubmitTransaction) {
@@ -821,6 +846,76 @@ export function CreateTransactionModal({
                   Tiene retención fiscal
                 </label>
               </div>
+
+              {/* Rounding section */}
+              <div className="form-group full-width">
+                <label className="form-label tax-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={roundingEnabled}
+                    onChange={e => { setRoundingEnabled(e.target.checked); if (!e.target.checked) setRoundingAccountId(undefined); }}
+                    className="tax-toggle-checkbox"
+                  />
+                  🪙 Redondeo al euro
+                </label>
+              </div>
+
+              {roundingEnabled && (
+                <div className="form-group">
+                  <label className="form-label">Cuenta destino del redondeo</label>
+                  <div className="searchable-dropdown" ref={roundingAccountRef}>
+                    <button
+                      type="button"
+                      className={'form-input account-select-trigger' + (roundingAccountOpen ? ' active' : '')}
+                      onClick={() => setRoundingAccountOpen(v => !v)}
+                    >
+                      {roundingAccountId ? (() => {
+                        const acc = accounts.find(a => a.id === roundingAccountId);
+                        return acc ? (
+                          <span className="account-option">
+                            <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
+                            <span className="account-info">
+                              <span className="account-name">{acc.name}</span>
+                              <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
+                            </span>
+                          </span>
+                        ) : null;
+                      })() : (
+                        <span className="category-trigger-placeholder">Selecciona cuenta destino…</span>
+                      )}
+                      <span className="category-trigger-arrow">{roundingAccountOpen ? '▲' : '▼'}</span>
+                    </button>
+
+                    {roundingAccountOpen && (
+                      <div className="dropdown-results">
+                        {accounts.filter(a => a.id !== sourceAccountId).map(acc => (
+                          <div
+                            key={acc.id}
+                            className={'dropdown-item' + (roundingAccountId === acc.id ? ' selected' : '')}
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => { setRoundingAccountId(acc.id); setRoundingAccountOpen(false); }}
+                          >
+                            <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
+                            <span className="account-info">
+                              <span className="account-name">{acc.name}</span>
+                              <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {roundingAccountId && amount && (() => {
+                    const absAmt = Math.abs(parseFloat(amount));
+                    const roundUp = parseFloat((Math.ceil(absAmt) - absAmt).toFixed(2));
+                    return roundUp >= 0.01 ? (
+                      <small className="form-hint">Se transferirán <strong>{roundUp.toFixed(2)} {currency || '€'}</strong> como redondeo</small>
+                    ) : (
+                      <small className="form-hint">El importe ya es un número entero, no se creará transferencia</small>
+                    );
+                  })()}
+                </div>
+              )}
 
               {hasTax && (
                 <>

@@ -143,6 +143,13 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
   const [accountDropdownPos, setAccountDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const accountRef  = useRef<HTMLDivElement>(null);
 
+  // ── Rounding feature
+  const [roundingEnabled, setRoundingEnabled]                     = useState(false);
+  const [roundingAccountId, setRoundingAccountId]                 = useState<number | ''>('');
+  const [roundingAccountOpen, setRoundingAccountOpen]             = useState(false);
+  const [roundingAccountDropdownPos, setRoundingAccountDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const roundingAccountRef = useRef<HTMLDivElement>(null);
+
   // ── Date range helper (mass mode)
   const [rangeFrom, setRangeFrom] = useState('');
   const [rangeTo, setRangeTo]     = useState('');
@@ -201,6 +208,7 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
   useEffect(() => {
     const handle = (e: MouseEvent) => {
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) setAccountOpen(false);
+      if (roundingAccountRef.current && !roundingAccountRef.current.contains(e.target as Node)) setRoundingAccountOpen(false);
     };
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
@@ -366,6 +374,9 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
       ? txnTypes.find(t => t.name.toLowerCase().includes('income') || t.name.toLowerCase().includes('ingreso'))?.id
       : txnTypes.find(t => t.name.toLowerCase().includes('expense') || t.name.toLowerCase().includes('gasto'))?.id;
 
+  const getTransferTypeId = () =>
+    txnTypes.find(t => t.name.toLowerCase().includes('transfer') || t.name.toLowerCase().includes('transferencia'))?.id;
+
   // ── Save all ──────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
@@ -415,6 +426,23 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
             taxTypeId: rowTaxTypeId as number,
             notes: '',
           });
+        }
+
+        // ── Rounding transfer
+        if (roundingEnabled && roundingAccountId !== '') {
+          const absNet = Math.abs(net);
+          const roundUpAmount = parseFloat((Math.ceil(absNet) - absNet).toFixed(2));
+          if (roundUpAmount >= 0.01) {
+            await createTransaction(accessToken, {
+              sourceAccountId: accountId as number,
+              destinationAccountId: roundingAccountId as number,
+              bookingDate: row.date + 'T00:00:00',
+              amount: -roundUpAmount,
+              currency: selectedAccount?.currency ?? 'EUR',
+              typeId: getTransferTypeId(),
+              description: 'Redondeo automático',
+            });
+          }
         }
 
         saved++;
@@ -497,6 +525,55 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
       </div>
     </div>
   );
+
+  const renderRoundingConfig = () => {
+    const roundingAccount = accounts.find(a => a.id === roundingAccountId);
+    return (
+      <div className="btm-rounding-config">
+        <label className="btm-rounding-toggle">
+          <input
+            type="checkbox"
+            checked={roundingEnabled}
+            onChange={e => { setRoundingEnabled(e.target.checked); if (!e.target.checked) setRoundingAccountId(''); }}
+            disabled={saving}
+          />
+          <span>🪙 Redondeo</span>
+        </label>
+        {roundingEnabled && (
+          <div className="btm-rounding-account">
+            <span className="btm-rounding-account-label">→</span>
+            <div className="btm-dropdown btm-dropdown--sm" ref={roundingAccountRef}>
+              <button
+                type="button"
+                className={`btm-dropdown-trigger btm-dropdown-trigger--sm${roundingAccountOpen ? ' open' : ''}${!roundingAccount ? ' placeholder' : ''}`}
+                onClick={() => {
+                  if (saving) return;
+                  if (!roundingAccountOpen) {
+                    const rect = roundingAccountRef.current?.getBoundingClientRect();
+                    if (rect) setRoundingAccountDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 260) });
+                  }
+                  setRoundingAccountOpen(v => !v);
+                }}
+                disabled={saving}
+              >
+                {roundingAccount ? (
+                  <span className="btm-acc-option">
+                    <InstLogo name={roundingAccount.institutionName} />
+                    <span className="btm-acc-info">
+                      <span className="btm-acc-name">{roundingAccount.name}</span>
+                    </span>
+                  </span>
+                ) : (
+                  <span className="btm-placeholder">Cuenta destino…</span>
+                )}
+                <span className="btm-dropdown-arrow">{roundingAccountOpen ? '▲' : '▼'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderMassCategoryDropdown = () => (
     <div className="btm-field btm-field--wide">
@@ -615,6 +692,7 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
                   {taxTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
+              {renderRoundingConfig()}
             </div>
 
             <div className="btm-date-helper">
@@ -672,6 +750,7 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
           <>
             <div className="btm-config btm-config--flex">
               {renderAccountDropdown()}
+              {renderRoundingConfig()}
               <div className="btm-config-hint">
                 <span>✏️</span>
                 <span>Modo personalizado: cada fila tiene su propia fecha, descripción, categoría, comercio, tags e importes.</span>
@@ -1063,6 +1142,29 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
             key={a.id}
             className={`btm-dropdown-item${accountId === a.id ? ' selected' : ''}`}
             onClick={() => { setAccountId(a.id); setAccountOpen(false); }}
+          >
+            <InstLogo name={a.institutionName} />
+            <span className="btm-acc-info">
+              <span className="btm-acc-name">{a.name}</span>
+              <span className="btm-acc-bank">{a.institutionName || 'Sin banco'}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* Rounding account dropdown — fixed */}
+    {roundingAccountOpen && roundingAccountDropdownPos && (
+      <div
+        className="btm-account-dropdown-fixed"
+        style={{ top: roundingAccountDropdownPos.top, left: roundingAccountDropdownPos.left, width: roundingAccountDropdownPos.width }}
+        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
+      >
+        {accounts.filter(a => a.id !== accountId).map(a => (
+          <div
+            key={a.id}
+            className={`btm-dropdown-item${roundingAccountId === a.id ? ' selected' : ''}`}
+            onClick={() => { setRoundingAccountId(a.id); setRoundingAccountOpen(false); }}
           >
             <InstLogo name={a.institutionName} />
             <span className="btm-acc-info">
