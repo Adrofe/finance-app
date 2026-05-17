@@ -834,8 +834,8 @@ export function CreateTransactionModal({
                 />
               </div>
 
-              {/* Tax withholding section */}
-              <div className="form-group full-width">
+              {/* Tax withholding section — inline toggle row */}
+              <div className="form-group full-width ctm-toggle-row">
                 <label className="form-label tax-toggle-label">
                   <input
                     type="checkbox"
@@ -845,11 +845,83 @@ export function CreateTransactionModal({
                   />
                   Tiene retención fiscal
                 </label>
+
+                {hasTax && (
+                  <div className="ctm-toggle-panel ctm-tax-panel">
+                    <div className="ctm-tax-grid">
+                      <div className="form-group">
+                        <label htmlFor="taxGross" className="form-label">
+                          Importe bruto <span className="required">*</span>
+                        </label>
+                        <input
+                          id="taxGross"
+                          type="number"
+                          step="0.01"
+                          className="form-input"
+                          value={taxGross}
+                          onChange={e => handleTaxFieldChange('gross', e.target.value)}
+                          placeholder="120.00"
+                          required={hasTax}
+                        />
+                        {currency && <span className="currency-badge">{currency}</span>}
+                        <small className="form-hint">Importe antes de aplicar la retención</small>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="taxAmount" className="form-label">
+                          Retención <span className="required">*</span>
+                        </label>
+                        <input
+                          id="taxAmount"
+                          type="number"
+                          step="0.01"
+                          className="form-input"
+                          value={taxAmount}
+                          onChange={e => handleTaxFieldChange('tax', e.target.value)}
+                          placeholder="23.40"
+                          required={hasTax}
+                        />
+                        {currency && <span className="currency-badge">{currency}</span>}
+                        <small className="form-hint">Se calcula desde bruto y cantidad (neto)</small>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="taxType" className="form-label">
+                          Tipo de retención <span className="required">*</span>
+                        </label>
+                        <select
+                          id="taxType"
+                          className="form-input"
+                          value={taxTypeId || ''}
+                          onChange={e => setTaxTypeId(Number(e.target.value) || undefined)}
+                          required={hasTax}
+                        >
+                          <option value="">Seleccionar tipo...</option>
+                          {taxTypes.map(tt => (
+                            <option key={tt.id} value={tt.id}>{tt.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="taxNotes" className="form-label">Notas (retención)</label>
+                        <input
+                          id="taxNotes"
+                          type="text"
+                          className="form-input"
+                          value={taxNotes}
+                          onChange={e => setTaxNotes(e.target.value)}
+                          placeholder="Ej: 19% IRPF sobre dividendos Inditex"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Rounding section */}
-              <div className="form-group full-width">
-                <label className="form-label tax-toggle-label">
+              {/* Rounding section — inline toggle row */}
+              <div className="form-group full-width ctm-toggle-row">
+                <label className="form-label tax-toggle-label ctm-rounding-toggle-label">
                   <input
                     type="checkbox"
                     checked={roundingEnabled}
@@ -858,135 +930,64 @@ export function CreateTransactionModal({
                   />
                   🪙 Redondeo al euro
                 </label>
-              </div>
 
-              {roundingEnabled && (
-                <div className="form-group">
-                  <label className="form-label">Cuenta destino del redondeo</label>
-                  <div className="searchable-dropdown" ref={roundingAccountRef}>
-                    <button
-                      type="button"
-                      className={'form-input account-select-trigger' + (roundingAccountOpen ? ' active' : '')}
-                      onClick={() => setRoundingAccountOpen(v => !v)}
-                    >
-                      {roundingAccountId ? (() => {
-                        const acc = accounts.find(a => a.id === roundingAccountId);
-                        return acc ? (
-                          <span className="account-option">
-                            <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
-                            <span className="account-info">
-                              <span className="account-name">{acc.name}</span>
-                              <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
+                {roundingEnabled && (
+                  <div className="ctm-toggle-panel">
+                    <label className="form-label">Cuenta destino</label>
+                    <div className="searchable-dropdown" ref={roundingAccountRef}>
+                      <button
+                        type="button"
+                        className={'form-input account-select-trigger' + (roundingAccountOpen ? ' active' : '')}
+                        onClick={() => setRoundingAccountOpen(v => !v)}
+                      >
+                        {roundingAccountId ? (() => {
+                          const acc = accounts.find(a => a.id === roundingAccountId);
+                          return acc ? (
+                            <span className="account-option">
+                              <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
+                              <span className="account-info">
+                                <span className="account-name">{acc.name}</span>
+                                <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
+                              </span>
                             </span>
-                          </span>
-                        ) : null;
-                      })() : (
-                        <span className="category-trigger-placeholder">Selecciona cuenta destino…</span>
+                          ) : null;
+                        })() : (
+                          <span className="category-trigger-placeholder">Selecciona cuenta destino…</span>
+                        )}
+                        <span className="category-trigger-arrow">{roundingAccountOpen ? '▲' : '▼'}</span>
+                      </button>
+
+                      {roundingAccountOpen && (
+                        <div className="dropdown-results">
+                          {accounts.filter(a => a.id !== sourceAccountId).map(acc => (
+                            <div
+                              key={acc.id}
+                              className={'dropdown-item' + (roundingAccountId === acc.id ? ' selected' : '')}
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => { setRoundingAccountId(acc.id); setRoundingAccountOpen(false); }}
+                            >
+                              <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
+                              <span className="account-info">
+                                <span className="account-name">{acc.name}</span>
+                                <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       )}
-                      <span className="category-trigger-arrow">{roundingAccountOpen ? '▲' : '▼'}</span>
-                    </button>
-
-                    {roundingAccountOpen && (
-                      <div className="dropdown-results">
-                        {accounts.filter(a => a.id !== sourceAccountId).map(acc => (
-                          <div
-                            key={acc.id}
-                            className={'dropdown-item' + (roundingAccountId === acc.id ? ' selected' : '')}
-                            onMouseDown={e => e.preventDefault()}
-                            onClick={() => { setRoundingAccountId(acc.id); setRoundingAccountOpen(false); }}
-                          >
-                            <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
-                            <span className="account-info">
-                              <span className="account-name">{acc.name}</span>
-                              <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    </div>
+                    {roundingAccountId && amount && (() => {
+                      const absAmt = Math.abs(parseFloat(amount));
+                      const roundUp = parseFloat((Math.ceil(absAmt) - absAmt).toFixed(2));
+                      return roundUp >= 0.01 ? (
+                        <small className="form-hint">Se transferirán <strong>{roundUp.toFixed(2)} {currency || '€'}</strong> como redondeo</small>
+                      ) : (
+                        <small className="form-hint">El importe ya es un número entero, no se creará transferencia</small>
+                      );
+                    })()}
                   </div>
-                  {roundingAccountId && amount && (() => {
-                    const absAmt = Math.abs(parseFloat(amount));
-                    const roundUp = parseFloat((Math.ceil(absAmt) - absAmt).toFixed(2));
-                    return roundUp >= 0.01 ? (
-                      <small className="form-hint">Se transferirán <strong>{roundUp.toFixed(2)} {currency || '€'}</strong> como redondeo</small>
-                    ) : (
-                      <small className="form-hint">El importe ya es un número entero, no se creará transferencia</small>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {hasTax && (
-                <>
-                  <div className="form-group">
-                    <label htmlFor="taxGross" className="form-label">
-                      Importe bruto <span className="required">*</span>
-                    </label>
-                    <input
-                      id="taxGross"
-                      type="number"
-                      step="0.01"
-                      className="form-input"
-                      value={taxGross}
-                      onChange={e => handleTaxFieldChange('gross', e.target.value)}
-                      placeholder="120.00"
-                      required={hasTax}
-                    />
-                    {currency && <span className="currency-badge">{currency}</span>}
-                    <small className="form-hint">Importe antes de aplicar la retención</small>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="taxAmount" className="form-label">
-                      Retención <span className="required">*</span>
-                    </label>
-                    <input
-                      id="taxAmount"
-                      type="number"
-                      step="0.01"
-                      className="form-input"
-                      value={taxAmount}
-                      onChange={e => handleTaxFieldChange('tax', e.target.value)}
-                      placeholder="23.40"
-                      required={hasTax}
-                    />
-                    {currency && <span className="currency-badge">{currency}</span>}
-                    <small className="form-hint">Se calcula desde bruto y cantidad (neto en cuenta)</small>
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="taxType" className="form-label">
-                      Tipo de retención <span className="required">*</span>
-                    </label>
-                    <select
-                      id="taxType"
-                      className="form-input"
-                      value={taxTypeId || ''}
-                      onChange={e => setTaxTypeId(Number(e.target.value) || undefined)}
-                      required={hasTax}
-                    >
-                      <option value="">Seleccionar tipo...</option>
-                      {taxTypes.map(tt => (
-                        <option key={tt.id} value={tt.id}>{tt.name}</option>
-                      ))}
-                    </select>
-
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="taxNotes" className="form-label">Notas (retención)</label>
-                    <input
-                      id="taxNotes"
-                      type="text"
-                      className="form-input"
-                      value={taxNotes}
-                      onChange={e => setTaxNotes(e.target.value)}
-                      placeholder="Ej: 19% IRPF sobre dividendos Inditex"
-                    />
-                  </div>
-                </>
-              )}
+                )}
+              </div>
 
             </div>
           </div>

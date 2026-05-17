@@ -767,6 +767,9 @@
   border: 2px solid #e8d8ff;
   border-radius: 8px;
   transition: background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: flex-start;
 }
 
 .tax-toggle-label:has(.tax-toggle-checkbox:checked) {
@@ -780,6 +783,57 @@
   height: 18px;
   accent-color: #764ba2;
   cursor: pointer;
+}
+
+/* ── Inline toggle rows ──────────────────────────────────────────────────── */
+.ctm-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.ctm-rounding-toggle-label {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.ctm-rounding-toggle-label:has(.tax-toggle-checkbox:checked) {
+  background: #dcfce7;
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+.ctm-rounding-toggle-label .tax-toggle-checkbox {
+  accent-color: #16a34a;
+}
+
+.ctm-toggle-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+.ctm-tax-panel .ctm-tax-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.ctm-tax-grid .form-group {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .ctm-toggle-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ctm-toggle-row > .tax-toggle-label {
+    white-space: normal;
+  }
+  .ctm-tax-panel .ctm-tax-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Dropdown enhancements ───────────────────────────────────────────────── */
