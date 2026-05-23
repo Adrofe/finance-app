@@ -49,3 +49,8 @@ export async function updateOperation(token: string, id: number, payload: Invest
 export async function deleteOperation(token: string, id: number): Promise<void> {
   await axios.delete(`${OPERATIONS_BASE}/${id}`, { headers: headers(token) });
 }
+
+export async function recalculateAllPositions(token: string): Promise<number> {
+  const res = await axios.post<ApiResponse<number>>(`${OPERATIONS_BASE}/recalculate-all`, null, { headers: headers(token) });
+  return res.data.data ?? 0;
+}
