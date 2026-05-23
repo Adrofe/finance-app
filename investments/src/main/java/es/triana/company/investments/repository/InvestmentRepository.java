@@ -23,6 +23,9 @@ public interface InvestmentRepository extends JpaRepository<Investment, Long> {
 
     List<Investment> findByInstrumentId(Long instrumentId);
 
+    @Query("SELECT DISTINCT i.instrumentId FROM Investment i WHERE i.quantity > 0")
+    List<Long> findDistinctActiveInstrumentIds();
+
     Optional<Investment> findByIdAndTenantId(Long id, Long tenantId);
 
     /**

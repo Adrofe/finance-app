@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,19 +93,26 @@ public class PriceRefreshService {
 
     @Transactional
     public PriceRefreshResultDTO refreshPricesAutomaticallyNow() {
-        List<InvestmentInstrument> instruments = investmentInstrumentRepository.findAll();
-        LOG.info("Starting automatic price refresh for {} instruments", instruments.size());
+        List<Long> activeInstrumentIds = investmentRepository.findDistinctActiveInstrumentIds();
+        List<InvestmentInstrument> instruments = activeInstrumentIds.isEmpty()
+            ? List.of()
+            : investmentInstrumentRepository.findAllById(activeInstrumentIds);
+        LOG.info(
+            "Starting automatic price refresh for {} active instruments ({} total configured)",
+            instruments.size(),
+            investmentInstrumentRepository.count());
 
         int recalculatedPositions = 0;
         List<Long> updatedInstrumentIds = new ArrayList<>();
         int skippedNoQuote = 0;
 
         LocalDateTime now = LocalDateTime.now();
+        Map<Long, MarketPriceClient.MarketQuote> quotesByInstrumentId = marketPriceClient.fetchLatestQuotes(instruments);
 
         for (InvestmentInstrument instrument : instruments) {
             try {
-                Optional<MarketPriceClient.MarketQuote> fetched = marketPriceClient.fetchLatestQuote(instrument);
-                if (fetched.isEmpty()) {
+            MarketPriceClient.MarketQuote quote = quotesByInstrumentId.get(instrument.getId());
+            if (quote == null) {
                     skippedNoQuote++;
                     LOG.debug(
                             "Auto refresh skipped instrumentId={} symbol={} market={} (no quote)",
@@ -115,7 +122,6 @@ public class PriceRefreshService {
                     continue;
                 }
 
-                MarketPriceClient.MarketQuote quote = fetched.get();
                 BigDecimal nextPrice = quote.price();
                 String source = quote.source();
                 String currency = normalizeCurrency(quote.currency(), instrument.getCurrency());
