@@ -1,0 +1,157 @@
+.fx-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.fx-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  background: linear-gradient(120deg, #f3f9ff 0%, #ecfdf3 100%);
+  border: 1px solid #d8e9db;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.fx-hero h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.fx-hero p {
+  margin: 4px 0 0;
+  color: #4e667d;
+}
+
+.fx-chip {
+  min-width: 180px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #d9e4ef;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.fx-chip span {
+  color: #6b7f94;
+  font-size: 0.78rem;
+}
+
+.fx-chip strong {
+  color: #10324f;
+}
+
+.fx-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.fx-card {
+  border: 1px solid #dbe6f2;
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.fx-card h4 {
+  margin: 0;
+  color: #18324b;
+}
+
+.fx-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.fx-form-grid label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #35516d;
+}
+
+.fx-form-grid input {
+  width: 100%;
+  border: 1px solid #cddceb;
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #f9fbfd;
+  font-size: 0.92rem;
+}
+
+.fx-form-grid input:focus {
+  outline: none;
+  border-color: #2f7ed8;
+  box-shadow: 0 0 0 3px rgba(47, 126, 216, 0.15);
+  background: #fff;
+}
+
+.fx-actions {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  grid-column: 1 / -1;
+}
+
+.fx-table-wrap {
+  border: 1px solid #dbe6f2;
+  border-radius: 14px;
+  overflow: auto;
+  background: #ffffff;
+}
+
+.fx-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 620px;
+}
+
+.fx-table th,
+.fx-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #edf2f7;
+  text-align: left;
+}
+
+.fx-table th {
+  background: #f8fbff;
+  color: #42607f;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fx-table tbody tr:hover {
+  background: #f8fcff;
+}
+
+.fx-empty {
+  text-align: center;
+  color: #5f7287;
+}
+
+@media (max-width: 720px) {
+  .fx-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .fx-chip {
+    width: 100%;
+  }
+
+  .fx-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fx-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

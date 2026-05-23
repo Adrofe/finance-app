@@ -11,6 +11,7 @@ import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
 import { InvestmentsDashboard } from './components/InvestmentsDashboard';
 import { InvestmentsOverviewTable } from './components/InvestmentsOverviewTable';
 import { InvestmentOperationsTable } from './components/InvestmentOperationsTable';
+import { ExchangeRatesPanel } from './components/ExchangeRatesPanel';
 import { LoginForm } from './components/LoginForm';
 import { AppHeader } from './components/AppHeader';
 import { TransactionsTable } from './components/TransactionsTable';
@@ -161,6 +162,16 @@ function App() {
 
           {investmentsSubTab === 'catalog' && (
             <InvestmentCatalogTable token={accessToken} onUnauthorized={handleUnauthorized} />
+          )}
+
+          {investmentsSubTab === 'forex' && (
+            <article className="sheet">
+              <div className="sheet-header">
+                <h3>Exchange Rates</h3>
+                <span>Histórico de divisas y mantenimiento manual</span>
+              </div>
+              <ExchangeRatesPanel token={accessToken} onUnauthorized={handleUnauthorized} />
+            </article>
           )}
         </section>
       )}

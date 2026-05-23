@@ -10,6 +10,7 @@ const TABS: { id: InvestmentsSubTab; label: string; icon: string }[] = [
   { id: 'investments', label: 'Investments',       icon: '💼' },
   { id: 'fifo',        label: 'FIFO Operations',   icon: '🔄' },
   { id: 'catalog',     label: 'Available Assets',  icon: '🏦' },
+  { id: 'forex',       label: 'FX Rates',          icon: '💱' },
 ];
 
 export function InvestmentsSubTabs({ activeTab, onSelectTab }: InvestmentsSubTabsProps) {
