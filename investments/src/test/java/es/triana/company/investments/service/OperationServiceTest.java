@@ -76,6 +76,7 @@ class OperationServiceTest {
     @Mock OperationFifoLotRepository fifoLotRepository;
     @Mock InvestmentRepository investmentRepository;
     @Mock ExchangeRateRepository exchangeRateRepository;
+        @Mock ExchangeRateRefreshService exchangeRateRefreshService;
     @Mock InvestmentInstrumentRepository investmentInstrumentRepository;
     @Mock InvestmentPlatformRepository investmentPlatformRepository;
     @Spy  OperationMapper operationMapper = new OperationMapper();

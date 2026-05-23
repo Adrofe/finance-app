@@ -45,6 +45,7 @@ public class OperationService {
     private final InvestmentInstrumentRepository investmentInstrumentRepository;
     private final InvestmentPlatformRepository investmentPlatformRepository;
     private final ExchangeRateRepository exchangeRateRepository;
+    private final ExchangeRateRefreshService exchangeRateRefreshService;
     private final es.triana.company.investments.service.mapper.OperationMapper operationMapper;
 
         public OperationService(InvestmentOperationRepository operationRepository,
@@ -53,6 +54,7 @@ public class OperationService {
             InvestmentInstrumentRepository investmentInstrumentRepository,
             InvestmentPlatformRepository investmentPlatformRepository,
             ExchangeRateRepository exchangeRateRepository,
+            ExchangeRateRefreshService exchangeRateRefreshService,
             es.triana.company.investments.service.mapper.OperationMapper operationMapper) {
                 this.operationRepository = operationRepository;
                 this.fifoLotRepository = fifoLotRepository;
@@ -60,6 +62,7 @@ public class OperationService {
             this.investmentInstrumentRepository = investmentInstrumentRepository;
             this.investmentPlatformRepository = investmentPlatformRepository;
                 this.exchangeRateRepository = exchangeRateRepository;
+                this.exchangeRateRefreshService = exchangeRateRefreshService;
                 this.operationMapper = operationMapper;
         }
 
@@ -661,9 +664,26 @@ public class OperationService {
         Optional<BigDecimal> exactRateOpt = findExactEurRate(curr, date);
         if (exactRateOpt.isPresent()) {
             return exactRateOpt.get();
-        } else {
-            LOG.warn("No exact ECB rate for EUR/{} on {}. Attempting to find most recent available rate.", currency, date);
-            return findMostRecentEurRateOrThrow(curr);
+        }
+
+        LOG.warn("No exact ECB rate for EUR/{} on {}. Attempting to fetch that day from ECB.", curr, date);
+        attemptBackfillRateForDate(date, curr);
+
+        Optional<BigDecimal> afterBackfillOpt = findExactEurRate(curr, date);
+        if (afterBackfillOpt.isPresent()) {
+            return afterBackfillOpt.get();
+        }
+
+        LOG.warn("ECB backfill did not provide EUR/{} on {}. Using most recent available rate.", curr, date);
+        return findMostRecentEurRateOrThrow(curr);
+    }
+
+    private void attemptBackfillRateForDate(LocalDate date, String currency) {
+        try {
+            int upserted = exchangeRateRefreshService.refreshRatesForDate(date);
+            LOG.info("ECB day backfill attempted for {}. upsertedRates={}", date, upserted);
+        } catch (Exception ex) {
+            LOG.warn("ECB day backfill failed for {} while resolving EUR/{}: {}", date, currency, ex.getMessage());
         }
     }
 
