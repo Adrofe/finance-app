@@ -440,6 +440,7 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
               amount: -roundUpAmount,
               currency: selectedAccount?.currency ?? 'EUR',
               typeId: getTransferTypeId(),
+              categoryId: categories.find(c => c.name.toLowerCase() === 'internal transfers' || (c.code ?? '').toUpperCase() === 'INT')?.id,
               description: 'Redondeo automático',
             });
           }

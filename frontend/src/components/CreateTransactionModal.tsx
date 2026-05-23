@@ -326,6 +326,7 @@ export function CreateTransactionModal({
         const roundUp = parseFloat((Math.ceil(absAmount) - absAmount).toFixed(2));
         if (roundUp >= 0.01) {
           const transferTypeId = types.find(t => t.name.toLowerCase().includes('transfer') || t.name.toLowerCase().includes('transferencia'))?.id;
+          const internalTransferCategoryId = categories.find(c => c.name.toLowerCase() === 'internal transfers' || (c.code ?? '').toUpperCase() === 'INT')?.id;
           await (await import('../services/transactionsService')).createTransaction(accessToken, {
             sourceAccountId,
             destinationAccountId: roundingAccountId,
@@ -333,6 +334,7 @@ export function CreateTransactionModal({
             bookingDate: `${bookingDate}T00:00:00`,
             currency,
             typeId: transferTypeId,
+            categoryId: internalTransferCategoryId,
             description: 'Redondeo automático',
           });
         }
