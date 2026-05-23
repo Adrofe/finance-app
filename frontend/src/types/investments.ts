@@ -1,4 +1,4 @@
-export type InvestmentsSubTab = 'dashboard' | 'investments' | 'fifo' | 'catalog';
+export type InvestmentsSubTab = 'dashboard' | 'investments' | 'fifo' | 'catalog' | 'forex';
 
 export type InvestmentOperationType = 'BUY' | 'SELL';
 
@@ -133,6 +133,23 @@ export type InvestmentTaxSummary = {
   totalGainLossEur: number;
   byInstrument: InvestmentTaxByInstrument[];
   byCurrency: InvestmentTaxByCurrency[];
+};
+
+export type ExchangeRateEntry = {
+  id: number;
+  fromCurrency: string;
+  toCurrency: string;
+  rate: number;
+  source?: string;
+  asOf: string;
+};
+
+export type ExchangeRateUpsertDraft = {
+  fromCurrency: string;
+  toCurrency: string;
+  rate: number;
+  asOf: string;
+  source?: string;
 };
 
 export type PriceRefreshResult = {

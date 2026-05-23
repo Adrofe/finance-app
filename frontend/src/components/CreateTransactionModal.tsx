@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import axios from 'axios';
-import type { CreateTransactionRequest, Transaction } from '../types/banking';
+import type { CreateTransactionRequest, Transaction, TaxType } from '../types/banking';
 import { CatalogService, Account, Tag, Merchant, TransactionCategory, TransactionStatus, TransactionType } from '../services/catalogService';
 import { getCategoryVisual, getMerchantLogo, getInstitutionLogo } from '../constants/visualConfig';
 import './CreateTransactionModal.css';
@@ -82,6 +82,18 @@ export function CreateTransactionModal({
   const [tagOpen, setTagOpen] = useState(false);
   const tagRef = useRef<HTMLDivElement>(null);
 
+  // Tax withholding state
+  const [hasTax, setHasTax] = useState(false);
+  const [taxGross, setTaxGross] = useState('');
+  const [taxAmount, setTaxAmount] = useState('');
+  const [taxTypeId, setTaxTypeId] = useState<number | undefined>();
+  const [taxNotes, setTaxNotes] = useState('');
+  const [taxTypes, setTaxTypes] = useState<TaxType[]>([]);
+  // Rounding state
+  const [roundingEnabled, setRoundingEnabled] = useState(false);
+  const [roundingAccountId, setRoundingAccountId] = useState<number | undefined>();
+  const [roundingAccountOpen, setRoundingAccountOpen] = useState(false);
+  const roundingAccountRef = useRef<HTMLDivElement>(null);
   // Loading states
   const [loading, setLoading] = useState(false);
   const [catalogsLoading, setCatalogsLoading] = useState(true);
@@ -97,13 +109,15 @@ export function CreateTransactionModal({
       CatalogService.fetchTypes(accessToken),
       CatalogService.fetchTags(accessToken),
       CatalogService.fetchMerchants(accessToken),
-    ]).then(([accs, cats, stats, typs, tgs, merch]) => {
+      CatalogService.fetchTaxTypes(accessToken),
+    ]).then(([accs, cats, stats, typs, tgs, merch, taxTypesData]) => {
       setAccounts(accs);
       setCategories(cats);
       setStatuses(stats);
       setTypes(typs);
       setTags(tgs);
       setMerchants(merch);
+      setTaxTypes(taxTypesData);
       const initialStatus = initialValues?.statusId;
       if (initialStatus) {
         setStatusId(initialStatus);
@@ -130,6 +144,9 @@ export function CreateTransactionModal({
       }
       if (destinationAccountRef.current && !destinationAccountRef.current.contains(e.target as Node)) {
         setDestinationAccountOpen(false);
+      }
+      if (roundingAccountRef.current && !roundingAccountRef.current.contains(e.target as Node)) {
+        setRoundingAccountOpen(false);
       }
 
       const clickedCategoryTrigger = categoryPickerRef.current?.contains(target);
@@ -292,6 +309,37 @@ export function CreateTransactionModal({
 
       const { createTransaction } = await import('../services/transactionsService');
       const createdTransaction = await createTransaction(accessToken, transaction);
+
+      // Save tax withholding if enabled
+      if (hasTax && createdTransaction.id && taxGross && taxAmount && taxTypeId) {
+        await CatalogService.saveTransactionTax(accessToken, createdTransaction.id, {
+          grossAmount: parseFloat(taxGross),
+          taxAmount: parseFloat(taxAmount),
+          taxTypeId,
+          notes: taxNotes || undefined,
+        });
+      }
+
+      // Rounding transfer
+      if (roundingEnabled && roundingAccountId) {
+        const absAmount = Math.abs(amountNum);
+        const roundUp = parseFloat((Math.ceil(absAmount) - absAmount).toFixed(2));
+        if (roundUp >= 0.01) {
+          const transferTypeId = types.find(t => t.name.toLowerCase().includes('transfer') || t.name.toLowerCase().includes('transferencia'))?.id;
+          const internalTransferCategoryId = categories.find(c => c.name.toLowerCase() === 'internal transfers' || (c.code ?? '').toUpperCase() === 'INT')?.id;
+          await (await import('../services/transactionsService')).createTransaction(accessToken, {
+            sourceAccountId,
+            destinationAccountId: roundingAccountId,
+            amount: -roundUp,
+            bookingDate: `${bookingDate}T00:00:00`,
+            currency,
+            typeId: transferTypeId,
+            categoryId: internalTransferCategoryId,
+            description: 'Redondeo automático',
+          });
+        }
+      }
+
       if (onSubmitTransaction) {
         await onSubmitTransaction(createdTransaction, transaction);
       }
@@ -306,6 +354,42 @@ export function CreateTransactionModal({
       alert(`Error al crear la transaccion: ${message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const recalculateTaxFromNet = (netValue: string) => {
+    const net = parseFloat(netValue);
+    const gross = parseFloat(taxGross);
+    const tax = parseFloat(taxAmount);
+
+    if (isNaN(net)) return;
+
+    if (!isNaN(gross) && (taxAmount.trim() === '' || isNaN(tax))) {
+      setTaxAmount((gross - net).toFixed(2));
+      return;
+    }
+
+    if (!isNaN(tax) && (taxGross.trim() === '' || isNaN(gross))) {
+      setTaxGross((net + tax).toFixed(2));
+    }
+  };
+
+  const handleTaxFieldChange = (field: 'gross' | 'tax', value: string) => {
+    const net = parseFloat(amount);
+    const gross = field === 'gross' ? parseFloat(value) : parseFloat(taxGross);
+    const tax = field === 'tax' ? parseFloat(value) : parseFloat(taxAmount);
+
+    if (field === 'gross') {
+      setTaxGross(value);
+      if (!isNaN(gross) && !isNaN(net)) {
+        setTaxAmount((gross - net).toFixed(2));
+      }
+      return;
+    }
+
+    setTaxAmount(value);
+    if (!isNaN(tax) && !isNaN(net)) {
+      setTaxGross((net + tax).toFixed(2));
     }
   };
 
@@ -449,7 +533,11 @@ export function CreateTransactionModal({
                   step="0.01"
                   className="form-input"
                   value={amount}
-                  onChange={e => setAmount(e.target.value)}
+                  onChange={e => {
+                    const value = e.target.value;
+                    setAmount(value);
+                    if (hasTax) recalculateTaxFromNet(value);
+                  }}
                   placeholder="100.00"
                   required
                   disabled={lockAmount}
@@ -746,6 +834,161 @@ export function CreateTransactionModal({
                   placeholder="Añade una nota sobre esta transacción..."
                   rows={3}
                 />
+              </div>
+
+              {/* Tax withholding section — inline toggle row */}
+              <div className="form-group full-width ctm-toggle-row">
+                <label className="form-label tax-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={hasTax}
+                    onChange={e => setHasTax(e.target.checked)}
+                    className="tax-toggle-checkbox"
+                  />
+                  Tiene retención fiscal
+                </label>
+
+                {hasTax && (
+                  <div className="ctm-toggle-panel ctm-tax-panel">
+                    <div className="ctm-tax-grid">
+                      <div className="form-group">
+                        <label htmlFor="taxGross" className="form-label">
+                          Importe bruto <span className="required">*</span>
+                        </label>
+                        <input
+                          id="taxGross"
+                          type="number"
+                          step="0.01"
+                          className="form-input"
+                          value={taxGross}
+                          onChange={e => handleTaxFieldChange('gross', e.target.value)}
+                          placeholder="120.00"
+                          required={hasTax}
+                        />
+                        {currency && <span className="currency-badge">{currency}</span>}
+                        <small className="form-hint">Importe antes de aplicar la retención</small>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="taxAmount" className="form-label">
+                          Retención <span className="required">*</span>
+                        </label>
+                        <input
+                          id="taxAmount"
+                          type="number"
+                          step="0.01"
+                          className="form-input"
+                          value={taxAmount}
+                          onChange={e => handleTaxFieldChange('tax', e.target.value)}
+                          placeholder="23.40"
+                          required={hasTax}
+                        />
+                        {currency && <span className="currency-badge">{currency}</span>}
+                        <small className="form-hint">Se calcula desde bruto y cantidad (neto)</small>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="taxType" className="form-label">
+                          Tipo de retención <span className="required">*</span>
+                        </label>
+                        <select
+                          id="taxType"
+                          className="form-input"
+                          value={taxTypeId || ''}
+                          onChange={e => setTaxTypeId(Number(e.target.value) || undefined)}
+                          required={hasTax}
+                        >
+                          <option value="">Seleccionar tipo...</option>
+                          {taxTypes.map(tt => (
+                            <option key={tt.id} value={tt.id}>{tt.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="taxNotes" className="form-label">Notas (retención)</label>
+                        <input
+                          id="taxNotes"
+                          type="text"
+                          className="form-input"
+                          value={taxNotes}
+                          onChange={e => setTaxNotes(e.target.value)}
+                          placeholder="Ej: 19% IRPF sobre dividendos Inditex"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Rounding section — inline toggle row */}
+              <div className="form-group full-width ctm-toggle-row">
+                <label className="form-label tax-toggle-label ctm-rounding-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={roundingEnabled}
+                    onChange={e => { setRoundingEnabled(e.target.checked); if (!e.target.checked) setRoundingAccountId(undefined); }}
+                    className="tax-toggle-checkbox"
+                  />
+                  🪙 Redondeo al euro
+                </label>
+
+                {roundingEnabled && (
+                  <div className="ctm-toggle-panel">
+                    <label className="form-label">Cuenta destino</label>
+                    <div className="searchable-dropdown" ref={roundingAccountRef}>
+                      <button
+                        type="button"
+                        className={'form-input account-select-trigger' + (roundingAccountOpen ? ' active' : '')}
+                        onClick={() => setRoundingAccountOpen(v => !v)}
+                      >
+                        {roundingAccountId ? (() => {
+                          const acc = accounts.find(a => a.id === roundingAccountId);
+                          return acc ? (
+                            <span className="account-option">
+                              <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
+                              <span className="account-info">
+                                <span className="account-name">{acc.name}</span>
+                                <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
+                              </span>
+                            </span>
+                          ) : null;
+                        })() : (
+                          <span className="category-trigger-placeholder">Selecciona cuenta destino…</span>
+                        )}
+                        <span className="category-trigger-arrow">{roundingAccountOpen ? '▲' : '▼'}</span>
+                      </button>
+
+                      {roundingAccountOpen && (
+                        <div className="dropdown-results">
+                          {accounts.filter(a => a.id !== sourceAccountId).map(acc => (
+                            <div
+                              key={acc.id}
+                              className={'dropdown-item' + (roundingAccountId === acc.id ? ' selected' : '')}
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => { setRoundingAccountId(acc.id); setRoundingAccountOpen(false); }}
+                            >
+                              <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
+                              <span className="account-info">
+                                <span className="account-name">{acc.name}</span>
+                                <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {roundingAccountId && amount && (() => {
+                      const absAmt = Math.abs(parseFloat(amount));
+                      const roundUp = parseFloat((Math.ceil(absAmt) - absAmt).toFixed(2));
+                      return roundUp >= 0.01 ? (
+                        <small className="form-hint">Se transferirán <strong>{roundUp.toFixed(2)} {currency || '€'}</strong> como redondeo</small>
+                      ) : (
+                        <small className="form-hint">El importe ya es un número entero, no se creará transferencia</small>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
 
             </div>

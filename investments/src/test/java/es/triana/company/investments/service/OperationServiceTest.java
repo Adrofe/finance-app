@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -37,10 +38,13 @@ import es.triana.company.investments.model.db.InvestmentOperation;
 import es.triana.company.investments.model.db.OperationFifoLot;
 import es.triana.company.investments.model.db.OperationType;
 import es.triana.company.investments.repository.ExchangeRateRepository;
+import es.triana.company.investments.repository.InvestmentInstrumentRepository;
 import es.triana.company.investments.repository.InvestmentOperationRepository;
+import es.triana.company.investments.repository.InvestmentPlatformRepository;
 import es.triana.company.investments.repository.InvestmentRepository;
 import es.triana.company.investments.repository.OperationFifoLotRepository;
 import es.triana.company.investments.service.exception.InvestmentValidationException;
+import es.triana.company.investments.service.mapper.OperationMapper;
 
 /**
  * Unit tests for OperationService covering DB state changes for BUY and SELL.
@@ -72,6 +76,10 @@ class OperationServiceTest {
     @Mock OperationFifoLotRepository fifoLotRepository;
     @Mock InvestmentRepository investmentRepository;
     @Mock ExchangeRateRepository exchangeRateRepository;
+        @Mock ExchangeRateRefreshService exchangeRateRefreshService;
+    @Mock InvestmentInstrumentRepository investmentInstrumentRepository;
+    @Mock InvestmentPlatformRepository investmentPlatformRepository;
+    @Spy  OperationMapper operationMapper = new OperationMapper();
 
     @InjectMocks OperationService operationService;
 
@@ -270,8 +278,8 @@ class OperationServiceTest {
         }
 
         @Test
-        @DisplayName("SELL reduces investment.quantity; invested_amount is NOT changed")
-        void sell_reducesQuantityButNotInvestedAmount() {
+        @DisplayName("SELL reduces investment.quantity and investedAmount proportionally (average cost)")
+        void sell_reducesQuantityAndInvestedAmountProportionally() {
             stubEurRate("USD", DATE_SELL, "1.12");
             stubSellOperation(savedOp(3L, OperationType.SELL, DATE_SELL, bd("8"), bd("180"), bd("4"),
                     bd("1436.0000"), "USD", bd("1.12"), bd("1282.1429")));
@@ -288,8 +296,8 @@ class OperationServiceTest {
 
             // quantity: 15 → 7
             assertThat(updated.getQuantity()).isEqualByComparingTo("7");
-            // invested_amount unchanged — reflects total capital deployed, not current holding
-            assertThat(updated.getInvestedAmount()).isEqualByComparingTo("2308.00");
+            // investedAmount reduced proportionally: 2308.00 * (1 - 8/15) = 2308.00 * 7/15 ≈ 1077.07
+            assertThat(updated.getInvestedAmount()).isEqualByComparingTo("1077.07");
         }
 
         @Test
@@ -611,16 +619,16 @@ class OperationServiceTest {
 
                         assertThat(result.tenantId()).isEqualTo(TENANT_ID);
                         assertThat(result.year()).isEqualTo(2024);
-                        assertThat(result.realizedGainLossEur()).isEqualByComparingTo("321.9877");
+                        assertThat(result.totalGainLossEur()).isEqualByComparingTo("321.9877");
 
                         assertThat(result.byInstrument()).hasSize(2);
                         assertThat(result.byInstrument().get(0).instrumentId()).isEqualTo(10L);
-                        assertThat(result.byInstrument().get(0).instrumentCode()).isEqualTo("AAPL");
-                        assertThat(result.byInstrument().get(0).realizedGainLossEur()).isEqualByComparingTo("250.1111");
+                        assertThat(result.byInstrument().get(0).code()).isEqualTo("AAPL");
+                        assertThat(result.byInstrument().get(0).gainLossEur()).isEqualByComparingTo("250.1111");
 
                         assertThat(result.byCurrency()).hasSize(2);
                         assertThat(result.byCurrency().get(0).currency()).isEqualTo("USD");
-                        assertThat(result.byCurrency().get(0).realizedGainLossEur()).isEqualByComparingTo("300.1000");
+                        assertThat(result.byCurrency().get(0).gainLossEur()).isEqualByComparingTo("300.1000");
                 }
 
                 @Test

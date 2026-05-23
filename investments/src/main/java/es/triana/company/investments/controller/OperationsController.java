@@ -80,6 +80,17 @@ public class OperationsController {
     }
 
     /**
+     * Recalculate invested_amount for all investment positions using average cost method.
+     * Useful after data migration or when positions show incorrect P&L due to sell operations
+     * not reducing the cost basis.
+     */
+    @PostMapping("/recalculate-all")
+    public ResponseEntity<ApiResponse<Integer>> recalculateAllPositions() {
+        int count = operationService.recalculateAllPositions();
+        return ResponseEntity.ok(new ApiResponse<>(200, "Recalculated " + count + " positions", count));
+    }
+
+    /**
      * Fiscal summary for one year based on realised FIFO lots (SELL side date).
      * Includes totals and breakdowns by instrument and currency.
      */

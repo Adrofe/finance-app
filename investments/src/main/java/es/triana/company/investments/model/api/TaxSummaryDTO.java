@@ -6,20 +6,20 @@ import java.util.List;
 public record TaxSummaryDTO(
         Long tenantId,
         int year,
-        BigDecimal realizedGainLossEur,
+        BigDecimal totalGainLossEur,
         List<ByInstrument> byInstrument,
         List<ByCurrency> byCurrency) {
 
     public record ByInstrument(
             Long instrumentId,
-            String instrumentCode,
-            String instrumentSymbol,
-            String instrumentName,
-            BigDecimal realizedGainLossEur) {
+            String code,
+            String symbol,
+            String name,
+            BigDecimal gainLossEur) {
     }
 
     public record ByCurrency(
             String currency,
-            BigDecimal realizedGainLossEur) {
+            BigDecimal gainLossEur) {
     }
 }

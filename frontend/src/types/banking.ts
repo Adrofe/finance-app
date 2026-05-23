@@ -33,7 +33,7 @@ export type CreateTransactionRequest = {
 };
 
 export type AppTab = 'banking' | 'investments' | 'wealth';
-export type BankingSubTab = 'dashboard' | 'accounts' | 'transactions' | 'budget' | 'import' | 'merchants' | 'tags';
+export type BankingSubTab = 'dashboard' | 'accounts' | 'transactions' | 'budget' | 'import' | 'merchants' | 'tags' | 'taxes';
 
 export type BankFormat = 'INTERNAL' | 'SANTANDER' | 'BBVA' | 'ING' | 'IMAGIN';
 
@@ -64,4 +64,30 @@ export type Category = {
   name: string;
   code: string;
   parentId: number | null;
+};
+
+export type TaxType = {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+};
+
+export type TransactionTax = {
+  id: number;
+  transactionId: number;
+  grossAmount: number;
+  taxAmount: number;
+  taxType: TaxType;
+  notes?: string;
+  bookingDate?: string;
+  transactionDescription?: string;
+  currency?: string;
+};
+
+export type TransactionTaxRequest = {
+  grossAmount: number;
+  taxAmount: number;
+  taxTypeId: number;
+  notes?: string;
 };

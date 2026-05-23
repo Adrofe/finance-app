@@ -5,11 +5,13 @@ import { BudgetPanel } from './components/BudgetPanel';
 import { BankImportPanel } from './components/BankImportPanel';
 import { MerchantEditPanel } from './components/MerchantEditPanel';
 import { TagsPanel } from './components/TagsPanel';
+import { TaxWithholdingReport } from './components/TaxWithholdingReport';
 import { InvestmentsSubTabs } from './components/InvestmentsSubTabs';
 import { InvestmentCatalogTable } from './components/InvestmentCatalogTable';
 import { InvestmentsDashboard } from './components/InvestmentsDashboard';
 import { InvestmentsOverviewTable } from './components/InvestmentsOverviewTable';
 import { InvestmentOperationsTable } from './components/InvestmentOperationsTable';
+import { ExchangeRatesPanel } from './components/ExchangeRatesPanel';
 import { LoginForm } from './components/LoginForm';
 import { AppHeader } from './components/AppHeader';
 import { TransactionsTable } from './components/TransactionsTable';
@@ -109,6 +111,13 @@ function App() {
             <TagsPanel token={accessToken} onUnauthorized={handleUnauthorized} />
           )}
 
+          {bankingSubTab === 'taxes' && (
+            <TaxWithholdingReport
+              token={accessToken}
+              onUnauthorized={() => handleUnauthorized('Session expired. Please log in again.')}
+            />
+          )}
+
         </section>
       )}
 
@@ -153,6 +162,16 @@ function App() {
 
           {investmentsSubTab === 'catalog' && (
             <InvestmentCatalogTable token={accessToken} onUnauthorized={handleUnauthorized} />
+          )}
+
+          {investmentsSubTab === 'forex' && (
+            <article className="sheet">
+              <div className="sheet-header">
+                <h3>Exchange Rates</h3>
+                <span>Histórico de divisas y mantenimiento manual</span>
+              </div>
+              <ExchangeRatesPanel token={accessToken} onUnauthorized={handleUnauthorized} />
+            </article>
           )}
         </section>
       )}

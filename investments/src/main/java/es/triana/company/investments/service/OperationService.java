@@ -45,6 +45,7 @@ public class OperationService {
     private final InvestmentInstrumentRepository investmentInstrumentRepository;
     private final InvestmentPlatformRepository investmentPlatformRepository;
     private final ExchangeRateRepository exchangeRateRepository;
+    private final ExchangeRateRefreshService exchangeRateRefreshService;
     private final es.triana.company.investments.service.mapper.OperationMapper operationMapper;
 
         public OperationService(InvestmentOperationRepository operationRepository,
@@ -53,6 +54,7 @@ public class OperationService {
             InvestmentInstrumentRepository investmentInstrumentRepository,
             InvestmentPlatformRepository investmentPlatformRepository,
             ExchangeRateRepository exchangeRateRepository,
+            ExchangeRateRefreshService exchangeRateRefreshService,
             es.triana.company.investments.service.mapper.OperationMapper operationMapper) {
                 this.operationRepository = operationRepository;
                 this.fifoLotRepository = fifoLotRepository;
@@ -60,6 +62,7 @@ public class OperationService {
             this.investmentInstrumentRepository = investmentInstrumentRepository;
             this.investmentPlatformRepository = investmentPlatformRepository;
                 this.exchangeRateRepository = exchangeRateRepository;
+                this.exchangeRateRefreshService = exchangeRateRefreshService;
                 this.operationMapper = operationMapper;
         }
 
@@ -565,10 +568,19 @@ public class OperationService {
             inv.setQuantity(newQty);
             inv.setInvestedAmount(newInvested);
         } else {
-            BigDecimal newQty = (inv.getQuantity() != null ? inv.getQuantity() : BigDecimal.ZERO).subtract(quantity);
+            BigDecimal currentQty = inv.getQuantity() != null ? inv.getQuantity() : BigDecimal.ZERO;
+            BigDecimal currentInvested = inv.getInvestedAmount() != null ? inv.getInvestedAmount() : BigDecimal.ZERO;
+            // Average cost method: reduce investedAmount proportionally on sell
+            if (currentQty.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal ratio = quantity.divide(currentQty, SCALE, RoundingMode.HALF_UP);
+                BigDecimal deducted = currentInvested.multiply(ratio).setScale(2, RoundingMode.HALF_UP);
+                inv.setInvestedAmount(currentInvested.subtract(deducted).max(BigDecimal.ZERO));
+            } else {
+                inv.setInvestedAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+            }
+            BigDecimal newQty = currentQty.subtract(quantity);
             if (newQty.compareTo(BigDecimal.ZERO) < 0) newQty = BigDecimal.ZERO;
             inv.setQuantity(newQty);
-            // invested_amount is not reduced on sell — it reflects total capital deployed
         }
         inv.setUpdatedAt(LocalDateTime.now());
         investmentRepository.save(inv);
@@ -580,7 +592,25 @@ public class OperationService {
 
     private void recalculateInvestmentPosition(Long investmentId, Long tenantId) {
         Investment investment = findAndLockInvestment(investmentId, tenantId);
-        List<InvestmentOperation> operations = operationRepository.findByInvestmentIdOrderByOperationDateAscIdAsc(investmentId);
+        recalculatePositionFromHistory(investment);
+    }
+
+    /**
+     * Recalculate quantity and investedAmount for all investment positions using
+     * the average cost method. Intended for startup migration and manual admin use.
+     */
+    @Transactional
+    public int recalculateAllPositions() {
+        List<Investment> all = investmentRepository.findAll();
+        for (Investment investment : all) {
+            recalculatePositionFromHistory(investment);
+        }
+        LOG.info("Recalculated {} investment positions", all.size());
+        return all.size();
+    }
+
+    private void recalculatePositionFromHistory(Investment investment) {
+        List<InvestmentOperation> operations = operationRepository.findByInvestmentIdOrderByOperationDateAscIdAsc(investment.getId());
 
         BigDecimal quantity = BigDecimal.ZERO;
         BigDecimal investedAmount = BigDecimal.ZERO;
@@ -590,6 +620,11 @@ public class OperationService {
                 quantity = quantity.add(operation.getQuantity());
                 investedAmount = investedAmount.add(operation.getTotalAmount());
             } else if (OperationType.SELL.equals(operation.getType())) {
+                // Average cost method: reduce investedAmount proportionally before reducing quantity
+                if (quantity.compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal ratio = operation.getQuantity().divide(quantity, SCALE, RoundingMode.HALF_UP);
+                    investedAmount = investedAmount.subtract(investedAmount.multiply(ratio)).max(BigDecimal.ZERO);
+                }
                 quantity = quantity.subtract(operation.getQuantity());
             }
         }
@@ -629,9 +664,26 @@ public class OperationService {
         Optional<BigDecimal> exactRateOpt = findExactEurRate(curr, date);
         if (exactRateOpt.isPresent()) {
             return exactRateOpt.get();
-        } else {
-            LOG.warn("No exact ECB rate for EUR/{} on {}. Attempting to find most recent available rate.", currency, date);
-            return findMostRecentEurRateOrThrow(curr);
+        }
+
+        LOG.warn("No exact ECB rate for EUR/{} on {}. Attempting to fetch that day from ECB.", curr, date);
+        attemptBackfillRateForDate(date, curr);
+
+        Optional<BigDecimal> afterBackfillOpt = findExactEurRate(curr, date);
+        if (afterBackfillOpt.isPresent()) {
+            return afterBackfillOpt.get();
+        }
+
+        LOG.warn("ECB backfill did not provide EUR/{} on {}. Using most recent available rate.", curr, date);
+        return findMostRecentEurRateOrThrow(curr);
+    }
+
+    private void attemptBackfillRateForDate(LocalDate date, String currency) {
+        try {
+            int upserted = exchangeRateRefreshService.refreshRatesForDate(date);
+            LOG.info("ECB day backfill attempted for {}. upsertedRates={}", date, upserted);
+        } catch (Exception ex) {
+            LOG.warn("ECB day backfill failed for {} while resolving EUR/{}: {}", date, currency, ex.getMessage());
         }
     }
 

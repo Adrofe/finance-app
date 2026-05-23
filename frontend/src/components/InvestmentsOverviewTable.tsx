@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useInvestmentsOverview } from '../hooks/useInvestmentsOverview';
+import { recalculateAllPositions } from '../services/investmentOperationsService';
 import './investments-overview.css';
 
 type Props = {
@@ -23,7 +24,16 @@ const fmtQty = (value: number | null | undefined) =>
 const pnlClass = (value: number | null | undefined) => safeNumber(value) >= 0 ? 'io-positive' : 'io-negative';
 
 export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorized }) => {
-  const { summary, positions, byInstrument, loading, error, clearError } = useInvestmentsOverview(token, onUnauthorized);
+  const { summary, positions, byInstrument, loading, error, clearError, reload } = useInvestmentsOverview(token, onUnauthorized);
+  const [recalculating, setRecalculating] = useState(false);
+
+  const handleRecalculate = () => {
+    setRecalculating(true);
+    recalculateAllPositions(token)
+      .then(() => reload())
+      .catch((err) => console.error('Recalculate failed', err))
+      .finally(() => setRecalculating(false));
+  };
 
   if (loading) {
     return <p className="state">Cargando resumen de inversiones...</p>;
@@ -73,11 +83,20 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
       <div className="io-panel">
         <div className="sheet-header">
           <h3>Resumen por Instrumento</h3>
-          <span>{byInstrument.length} instrumentos · {positions.length} posiciones</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span>{byInstrument.length} instrumentos · {positions.length} posiciones</span>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={handleRecalculate}
+              disabled={recalculating}
+            >
+              {recalculating ? 'Recalculando...' : 'Recalcular posiciones'}
+            </button>
+          </div>
         </div>
-
         <div className="io-table-wrap">
-          <table className="table io-table">
+          <table className="io-table">
             <thead>
               <tr>
                 <th>Instrumento</th>

@@ -83,7 +83,7 @@ export function useInvestmentsDashboard(token: string, onUnauthorized?: (message
         ...loadedSummary,
         byType: sortTypeSummary(loadedSummary.byType ?? []),
       });
-      setPositions(sortPositions(loadedPositions));
+      setPositions(sortPositions(loadedPositions.filter((p) => (p.quantity ?? 0) > 0)));
       setOperations(loadedOperations);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {

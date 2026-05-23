@@ -44,7 +44,7 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
     Promise.all([fetchInvestmentSummary(token), fetchInvestmentPositions(token)])
       .then(([loadedSummary, loadedPositions]) => {
         setSummary(loadedSummary);
-        setPositions(sortPositions(loadedPositions));
+        setPositions(sortPositions(loadedPositions.filter((p) => (p.quantity ?? 0) > 0)));
       })
       .catch((err) => {
         if (axios.isAxiosError(err) && err.response?.status === 401) {

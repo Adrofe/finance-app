@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.math.BigDecimal;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -276,6 +277,55 @@ public class TransactionService {
         } else {
             Transaction savedTransaction = transactionRepository.save(existingTransaction);
             revertBalanceForUpdate(oldSourceAccountId, oldDestinationAccountId, oldAmount, oldStatus, tenantId);
+            applyBalanceForUpdate(savedTransaction, tenantId);
+            return transactionMapper.toDto(savedTransaction);
+        }
+    }
+
+    /**
+     * Updates only the transaction amount while preserving the rest of fields.
+     * Balance deltas are reverted/applied using the same rules as full update.
+     */
+    public TransactionDTO updateTransactionAmount(Long transactionId, BigDecimal newAmount, Long tenantId) {
+        validateTenantAccess(transactionId, tenantId, "Transaction id is required");
+        if (newAmount == null) {
+            throw new TransactionValidationException("Amount is required");
+        }
+
+        Transaction existingTransaction = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
+            .orElseThrow(() -> new TransactionNotFoundException("Transaction not found with id: " + transactionId));
+
+        Long oldSourceAccountId = existingTransaction.getSourceAccount().getId();
+        Long oldDestinationAccountId = existingTransaction.getDestinationAccount() != null ? existingTransaction.getDestinationAccount().getId() : null;
+        BigDecimal oldAmount = existingTransaction.getAmount();
+        TransactionStatus oldStatus = existingTransaction.getStatus();
+
+        Long existingLinkedId = existingTransaction.getLinkedTransactionId();
+        Transaction linkedTransaction = existingLinkedId != null
+                ? transactionRepository.findByIdAndTenantId(existingLinkedId, tenantId).orElse(null)
+                : null;
+
+        existingTransaction.setAmount(newAmount);
+        existingTransaction.setUpdatedAt(LocalDateTime.now());
+
+        if (linkedTransaction != null) {
+            revertSingleAccountBalance(oldSourceAccountId, oldAmount, oldStatus, tenantId);
+            revertSingleAccountBalance(linkedTransaction.getSourceAccount().getId(),
+                    linkedTransaction.getAmount(), linkedTransaction.getStatus(), tenantId);
+
+            Transaction savedTransaction = transactionRepository.save(existingTransaction);
+
+            linkedTransaction.setAmount(savedTransaction.getAmount().negate());
+            linkedTransaction.setUpdatedAt(LocalDateTime.now());
+            transactionRepository.save(linkedTransaction);
+
+            applySingleAccountBalance(savedTransaction, tenantId);
+            applySingleAccountBalance(linkedTransaction, tenantId);
+
+            return transactionMapper.toDto(savedTransaction);
+        } else {
+            revertBalanceForUpdate(oldSourceAccountId, oldDestinationAccountId, oldAmount, oldStatus, tenantId);
+            Transaction savedTransaction = transactionRepository.save(existingTransaction);
             applyBalanceForUpdate(savedTransaction, tenantId);
             return transactionMapper.toDto(savedTransaction);
         }
