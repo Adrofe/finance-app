@@ -3,7 +3,8 @@ import axios from 'axios';
 import { INVESTMENT_CURRENCY_OPTIONS, getInvestmentTypeVisual } from '../constants/visualConfig';
 import { CreateTransactionModal } from './CreateTransactionModal';
 import { useInvestmentOperations } from '../hooks/useInvestmentOperations';
-import { fetchInstruments, fetchPlatforms } from '../services/investmentCatalogService';
+import { CatalogService, type TransactionCategory } from '../services/catalogService';
+import { fetchInstruments, fetchInvestmentTypes, fetchPlatforms } from '../services/investmentCatalogService';
 import { deleteTransaction } from '../services/transactionsService';
 import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import type { CreateTransactionRequest, Transaction } from '../types/banking';
@@ -14,6 +15,7 @@ import type {
   InvestmentOperationType,
   InvestmentPlatform,
   InvestmentPosition,
+  InvestmentType,
 } from '../types/investments';
 import './investment-operations.css';
 
@@ -75,7 +77,9 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
   const [deleting, setDeleting] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [instruments, setInstruments] = useState<InvestmentInstrument[]>([]);
+  const [investmentTypes, setInvestmentTypes] = useState<InvestmentType[]>([]);
   const [platforms, setPlatforms] = useState<InvestmentPlatform[]>([]);
+  const [transactionCategories, setTransactionCategories] = useState<TransactionCategory[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [showIntegratedTransactionModal, setShowIntegratedTransactionModal] = useState(false);
@@ -86,10 +90,17 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     setCatalogLoading(true);
     setCatalogError(null);
 
-    Promise.all([fetchInstruments(token), fetchPlatforms(token)])
-      .then(([loadedInstruments, loadedPlatforms]) => {
+    Promise.all([
+      fetchInstruments(token),
+      fetchInvestmentTypes(token),
+      fetchPlatforms(token),
+      CatalogService.fetchCategories(token),
+    ])
+      .then(([loadedInstruments, loadedTypes, loadedPlatforms, loadedCategories]) => {
         setInstruments([...loadedInstruments].sort((a, b) => a.name.localeCompare(b.name)));
+        setInvestmentTypes([...loadedTypes].sort((a, b) => a.name.localeCompare(b.name)));
         setPlatforms([...loadedPlatforms].sort((a, b) => a.name.localeCompare(b.name)));
+        setTransactionCategories(loadedCategories);
       })
       .catch((err: unknown) => {
         const resolved = err as { response?: { data?: { message?: string } }; message?: string };
@@ -151,6 +162,19 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
 
   const onChange = (key: keyof typeof EMPTY_FORM, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const onInstrumentChange = (instrumentIdRaw: string) => {
+    const instrumentId = Number(instrumentIdRaw);
+    const matchedInstrument = Number.isFinite(instrumentId)
+      ? instruments.find((instrument) => instrument.id === instrumentId)
+      : undefined;
+
+    setForm((current) => ({
+      ...current,
+      instrumentId: instrumentIdRaw,
+      currency: matchedInstrument?.currency || current.currency,
+    }));
   };
 
   const getOperationDraft = (link?: { linkedAccountId?: number; linkedTransactionId?: number }): { payload?: InvestmentOperationDraft; error?: string } => {
@@ -281,9 +305,35 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
   const selectedInstrument = selectedInstrumentId
     ? instruments.find((instrument) => instrument.id === selectedInstrumentId)
     : undefined;
+  const selectedInstrumentType = selectedInstrument
+    ? investmentTypes.find((type) => type.id === selectedInstrument.typeId)
+    : undefined;
   const selectedPlatform = selectedPlatformId
     ? platforms.find((platform) => platform.id === selectedPlatformId)
     : undefined;
+
+  const integratedCategoryId = useMemo(() => {
+    if (transactionCategories.length === 0) return undefined;
+
+    if (form.type === 'SELL') {
+      return transactionCategories.find((category) => (category.code ?? '').toUpperCase() === 'INC.INVEST')?.id;
+    }
+
+    const investmentCategoryByTypeCode: Record<string, string> = {
+      STOCK: 'SAV.STOCKS',
+      BOND: 'SAV.BONDS',
+      ETF: 'SAV.ETFS',
+      FUND: 'SAV.FUNDS',
+      CRYPTO: 'SAV.CRYPTO',
+    };
+
+    const instrumentTypeCode = (selectedInstrumentType?.code ?? '').toUpperCase();
+    const preferredCode = investmentCategoryByTypeCode[instrumentTypeCode] || 'SAV.OTH';
+
+    return transactionCategories.find((category) => (category.code ?? '').toUpperCase() === preferredCode)?.id
+      ?? transactionCategories.find((category) => (category.code ?? '').toUpperCase() === 'SAV.OTH')?.id
+      ?? transactionCategories.find((category) => (category.code ?? '').toUpperCase() === 'SAV')?.id;
+  }, [form.type, selectedInstrumentType, transactionCategories]);
 
   const integratedTransactionTitle = form.type === 'BUY'
     ? '💳 Compra enlazada a cuenta'
@@ -391,7 +441,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
               <div className="iot-form-row iot-form-row--pair">
                 <div className="modal-row">
                   <label>Instrumento</label>
-                  <select className="iot-select" required value={form.instrumentId} onChange={(event) => onChange('instrumentId', event.target.value)}>
+                  <select className="iot-select" required value={form.instrumentId} onChange={(event) => onInstrumentChange(event.target.value)}>
                     <option value="">Selecciona un instrumento</option>
                     {instruments.map((instrument) => (
                       <option key={instrument.id} value={instrument.id}>
@@ -517,6 +567,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
             valueDate: form.operationDate,
             currency: form.currency,
             description: integratedTransactionDescription,
+            categoryId: integratedCategoryId,
           }}
           onSubmitTransaction={handleIntegratedTransactionSubmit}
         />
