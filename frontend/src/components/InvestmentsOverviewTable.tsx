@@ -1,7 +1,16 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useInvestmentsOverview } from '../hooks/useInvestmentsOverview';
 import { recalculateAllPositions } from '../services/investmentOperationsService';
+import { getInvestmentTypeVisual } from '../constants/visualConfig';
 import './investments-overview.css';
+
+type SortKey = 'symbol' | 'investedAmount' | 'currentValue' | 'pnl' | 'pnlPct' | 'quantity';
+type SortDir = 'asc' | 'desc';
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <span className="io-sort-icon io-sort-inactive">⇅</span>;
+  return <span className="io-sort-icon">{dir === 'asc' ? '↑' : '↓'}</span>;
+}
 
 type Props = {
   token: string;
@@ -19,13 +28,25 @@ const fmtPct = (value: number | null | undefined) => {
 };
 
 const fmtQty = (value: number | null | undefined) =>
-  safeNumber(value).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+  safeNumber(value).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 6 });
 
-const pnlClass = (value: number | null | undefined) => safeNumber(value) >= 0 ? 'io-positive' : 'io-negative';
+const pnlClass = (value: number | null | undefined) => safeNumber(value) >= 0 ? 'io-pos' : 'io-neg';
 
 export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorized }) => {
   const { summary, positions, byInstrument, loading, error, clearError, reload } = useInvestmentsOverview(token, onUnauthorized);
   const [recalculating, setRecalculating] = useState(false);
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('currentValue');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
 
   const handleRecalculate = () => {
     setRecalculating(true);
@@ -35,13 +56,39 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
       .finally(() => setRecalculating(false));
   };
 
+  const displayRows = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    const filtered = q
+      ? byInstrument.filter(
+          (g) =>
+            g.instrumentSymbol.toLowerCase().includes(q) ||
+            g.instrumentName.toLowerCase().includes(q) ||
+            g.typeCode.toLowerCase().includes(q) ||
+            g.platforms.some((p) => p.toLowerCase().includes(q)),
+        )
+      : byInstrument;
+
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'symbol':      cmp = a.instrumentSymbol.localeCompare(b.instrumentSymbol); break;
+        case 'investedAmount': cmp = a.investedAmount - b.investedAmount; break;
+        case 'currentValue':   cmp = a.currentValue - b.currentValue; break;
+        case 'pnl':            cmp = a.pnl - b.pnl; break;
+        case 'pnlPct':         cmp = a.pnlPct - b.pnlPct; break;
+        case 'quantity':       cmp = a.quantity - b.quantity; break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [byInstrument, search, sortKey, sortDir]);
+
   if (loading) {
-    return <p className="state">Cargando resumen de inversiones...</p>;
+    return <p className="state">Cargando resumen de inversiones…</p>;
   }
 
   if (error) {
     return (
-      <div className="io-state">
+      <div className="io-state-row">
         <p className="state error">{error}</p>
         <button className="btn secondary" type="button" onClick={clearError}>Cerrar</button>
       </div>
@@ -52,91 +99,160 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
     return <p className="state">No hay resumen disponible todavía.</p>;
   }
 
+  const pnlPositive = safeNumber(summary.totalPnl) >= 0;
+
   return (
     <div className="io-wrapper">
-      <div className="io-metrics-grid">
-        <article className="metric-card">
-          <h3>Total Invertido</h3>
-          <strong>{fmtMoney(summary.totalInvested)}</strong>
-          <span>Capital desplegado en cartera</span>
+
+      {/* ── KPI cards ───────────────────────────────────────────────────── */}
+      <div className="io-kpi-grid">
+        <article className="io-kpi io-kpi--invested">
+          <span className="io-kpi-icon">💰</span>
+          <span className="io-kpi-label">Total invertido</span>
+          <strong className="io-kpi-value">{fmtMoney(summary.totalInvested)}</strong>
+          <span className="io-kpi-sub">Capital desplegado</span>
         </article>
 
-        <article className="metric-card">
-          <h3>Valor Actual</h3>
-          <strong>{fmtMoney(summary.totalCurrentValue)}</strong>
-          <span>Manual o calculado por precio</span>
+        <article className="io-kpi io-kpi--current">
+          <span className="io-kpi-icon">📈</span>
+          <span className="io-kpi-label">Valor actual</span>
+          <strong className="io-kpi-value">{fmtMoney(summary.totalCurrentValue)}</strong>
+          <span className="io-kpi-sub">Manual o por precio</span>
         </article>
 
-        <article className="metric-card">
-          <h3>P&amp;L Total</h3>
-          <strong className={pnlClass(summary.totalPnl)}>{fmtMoney(summary.totalPnl)}</strong>
-          <span className={pnlClass(summary.totalPnlPct)}>{fmtPct(summary.totalPnlPct)}</span>
+        <article className={`io-kpi ${pnlPositive ? 'io-kpi--gain' : 'io-kpi--loss'}`}>
+          <span className="io-kpi-icon">{pnlPositive ? '🟢' : '🔴'}</span>
+          <span className="io-kpi-label">P&amp;L total</span>
+          <strong className={`io-kpi-value ${pnlClass(summary.totalPnl)}`}>
+            {fmtMoney(summary.totalPnl)}
+          </strong>
+          <span className={`io-kpi-sub ${pnlClass(summary.totalPnlPct)}`}>
+            {fmtPct(summary.totalPnlPct)}
+          </span>
         </article>
 
-        <article className="metric-card">
-          <h3>Posiciones</h3>
-          <strong>{summary.positions}</strong>
-          <span>Distribuidas en {byInstrument.length} instrumentos</span>
+        <article className="io-kpi io-kpi--positions">
+          <span className="io-kpi-icon">🏦</span>
+          <span className="io-kpi-label">Posiciones</span>
+          <strong className="io-kpi-value">{summary.positions}</strong>
+          <span className="io-kpi-sub">{byInstrument.length} instrumentos</span>
         </article>
       </div>
 
-      <div className="io-panel">
-        <div className="sheet-header">
-          <h3>Resumen por Instrumento</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span>{byInstrument.length} instrumentos · {positions.length} posiciones</span>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={handleRecalculate}
-              disabled={recalculating}
-            >
-              {recalculating ? 'Recalculando...' : 'Recalcular posiciones'}
-            </button>
-          </div>
+      {/* ── Toolbar ──────────────────────────────────────────────────────── */}
+      <div className="io-toolbar">
+        <div className="io-search-wrap">
+          <span className="io-search-icon">🔍</span>
+          <input
+            type="text"
+            className="io-search"
+            placeholder="Filtrar por símbolo, nombre, tipo o plataforma…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button type="button" className="io-search-clear" onClick={() => setSearch('')}>✕</button>
+          )}
         </div>
-        <div className="io-table-wrap">
-          <table className="io-table">
-            <thead>
-              <tr>
-                <th>Instrumento</th>
-                <th>Plataformas</th>
-                <th>Posiciones</th>
-                <th className="io-right">Cantidad</th>
-                <th className="io-right">Invertido</th>
-                <th className="io-right">Valor actual</th>
-                <th className="io-right">P&amp;L</th>
-                <th className="io-right">Rentabilidad</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byInstrument.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="io-empty">Todavía no hay inversiones para mostrar.</td>
-                </tr>
-              )}
+        <div className="io-toolbar-right">
+          <span className="io-count">
+            {displayRows.length} / {byInstrument.length} instrumentos · {positions.length} posiciones
+          </span>
+          <button
+            type="button"
+            className="io-btn-recalc"
+            onClick={handleRecalculate}
+            disabled={recalculating}
+          >
+            {recalculating ? '⏳ Recalculando…' : '↻ Recalcular'}
+          </button>
+        </div>
+      </div>
 
-              {byInstrument.map((group) => (
-                <tr key={group.instrumentId}>
+      {/* ── Table ────────────────────────────────────────────────────────── */}
+      <div className="io-table-wrap">
+        <table className="io-table">
+          <thead>
+            <tr>
+              <th className="io-th-sortable" onClick={() => handleSort('symbol')}>
+                Instrumento <SortIcon active={sortKey === 'symbol'} dir={sortDir} />
+              </th>
+              <th>Plataformas</th>
+              <th className="io-right">Pos.</th>
+              <th className="io-right io-th-sortable" onClick={() => handleSort('quantity')}>
+                Cantidad <SortIcon active={sortKey === 'quantity'} dir={sortDir} />
+              </th>
+              <th className="io-right io-th-sortable" onClick={() => handleSort('investedAmount')}>
+                Invertido <SortIcon active={sortKey === 'investedAmount'} dir={sortDir} />
+              </th>
+              <th className="io-right io-th-sortable" onClick={() => handleSort('currentValue')}>
+                Valor actual <SortIcon active={sortKey === 'currentValue'} dir={sortDir} />
+              </th>
+              <th className="io-right io-th-sortable" onClick={() => handleSort('pnl')}>
+                P&amp;L <SortIcon active={sortKey === 'pnl'} dir={sortDir} />
+              </th>
+              <th className="io-right io-th-sortable" onClick={() => handleSort('pnlPct')}>
+                Rentab. <SortIcon active={sortKey === 'pnlPct'} dir={sortDir} />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayRows.length === 0 && (
+              <tr>
+                <td colSpan={8} className="io-empty">
+                  {search ? 'No hay instrumentos que coincidan con el filtro.' : 'Todavía no hay inversiones para mostrar.'}
+                </td>
+              </tr>
+            )}
+
+            {displayRows.map((group) => {
+              const visual = getInvestmentTypeVisual(group.typeCode, group.typeName);
+              const pnlPos = group.pnl >= 0;
+              return (
+                <tr key={group.instrumentId} className="io-row">
                   <td>
-                    <div className="io-instrument">
-                      <strong>{group.instrumentSymbol}</strong>
-                      <span>{group.instrumentName}</span>
+                    <div className="io-instrument-cell">
+                      <span
+                        className="io-type-badge"
+                        style={{ background: visual.background, color: visual.color }}
+                        title={group.typeName || group.typeCode}
+                      >
+                        {visual.emoji}
+                      </span>
+                      <div className="io-instrument-info">
+                        <strong className="io-symbol">{group.instrumentSymbol}</strong>
+                        <span className="io-name">{group.instrumentName}</span>
+                      </div>
                     </div>
                   </td>
-                  <td>{group.platforms.join(', ')}</td>
-                  <td>{group.positions}</td>
-                  <td className="io-right">{fmtQty(group.quantity)}</td>
-                  <td className="io-right">{fmtMoney(group.investedAmount, group.currency)}</td>
-                  <td className="io-right">{fmtMoney(group.currentValue, group.currency)}</td>
-                  <td className={`io-right ${pnlClass(group.pnl)}`}>{fmtMoney(group.pnl, group.currency)}</td>
-                  <td className={`io-right ${pnlClass(group.pnlPct)}`}>{fmtPct(group.pnlPct)}</td>
+                  <td>
+                    <div className="io-platforms">
+                      {group.platforms.map((p) => (
+                        <span key={p} className="io-platform-chip">{p}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="io-right io-dim">{group.positions}</td>
+                  <td className="io-right io-mono">{fmtQty(group.quantity)}</td>
+                  <td className="io-right io-mono">{fmtMoney(group.investedAmount, group.currency)}</td>
+                  <td className="io-right io-mono">{fmtMoney(group.currentValue, group.currency)}</td>
+                  <td className="io-right">
+                    <span className={`io-pnl-badge ${pnlPos ? 'io-pnl-pos' : 'io-pnl-neg'}`}>
+                      {pnlPos ? '▲' : '▼'} {fmtMoney(Math.abs(group.pnl), group.currency)}
+                    </span>
+                  </td>
+                  <td className="io-right">
+                    <span className={`io-pct-badge ${pnlPos ? 'io-pct-pos' : 'io-pct-neg'}`}>
+                      {fmtPct(group.pnlPct)}
+                    </span>
+                  </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
+
     </div>
   );
 };

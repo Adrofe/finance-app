@@ -8,6 +8,8 @@ type InstrumentGroup = {
   instrumentId: number;
   instrumentSymbol: string;
   instrumentName: string;
+  typeCode: string;
+  typeName: string;
   currency: string;
   positions: number;
   quantity: number;
@@ -90,6 +92,8 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
           instrumentId,
           instrumentSymbol,
           instrumentName,
+          typeCode: position.typeCode ?? '',
+          typeName: position.typeName ?? '',
           currency: position.currency || 'EUR',
           positions: 1,
           quantity,
