@@ -43,8 +43,149 @@
   color: var(--ink);
 }
 
-.iot-stat--buy .iot-stat-value { color: #166534; }
-.iot-stat--sell .iot-stat-value { color: #b91c1c; }
+.iot-stat--buy .iot-stat-value { color: #b91c1c; }
+.iot-stat--sell .iot-stat-value { color: #166534; }
+
+/* ─── Filter bar ─────────────────────────────────────────────────────────── */
+
+.iot-filters {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px 24px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(17, 48, 76, 0.05);
+}
+
+.iot-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.iot-filter-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Pill rows – same pattern as db-presets */
+.iot-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.iot-preset-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--pill, #f0f4f8);
+  color: #30506a;
+  padding: 5px 14px;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.iot-preset-btn:hover {
+  background: #dceeff;
+  border-color: #aac8e8;
+}
+
+.iot-preset-btn.active {
+  background: var(--brand, #0f6bb4);
+  border-color: var(--brand, #0f6bb4);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(15, 107, 180, 0.25);
+}
+
+/* BUY variant – active = red */
+.iot-preset-btn--buy.active {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  box-shadow: 0 3px 10px rgba(185, 28, 28, 0.25);
+}
+
+/* SELL variant – active = green */
+.iot-preset-btn--sell.active {
+  background: #166534;
+  border-color: #166534;
+  box-shadow: 0 3px 10px rgba(22, 101, 52, 0.22);
+}
+
+/* Custom date sub-row */
+.iot-custom-dates {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.iot-custom-dates label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #284257;
+}
+
+.iot-custom-dates input[type="date"] {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #c8d6e6;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.84rem;
+  background: #fcfeff;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.iot-custom-dates input[type="date"]:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+.iot-date-sep {
+  color: #9ca3af;
+  font-weight: 600;
+}
+
+/* Clear button */
+.iot-btn-clear-filters {
+  align-self: flex-end;
+  margin-top: auto;
+  border: 1px solid #dbe4f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 14px;
+  transition: background 0.15s, color 0.15s;
+  margin-top: 2px;
+}
+
+.iot-btn-clear-filters:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
 
 .iot-btn-add {
   padding: 9px 16px;
@@ -185,13 +326,13 @@
 }
 
 .iot-type-pill.buy {
-  background: #dcfce7;
-  color: #166534;
+  background: #fee2e2;
+  color: #b91c1c;
 }
 
 .iot-type-pill.sell {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #dcfce7;
+  color: #166534;
 }
 
 .iot-actions {
@@ -396,15 +537,15 @@
 }
 
 .iot-type-btn.active.buy {
-  background: linear-gradient(135deg, #15803d, #16a34a);
-  color: #fff;
-  box-shadow: 0 10px 20px rgba(22, 101, 52, 0.24);
-}
-
-.iot-type-btn.active.sell {
   background: linear-gradient(135deg, #b91c1c, #ef4444);
   color: #fff;
   box-shadow: 0 10px 20px rgba(185, 28, 28, 0.24);
+}
+
+.iot-type-btn.active.sell {
+  background: linear-gradient(135deg, #15803d, #16a34a);
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(22, 101, 52, 0.24);
 }
 
 .iot-selected-investment {
@@ -490,6 +631,20 @@
 
   .iot-summary-bar {
     align-items: stretch;
+  }
+
+  .iot-filters {
+    padding: 12px;
+    gap: 12px 16px;
+  }
+
+  .iot-pill-row {
+    gap: 4px;
+  }
+
+  .iot-preset-btn {
+    font-size: 0.8rem;
+    padding: 4px 10px;
   }
 
   .iot-btn-add {

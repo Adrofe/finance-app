@@ -24,6 +24,8 @@ type Props = {
   onUnauthorized?: (message: string) => void;
 };
 
+type DatePreset = 'ALL' | 'THIS_MONTH' | 'LAST_3_MONTHS' | 'LAST_YEAR' | 'PREVIOUS_YEAR' | 'CUSTOM';
+
 const EMPTY_FORM = {
   instrumentId: '',
   platformId: '',
@@ -48,6 +50,41 @@ const fmtNumber = (value: number | null | undefined) =>
 const fmtDate = (value: string) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const toIsoDate = (date: Date) => date.toISOString().slice(0, 10);
+
+const getPresetRange = (preset: DatePreset): { from?: string; to?: string } => {
+  const now = new Date();
+
+  if (preset === 'ALL') {
+    return {};
+  }
+
+  if (preset === 'THIS_MONTH') {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { from: toIsoDate(from), to: toIsoDate(to) };
+  }
+
+  if (preset === 'LAST_3_MONTHS') {
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    return { from: toIsoDate(from), to: toIsoDate(to) };
+  }
+
+  if (preset === 'LAST_YEAR') {
+    const to = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+    return { from: toIsoDate(from), to: toIsoDate(to) };
+  }
+
+  if (preset === 'PREVIOUS_YEAR') {
+    const year = now.getFullYear() - 1;
+    return { from: `${year}-01-01`, to: `${year}-12-31` };
+  }
+
+  return {};
 };
 
 const getInvestmentSubtitle = (investment?: InvestmentPosition) => {
@@ -83,6 +120,11 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [showIntegratedTransactionModal, setShowIntegratedTransactionModal] = useState(false);
+  const [datePreset, setDatePreset] = useState<DatePreset>('ALL');
+  const [customFromDate, setCustomFromDate] = useState('');
+  const [customToDate, setCustomToDate] = useState('');
+  const [operationFilter, setOperationFilter] = useState<'ALL' | InvestmentOperationType>('ALL');
+  const [investmentTypeFilter, setInvestmentTypeFilter] = useState<'ALL' | string>('ALL');
 
   useEffect(() => {
     if (!token) return;
@@ -114,15 +156,58 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     [investments]
   );
 
+  const activeDateRange = useMemo(() => {
+    if (datePreset === 'CUSTOM') {
+      return {
+        from: customFromDate || undefined,
+        to: customToDate || undefined,
+      };
+    }
+    return getPresetRange(datePreset);
+  }, [datePreset, customFromDate, customToDate]);
+
+  const filteredOperations = useMemo(() => {
+    return operations.filter((operation) => {
+      if (operationFilter !== 'ALL' && operation.type !== operationFilter) {
+        return false;
+      }
+
+      if (activeDateRange.from && operation.operationDate < activeDateRange.from) {
+        return false;
+      }
+
+      if (activeDateRange.to && operation.operationDate > activeDateRange.to) {
+        return false;
+      }
+
+      if (investmentTypeFilter !== 'ALL') {
+        const relatedInvestment = investmentMap.get(operation.investmentId);
+        if (!relatedInvestment) {
+          return false;
+        }
+        if (String(relatedInvestment.typeId) !== investmentTypeFilter) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [operations, operationFilter, activeDateRange, investmentTypeFilter, investmentMap]);
+
   const totals = useMemo(() => {
-    const buyTotal = operations
+    const buyTotal = filteredOperations
       .filter((operation) => operation.type === 'BUY')
       .reduce((sum, operation) => sum + operation.totalAmount, 0);
-    const sellTotal = operations
+    const sellTotal = filteredOperations
       .filter((operation) => operation.type === 'SELL')
       .reduce((sum, operation) => sum + operation.totalAmount, 0);
     return { buyTotal, sellTotal };
-  }, [operations]);
+  }, [filteredOperations]);
+
+  const filteredPositionCount = useMemo(
+    () => new Set(filteredOperations.map((operation) => operation.investmentId)).size,
+    [filteredOperations]
+  );
 
   const resetForm = () => {
     setForm({ ...EMPTY_FORM });
@@ -384,7 +469,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
         <div className="iot-summary-stats">
           <div className="iot-stat">
             <span className="iot-stat-label">Operaciones</span>
-            <span className="iot-stat-value">{operations.length}</span>
+            <span className="iot-stat-value">{filteredOperations.length}</span>
           </div>
           <div className="iot-stat iot-stat--buy">
             <span className="iot-stat-label">Compras</span>
@@ -396,12 +481,125 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
           </div>
           <div className="iot-stat">
             <span className="iot-stat-label">Posiciones</span>
-            <span className="iot-stat-value">{investments.length}</span>
+            <span className="iot-stat-value">{filteredPositionCount}</span>
           </div>
         </div>
 
         <button className={`iot-btn-add${showForm ? ' iot-btn-add--cancel' : ''}`} type="button" onClick={() => showForm ? closeForm() : openCreate()} disabled={catalogLoading && !showForm}>
           {showForm ? '✕ Cancelar' : '+ Nueva operación'}
+        </button>
+      </div>
+
+      <div className="iot-filters" aria-label="Filtros de operaciones FIFO">
+
+        {/* ── Fecha ─────────────────────────────────────────────────────── */}
+        <div className="iot-filter-group">
+          <span className="iot-filter-label">Fecha</span>
+          <div className="iot-pill-row">
+            {([
+              { value: 'ALL',           label: 'Todo' },
+              { value: 'THIS_MONTH',    label: 'Este mes' },
+              { value: 'LAST_3_MONTHS', label: 'Últimos 3m' },
+              { value: 'LAST_YEAR',     label: 'Último año' },
+              { value: 'PREVIOUS_YEAR', label: 'Año pasado' },
+              { value: 'CUSTOM',        label: '📅 Personalizado' },
+            ] as { value: DatePreset; label: string }[]).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                className={`iot-preset-btn${datePreset === value ? ' active' : ''}`}
+                onClick={() => setDatePreset(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {datePreset === 'CUSTOM' && (
+            <div className="iot-custom-dates">
+              <label>
+                Desde
+                <input type="date" value={customFromDate} onChange={(e) => setCustomFromDate(e.target.value)} />
+              </label>
+              <span className="iot-date-sep">–</span>
+              <label>
+                Hasta
+                <input type="date" value={customToDate} onChange={(e) => setCustomToDate(e.target.value)} />
+              </label>
+            </div>
+          )}
+        </div>
+
+        {/* ── Tipo operación ─────────────────────────────────────────────── */}
+        <div className="iot-filter-group">
+          <span className="iot-filter-label">Operación</span>
+          <div className="iot-pill-row">
+            <button
+              type="button"
+              className={`iot-preset-btn${operationFilter === 'ALL' ? ' active' : ''}`}
+              onClick={() => setOperationFilter('ALL')}
+            >
+              📊 Todas
+            </button>
+            <button
+              type="button"
+              className={`iot-preset-btn iot-preset-btn--buy${operationFilter === 'BUY' ? ' active' : ''}`}
+              onClick={() => setOperationFilter('BUY')}
+            >
+              🔴 Compra
+            </button>
+            <button
+              type="button"
+              className={`iot-preset-btn iot-preset-btn--sell${operationFilter === 'SELL' ? ' active' : ''}`}
+              onClick={() => setOperationFilter('SELL')}
+            >
+              🟢 Venta
+            </button>
+          </div>
+        </div>
+
+        {/* ── Tipo inversión ─────────────────────────────────────────────── */}
+        <div className="iot-filter-group">
+          <span className="iot-filter-label">Instrumento</span>
+          <div className="iot-pill-row">
+            <button
+              type="button"
+              className={`iot-preset-btn${investmentTypeFilter === 'ALL' ? ' active' : ''}`}
+              onClick={() => setInvestmentTypeFilter('ALL')}
+            >
+              ✨ Todos
+            </button>
+            {investmentTypes.map((type) => {
+              const visual = getInvestmentTypeVisual(type.code, type.name);
+              const isActive = investmentTypeFilter === String(type.id);
+              return (
+                <button
+                  key={type.id}
+                  type="button"
+                  className={`iot-preset-btn iot-preset-btn--type${isActive ? ' active' : ''}`}
+                  style={isActive ? { background: visual.background, color: visual.color, borderColor: visual.color } : undefined}
+                  onClick={() => setInvestmentTypeFilter(isActive ? 'ALL' : String(type.id))}
+                >
+                  {visual.emoji} {type.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Limpiar ────────────────────────────────────────────────────── */}
+        <button
+          type="button"
+          className="iot-btn-clear-filters"
+          onClick={() => {
+            setDatePreset('ALL');
+            setCustomFromDate('');
+            setCustomToDate('');
+            setOperationFilter('ALL');
+            setInvestmentTypeFilter('ALL');
+          }}
+        >
+          ✕ Limpiar
         </button>
       </div>
 
@@ -613,13 +811,13 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
             </tr>
           </thead>
           <tbody>
-            {operations.length === 0 && (
+            {filteredOperations.length === 0 && (
               <tr>
-                <td className="iot-empty-row" colSpan={9}>Todavía no hay operaciones registradas.</td>
+                <td className="iot-empty-row" colSpan={9}>No hay operaciones para los filtros seleccionados.</td>
               </tr>
             )}
 
-            {operations.map((operation) => {
+            {filteredOperations.map((operation) => {
               const investment = investmentMap.get(operation.investmentId);
               const typeVisual = investment ? getInvestmentTypeVisual(investment.typeCode, investment.typeName) : null;
 
