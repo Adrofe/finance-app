@@ -9,6 +9,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,14 @@ public class MarketPriceClient {
     @Value("${investments.prices.providers.twelvedata.outputsize:1}")
     private int twelveDataOutputSize;
 
+    /** Max symbols per batch request — TwelveData free tier allows 8 credits/min. */
+    @Value("${investments.prices.providers.twelvedata.max-batch-size:8}")
+    private int maxBatchSize;
+
+    /** Milliseconds to wait between consecutive batch requests to stay within the rate limit. */
+    @Value("${investments.prices.providers.twelvedata.batch-delay-ms:62000}")
+    private long batchDelayMs;
+
     public MarketPriceClient() {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
@@ -57,21 +66,43 @@ public class MarketPriceClient {
     }
 
     public Map<Long, MarketQuote> fetchLatestQuotes(List<InvestmentInstrument> instruments) {
-        Map<Long, MarketQuote> quotesByInstrumentId = new HashMap<>();
+        Map<Long, MarketQuote> result = new HashMap<>();
         if (instruments == null || instruments.isEmpty()) {
-            return quotesByInstrumentId;
+            return result;
         }
 
-        List<InvestmentInstrument> validInstruments = instruments.stream()
-                .filter(instrument -> instrument.getCode() != null && !instrument.getCode().isBlank())
+        List<InvestmentInstrument> valid = instruments.stream()
+                .filter(i -> i.getCode() != null && !i.getCode().isBlank())
                 .toList();
 
-        if (validInstruments.isEmpty()) {
-            return quotesByInstrumentId;
+        if (valid.isEmpty()) {
+            return result;
         }
 
-        String symbolsCsv = validInstruments.stream()
-                .map(instrument -> instrument.getCode().trim())
+        List<List<InvestmentInstrument>> chunks = partition(valid, maxBatchSize);
+        LOG.info("Fetching quotes for {} instruments in {} batch(es) of up to {} (delay between batches: {}ms)",
+                valid.size(), chunks.size(), maxBatchSize, batchDelayMs);
+
+        for (int i = 0; i < chunks.size(); i++) {
+            if (i > 0) {
+                LOG.info("Rate-limit pause: waiting {}ms before batch {}/{}", batchDelayMs, i + 1, chunks.size());
+                try {
+                    Thread.sleep(batchDelayMs);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    LOG.warn("Price fetch interrupted during rate-limit pause");
+                    break;
+                }
+            }
+            fetchBatch(chunks.get(i), result);
+        }
+
+        return result;
+    }
+
+    private void fetchBatch(List<InvestmentInstrument> chunk, Map<Long, MarketQuote> resultMap) {
+        String symbolsCsv = chunk.stream()
+                .map(i -> i.getCode().trim())
                 .collect(Collectors.joining(","));
 
         try {
@@ -79,45 +110,35 @@ public class MarketPriceClient {
             JsonNode statusNode = root.get("status");
 
             if (statusNode != null && "error".equalsIgnoreCase(statusNode.asText())) {
-                String message = root.path("message").asText("(no message)");
-                LOG.warn("TwelveData batch API error for symbols={}: {}", symbolsCsv, message);
-                return fallbackSingleFetch(validInstruments, quotesByInstrumentId);
+                LOG.warn("TwelveData batch API error for symbols={}: {}", symbolsCsv,
+                        root.path("message").asText("(no message)"));
+                return;
             }
 
-            if (validInstruments.size() == 1) {
-                InvestmentInstrument single = validInstruments.get(0);
-                parseTimeSeriesNode(root, single).ifPresent(quote -> quotesByInstrumentId.put(single.getId(), quote));
-                return quotesByInstrumentId;
+            if (chunk.size() == 1) {
+                parseTimeSeriesNode(root, chunk.get(0))
+                        .ifPresent(q -> resultMap.put(chunk.get(0).getId(), q));
+                return;
             }
 
-            for (InvestmentInstrument instrument : validInstruments) {
+            for (InvestmentInstrument instrument : chunk) {
                 JsonNode node = root.path(instrument.getCode().trim());
-                if (node.isMissingNode() || node.isNull()) {
-                    continue;
+                if (!node.isMissingNode() && !node.isNull()) {
+                    parseTimeSeriesNode(node, instrument)
+                            .ifPresent(q -> resultMap.put(instrument.getId(), q));
                 }
-
-                parseTimeSeriesNode(node, instrument).ifPresent(quote -> quotesByInstrumentId.put(instrument.getId(), quote));
             }
-
-            if (quotesByInstrumentId.size() != validInstruments.size()) {
-                List<InvestmentInstrument> unresolved = validInstruments.stream()
-                        .filter(instrument -> !quotesByInstrumentId.containsKey(instrument.getId()))
-                        .toList();
-                fallbackSingleFetch(unresolved, quotesByInstrumentId);
-            }
-
-            return quotesByInstrumentId;
         } catch (Exception ex) {
             LOG.warn("TwelveData batch fetch failed for symbols={}: {}", symbolsCsv, ex.getMessage());
-            return fallbackSingleFetch(validInstruments, quotesByInstrumentId);
         }
     }
 
-    private Map<Long, MarketQuote> fallbackSingleFetch(List<InvestmentInstrument> instruments, Map<Long, MarketQuote> quotesByInstrumentId) {
-        for (InvestmentInstrument instrument : instruments) {
-            fetchFromTwelveDataSingle(instrument).ifPresent(quote -> quotesByInstrumentId.put(instrument.getId(), quote));
+    private static <T> List<List<T>> partition(List<T> list, int size) {
+        List<List<T>> partitions = new ArrayList<>();
+        for (int i = 0; i < list.size(); i += size) {
+            partitions.add(list.subList(i, Math.min(i + size, list.size())));
         }
-        return quotesByInstrumentId;
+        return partitions;
     }
 
     private Optional<MarketQuote> fetchFromTwelveDataSingle(InvestmentInstrument instrument) {

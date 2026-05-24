@@ -48,9 +48,10 @@ public class PriceController {
     }
 
     @PostMapping("/prices/refresh/auto")
-    public ResponseEntity<ApiResponse<PriceRefreshResultDTO>> refreshPricesAutoNow() {
-        PriceRefreshResultDTO result = priceRefreshService.refreshPricesAutomaticallyNow();
-        return ResponseEntity.ok(new ApiResponse<>(200, "Automatic price refresh executed", result));
+    public ResponseEntity<ApiResponse<Void>> refreshPricesAutoNow() {
+        Thread.ofVirtual().start(priceRefreshService::refreshPricesAutomaticallyNow);
+        return ResponseEntity.accepted()
+                .body(new ApiResponse<>(202, "Price refresh started in background", null));
     }
 
     @PostMapping("/forex/refresh-day")
