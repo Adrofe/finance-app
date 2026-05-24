@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useInvestmentCatalog } from '../hooks/useInvestmentCatalog';
 import {
   getInvestmentTypeVisual,
@@ -51,6 +51,15 @@ const getTypeLabel = (type: InvestmentType) => {
   return `${visual.emoji} ${type.name} (${type.code})`;
 };
 
+// ─── Sort helpers ─────────────────────────────────────────────────────────────
+type SortColKey = 'name' | 'symbol' | 'code' | 'market' | 'currency';
+
+const SortIcon = ({ col, active, dir }: { col: SortColKey; active: SortColKey; dir: 'asc' | 'desc' }) => (
+  col !== active
+    ? <span className="ict-sort-icon ict-sort-icon--idle">↕</span>
+    : <span className="ict-sort-icon">{dir === 'asc' ? '↑' : '↓'}</span>
+);
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized }) => {
@@ -72,7 +81,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null);
   const [deleting, setDeleting]           = useState(false);
   const [refreshingPrices, setRefreshingPrices] = useState(false);
-  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [refreshMessage, setRefreshMessage]     = useState<string | null>(null);
+  const [searchQuery, setSearchQuery]           = useState('');
+  const [sortKey, setSortKey]                   = useState<SortColKey>('name');
+  const [sortDir, setSortDir]                   = useState<'asc' | 'desc'>('asc');
 
   // ── instrument form ───────────────────────────────────────────────────────
   const [instrForm, setInstrForm] = useState({ ...EMPTY_INSTRUMENT });
@@ -88,6 +100,43 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [platForm, setPlatForm] = useState({ ...EMPTY_PLATFORM });
   const onPlatChange = (k: keyof typeof EMPTY_PLATFORM, v: string) =>
     setPlatForm(s => ({ ...s, [k]: v }));
+
+  // ── filtered / sorted data ────────────────────────────────────────────────
+  const filteredInstruments = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    const list = instruments.filter(i =>
+      !q ||
+      i.name.toLowerCase().includes(q) ||
+      i.symbol.toLowerCase().includes(q) ||
+      i.code.toLowerCase().includes(q) ||
+      (types.find(t => t.id === i.typeId)?.name ?? '').toLowerCase().includes(q)
+    );
+    return [...list].sort((a, b) => {
+      const av = sortKey === 'symbol'   ? a.symbol
+               : sortKey === 'code'     ? a.code
+               : sortKey === 'market'   ? (a.market ?? '')
+               : sortKey === 'currency' ? a.currency
+               : a.name;
+      const bv = sortKey === 'symbol'   ? b.symbol
+               : sortKey === 'code'     ? b.code
+               : sortKey === 'market'   ? (b.market ?? '')
+               : sortKey === 'currency' ? b.currency
+               : b.name;
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+  }, [instruments, searchQuery, sortKey, sortDir, types]);
+
+  const filteredPlatforms = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return platforms.filter(p =>
+      !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q)
+    );
+  }, [platforms, searchQuery]);
+
+  const toggleSort = (col: SortColKey) => {
+    if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(col); setSortDir('asc'); }
+  };
 
   // ── open/close form ───────────────────────────────────────────────────────
   const openCreate = () => {
@@ -193,6 +242,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   // ── section switch ────────────────────────────────────────────────────────
   const switchSection = (s: Section) => {
     setSection(s);
+    setSearchQuery('');
     closeForm();
     setConfirmDelete(null);
     setRefreshMessage(null);
@@ -239,46 +289,69 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         </button>
       </div>
 
-      {/* ── Summary bar ── */}
-      <div className="ict-bar">
-        <div className="ict-stats">
-          {section === 'instruments' ? (
-            <>
-              <div className="ict-stat">
-                <span className="ict-stat-label">Instruments</span>
-                <span className="ict-stat-value">{instruments.length}</span>
-              </div>
-              {types.map(t => (
-                <div key={t.id} className="ict-stat">
-                  <span className="ict-stat-label">{t.name}</span>
-                  <span className="ict-stat-value">{instruments.filter(i => i.typeId === t.id).length}</span>
-                </div>
-              ))}
-            </>
-          ) : (
-            <div className="ict-stat">
-              <span className="ict-stat-label">Platforms</span>
-              <span className="ict-stat-value">{platforms.length}</span>
-            </div>
-          )}
+      {/* ── KPI cards ────────────────────────────────────────────────────── */}
+      <div className="ict-kpi-grid">
+        <article className="ict-kpi ict-kpi--instruments">
+          <span className="ict-kpi-icon">📦</span>
+          <span className="ict-kpi-label">Total activos</span>
+          <strong className="ict-kpi-value">{instruments.length}</strong>
+          <span className="ict-kpi-sub">
+            {searchQuery ? `${filteredInstruments.length} visibles` : 'instrumentos'}
+          </span>
+        </article>
+        {types.map(t => {
+          const count = instruments.filter(i => i.typeId === t.id).length;
+          const visual = getInvestmentTypeVisual(t.code, t.name);
+          return (
+            <article key={t.id} className="ict-kpi" style={{ borderLeftColor: visual.color }}>
+              <span className="ict-kpi-icon">{visual.emoji}</span>
+              <span className="ict-kpi-label">{t.name}</span>
+              <strong className="ict-kpi-value">{count}</strong>
+              <span className="ict-kpi-sub">{t.code}</span>
+            </article>
+          );
+        })}
+        <article className="ict-kpi ict-kpi--platforms">
+          <span className="ict-kpi-icon">🏦</span>
+          <span className="ict-kpi-label">Plataformas</span>
+          <strong className="ict-kpi-value">{platforms.length}</strong>
+          <span className="ict-kpi-sub">brokers / custodios</span>
+        </article>
+      </div>
+
+      {/* ── Toolbar ──────────────────────────────────────────────────────── */}
+      <div className="ict-toolbar">
+        <div className="ict-search-wrap">
+          <span className="ict-search-icon">🔍</span>
+          <input
+            type="search"
+            className="ict-search"
+            placeholder={section === 'instruments'
+              ? 'Buscar por nombre, símbolo, código o tipo…'
+              : 'Buscar plataforma…'}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
         </div>
-        <button
-          type="button"
-          className={`ict-btn-add${showForm ? ' ict-btn-add--cancel' : ''}`}
-          onClick={showForm ? closeForm : openCreate}
-        >
-          {showForm ? '✕ Cancelar' : section === 'instruments' ? '+ New instrument' : '+ New platform'}
-        </button>
-        {section === 'instruments' && (
+        <div className="ict-toolbar-actions">
+          {section === 'instruments' && (
+            <button
+              type="button"
+              className="ict-btn-refresh"
+              onClick={handleRefreshPrices}
+              disabled={refreshingPrices}
+            >
+              {refreshingPrices ? '⏳ Actualizando…' : '↻ Refresh prices'}
+            </button>
+          )}
           <button
             type="button"
-            className="ict-btn-refresh"
-            onClick={handleRefreshPrices}
-            disabled={refreshingPrices}
+            className={`ict-btn-add${showForm ? ' ict-btn-add--cancel' : ''}`}
+            onClick={showForm ? closeForm : openCreate}
           >
-            {refreshingPrices ? 'Refreshing prices…' : '↻ Refresh prices'}
+            {showForm ? '✕ Cancelar' : section === 'instruments' ? '+ Nuevo activo' : '+ Nueva plataforma'}
           </button>
-        )}
+        </div>
       </div>
 
       {/* ── Error toast ── */}
@@ -503,12 +576,22 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
           <table className="ict-table">
             <thead>
               <tr>
-                <th className="ict-th">Code</th>
-                <th className="ict-th">Name</th>
-                <th className="ict-th">Symbol</th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('code')}>
+                  Code <SortIcon col="code" active={sortKey} dir={sortDir} />
+                </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('name')}>
+                  Name <SortIcon col="name" active={sortKey} dir={sortDir} />
+                </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('symbol')}>
+                  Symbol <SortIcon col="symbol" active={sortKey} dir={sortDir} />
+                </th>
                 <th className="ict-th">Type</th>
-                <th className="ict-th">Market</th>
-                <th className="ict-th">Currency</th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('market')}>
+                  Market <SortIcon col="market" active={sortKey} dir={sortDir} />
+                </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('currency')}>
+                  Currency <SortIcon col="currency" active={sortKey} dir={sortDir} />
+                </th>
                 <th className="ict-th ict-th--right">Last price</th>
                 <th className="ict-th">Source</th>
                 <th className="ict-th">Price date</th>
@@ -516,10 +599,14 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
               </tr>
             </thead>
             <tbody>
-              {instruments.length === 0 && (
-                <tr><td colSpan={10} className="ict-empty">No instruments found. Add one to get started.</td></tr>
+              {filteredInstruments.length === 0 && (
+                <tr><td colSpan={10} className="ict-empty">
+                  {instruments.length === 0
+                    ? 'No hay activos. Añade uno para empezar.'
+                    : 'Ningún activo coincide con la búsqueda.'}
+                </td></tr>
               )}
-              {instruments.map(instr => {
+              {filteredInstruments.map(instr => {
                 const type = types.find(t => t.id === instr.typeId);
                 const typeName = type?.name ?? String(instr.typeId);
                 const typeVisual = getInvestmentTypeVisual(type?.code, type?.name);
@@ -582,10 +669,14 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
               </tr>
             </thead>
             <tbody>
-              {platforms.length === 0 && (
-                <tr><td colSpan={3} className="ict-empty">No platforms found. Add one to get started.</td></tr>
+              {filteredPlatforms.length === 0 && (
+                <tr><td colSpan={3} className="ict-empty">
+                  {platforms.length === 0
+                    ? 'No hay plataformas. Añade una para empezar.'
+                    : 'Ninguna plataforma coincide con la búsqueda.'}
+                </td></tr>
               )}
-              {platforms.map(plat => (
+              {filteredPlatforms.map(plat => (
                 <tr key={plat.id} className="ict-row">
                   <td className="ict-td"><span className="ict-code">{plat.code}</span></td>
                   <td className="ict-td"><span className="ict-name">{plat.name}</span></td>
