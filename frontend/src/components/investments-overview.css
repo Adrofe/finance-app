@@ -172,6 +172,40 @@
   cursor: not-allowed;
 }
 
+.io-btn-eur-toggle {
+  padding: 7px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.io-btn-eur-toggle:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.io-btn-eur-toggle--active {
+  background: color-mix(in srgb, var(--brand) 15%, var(--surface));
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.io-btn-eur-toggle--active:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand) 25%, var(--surface));
+}
+
+.io-btn-eur-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Table ───────────────────────────────────────────────────────────────── */
 .io-table-wrap {
   overflow-x: auto;
