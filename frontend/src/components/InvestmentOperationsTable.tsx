@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { INVESTMENT_CURRENCY_OPTIONS, getInvestmentTypeVisual } from '../constants/visualConfig';
 import { CreateTransactionModal } from './CreateTransactionModal';
@@ -125,6 +125,9 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
   const [customToDate, setCustomToDate] = useState('');
   const [operationFilter, setOperationFilter] = useState<'ALL' | InvestmentOperationType>('ALL');
   const [investmentTypeFilter, setInvestmentTypeFilter] = useState<'ALL' | string>('ALL');
+  const [instrumentSearch, setInstrumentSearch] = useState('');
+  const [instrumentDropdownOpen, setInstrumentDropdownOpen] = useState(false);
+  const instrumentComboRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -155,6 +158,14 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     () => new Map(investments.map((investment) => [investment.id, investment])),
     [investments]
   );
+
+  const filteredInstruments = useMemo(() => {
+    const q = instrumentSearch.toLowerCase().trim();
+    if (!q) return instruments;
+    return instruments.filter(
+      (i) => i.name.toLowerCase().includes(q) || i.symbol.toLowerCase().includes(q)
+    );
+  }, [instruments, instrumentSearch]);
 
   const activeDateRange = useMemo(() => {
     if (datePreset === 'CUSTOM') {
@@ -214,6 +225,8 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     setEditingId(null);
     setFormError(null);
     setShowIntegratedTransactionModal(false);
+    setInstrumentSearch('');
+    setInstrumentDropdownOpen(false);
   };
 
   const closeForm = () => {
@@ -230,6 +243,10 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     const relatedInvestment = investmentMap.get(operation.investmentId);
     setEditingId(operation.id);
     setFormError(null);
+    const instrId = relatedInvestment?.instrumentId;
+    const instrItem = instrId ? instruments.find((i) => i.id === instrId) : undefined;
+    setInstrumentSearch(instrItem ? `${instrItem.symbol} · ${instrItem.name}` : '');
+    setInstrumentDropdownOpen(false);
     setForm({
       instrumentId: relatedInvestment?.instrumentId ? String(relatedInvestment.instrumentId) : '',
       platformId: relatedInvestment?.platformId ? String(relatedInvestment.platformId) : '',
@@ -639,14 +656,44 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
               <div className="iot-form-row iot-form-row--pair">
                 <div className="modal-row">
                   <label>Instrumento</label>
-                  <select className="iot-select" required value={form.instrumentId} onChange={(event) => onInstrumentChange(event.target.value)}>
-                    <option value="">Selecciona un instrumento</option>
-                    {instruments.map((instrument) => (
-                      <option key={instrument.id} value={instrument.id}>
-                        {instrument.name} · {instrument.symbol}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="iot-instrument-combo" ref={instrumentComboRef}>
+                    <input
+                      type="text"
+                      className="iot-select iot-instrument-input"
+                      placeholder="Buscar por nombre o símbolo…"
+                      value={instrumentSearch}
+                      autoComplete="off"
+                      onChange={(e) => {
+                        setInstrumentSearch(e.target.value);
+                        setInstrumentDropdownOpen(true);
+                        if (form.instrumentId) onChange('instrumentId', '');
+                      }}
+                      onFocus={() => setInstrumentDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setInstrumentDropdownOpen(false), 160)}
+                    />
+                    {instrumentDropdownOpen && (
+                      <div className="iot-instrument-dropdown">
+                        {filteredInstruments.length === 0 ? (
+                          <div className="iot-instrument-empty">Sin resultados</div>
+                        ) : (
+                          filteredInstruments.map((instrument) => (
+                            <div
+                              key={instrument.id}
+                              className={`iot-instrument-option${form.instrumentId === String(instrument.id) ? ' selected' : ''}`}
+                              onMouseDown={() => {
+                                onInstrumentChange(String(instrument.id));
+                                setInstrumentSearch(`${instrument.symbol} · ${instrument.name}`);
+                                setInstrumentDropdownOpen(false);
+                              }}
+                            >
+                              <span className="iot-instr-symbol">{instrument.symbol}</span>
+                              <span className="iot-instr-name">{instrument.name}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="modal-row">
