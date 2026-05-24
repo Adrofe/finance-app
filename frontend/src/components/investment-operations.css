@@ -373,6 +373,31 @@
   font-size: 12px;
 }
 
+.iot-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.iot-bank-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  color: #1d4ed8;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  width: fit-content;
+}
+.iot-bank-link:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
 .iot-total-cell {
   display: flex;
   flex-direction: column;

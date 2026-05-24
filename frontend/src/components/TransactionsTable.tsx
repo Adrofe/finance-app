@@ -21,6 +21,8 @@ type TransactionsTableProps = {
   items: Transaction[];
   accessToken: string;
   onRefresh?: () => void;
+  highlightTransactionId?: number;
+  onClearHighlight?: () => void;
 };
 
 const STATUS_STYLES: Record<string, { background: string; color: string }> = {
@@ -60,7 +62,7 @@ function formatDate(dateStr?: string): { day: string; rest: string } {
   };
 }
 
-export function TransactionsTable({ items, accessToken, onRefresh }: TransactionsTableProps) {
+export function TransactionsTable({ items, accessToken, onRefresh, highlightTransactionId, onClearHighlight }: TransactionsTableProps) {
   const {
     statusMap,
     typeMap,
@@ -87,7 +89,9 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
   const [editingId,       setEditingId]         = useState<number | null>(null);
   const [editingTaxId,    setEditingTaxId]      = useState<number | null>(null);
 
-  const filteredItems  = applyFilters(items, filters, categories);
+  const filteredItems  = highlightTransactionId != null
+    ? items.filter(t => t.id === highlightTransactionId)
+    : applyFilters(items, filters, categories);
   const activeFilters  = countActiveFilters(filters);
 
   const handleSuccess = () => { if (onRefresh) onRefresh(); };
@@ -287,6 +291,16 @@ export function TransactionsTable({ items, accessToken, onRefresh }: Transaction
           types={types}
           tags={tags}
         />
+      )}
+
+      {/* ── Highlight banner ── */}
+      {highlightTransactionId != null && (
+        <div className="tt-highlight-banner">
+          <span>🔗 Mostrando transacción vinculada a operación de inversión</span>
+          <button className="tt-highlight-clear" type="button" onClick={onClearHighlight}>
+            Quitar filtro ×
+          </button>
+        </div>
       )}
 
       {/* ── Table ── */}

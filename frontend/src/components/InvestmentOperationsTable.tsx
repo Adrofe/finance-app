@@ -7,7 +7,7 @@ import { CatalogService, type TransactionCategory } from '../services/catalogSer
 import { fetchInstruments, fetchInvestmentTypes, fetchPlatforms } from '../services/investmentCatalogService';
 import { deleteTransaction } from '../services/transactionsService';
 import { fetchExchangeRates } from '../services/exchangeRatesService';
-import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
+import { dispatchFinanceEvent, dispatchNavigateToTransaction, FINANCE_EVENTS } from '../events/financeEvents';
 import type { CreateTransactionRequest, Transaction } from '../types/banking';
 import type {
   InvestmentInstrument,
@@ -919,7 +919,20 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
                       <span>{fmtMoney(operation.totalAmountEur, 'EUR')}</span>
                     </div>
                   </td>
-                  <td className="iot-td iot-notes">{operation.notes?.trim() || '—'}</td>
+                  <td className="iot-td iot-notes">
+                    {operation.notes?.trim() || ''}
+                    {operation.linkedTransactionId != null && (
+                      <button
+                        className="iot-bank-link"
+                        type="button"
+                        title={`Ver transacción bancaria #${operation.linkedTransactionId}`}
+                        onClick={() => dispatchNavigateToTransaction(operation.linkedTransactionId!)}
+                      >
+                        🏦 Ver transacción
+                      </button>
+                    )}
+                    {!operation.linkedTransactionId && !operation.notes?.trim() && '—'}
+                  </td>
                   <td className="iot-td">
                     <div className="iot-actions">
                       <button className="iot-btn-icon" type="button" onClick={() => openEdit(operation)} title="Editar operación">✏️</button>
