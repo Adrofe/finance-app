@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import type { ExchangeRateEntry } from '../types/investments';
 import {
+  deleteExchangeRate,
   fetchExchangeRates,
   refreshExchangeRatesForDay,
   upsertExchangeRate,
@@ -44,6 +45,7 @@ export function ExchangeRatesPanel({ token, onUnauthorized }: Props) {
   const [manualRate, setManualRate] = useState('1.000000');
   const [manualSource, setManualSource] = useState('MANUAL');
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const loadRates = useCallback(async () => {
     setLoading(true);
@@ -103,6 +105,28 @@ export function ExchangeRatesPanel({ token, onUnauthorized }: Props) {
     }
   };
 
+  const handleDelete = async (row: ExchangeRateEntry) => {
+    if (!window.confirm(`¿Borrar el registro ${row.fromCurrency}/${row.toCurrency} del ${fmtDateDdMmYyyy(row.asOf)}?`)) return;
+    setDeletingId(row.id);
+    setError(null);
+    setSuccess(null);
+    try {
+      await deleteExchangeRate(token, row.id);
+      setSuccess(`Registro ${row.fromCurrency}/${row.toCurrency} (${fmtDateDdMmYyyy(row.asOf)}) eliminado.`);
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        onUnauthorized?.('Session expired or invalid token. Please login again.');
+        return;
+      }
+      setError((err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message
+        || (err as { message?: string })?.message
+        || 'Error deleting exchange rate');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const refreshFromEcb = async () => {
     setSaving(true);
     setError(null);
@@ -126,91 +150,146 @@ export function ExchangeRatesPanel({ token, onUnauthorized }: Props) {
 
   return (
     <div className="fx-panel">
-      <div className="fx-hero">
-        <div>
-          <h3>Histórico de Tipo de Cambio</h3>
-          <p>Consulta y completa manualmente series FX para operaciones históricas.</p>
-        </div>
-        <div className="fx-chip">
-          <span>Último</span>
-          <strong>{latest ? `${fmtDateDdMmYyyy(latest.asOf)} · ${fmtRate(latest.rate)}` : 'Sin datos'}</strong>
-        </div>
+
+      {/* ── KPI row ─────────────────────────────────────────────────────── */}
+      <div className="fx-kpi-grid">
+        <article className="fx-kpi fx-kpi--rate">
+          <span className="fx-kpi-icon">💱</span>
+          <span className="fx-kpi-label">Último tipo de cambio</span>
+          <strong className="fx-kpi-value">{latest ? fmtRate(latest.rate) : '—'}</strong>
+          <span className="fx-kpi-sub">{fromCurrency} → {toCurrency}</span>
+        </article>
+
+        <article className="fx-kpi fx-kpi--date">
+          <span className="fx-kpi-icon">📅</span>
+          <span className="fx-kpi-label">Fecha del último registro</span>
+          <strong className="fx-kpi-value">{latest ? fmtDateDdMmYyyy(latest.asOf) : '—'}</strong>
+          <span className="fx-kpi-sub">{latest?.source ?? 'Sin datos'}</span>
+        </article>
+
+        <article className="fx-kpi fx-kpi--count">
+          <span className="fx-kpi-icon">📊</span>
+          <span className="fx-kpi-label">Registros cargados</span>
+          <strong className="fx-kpi-value">{rows.length}</strong>
+          <span className="fx-kpi-sub">{fromDate ? `Desde ${fmtDateDdMmYyyy(fromDate)}` : ''}</span>
+        </article>
       </div>
 
-      <div className="fx-grid">
+      {/* ── Control cards ───────────────────────────────────────────────── */}
+      <div className="fx-controls">
         <section className="fx-card">
-          <h4>Filtro histórico</h4>
+          <h4 className="fx-card-title">🔍 Filtro histórico</h4>
           <div className="fx-form-grid">
-            <label>
-              From
-              <input value={fromCurrency} maxLength={3} onChange={(e) => setFromCurrency(e.target.value.toUpperCase())} />
+            <label className="fx-label">
+              <span>From</span>
+              <input
+                className="fx-input fx-input--currency"
+                value={fromCurrency}
+                maxLength={3}
+                onChange={(e) => setFromCurrency(e.target.value.toUpperCase())}
+              />
             </label>
-            <label>
-              To
-              <input value={toCurrency} maxLength={3} onChange={(e) => setToCurrency(e.target.value.toUpperCase())} />
+            <label className="fx-label">
+              <span>To</span>
+              <input
+                className="fx-input fx-input--currency"
+                value={toCurrency}
+                maxLength={3}
+                onChange={(e) => setToCurrency(e.target.value.toUpperCase())}
+              />
             </label>
-            <label>
-              Desde
-              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            <label className="fx-label">
+              <span>Desde</span>
+              <input className="fx-input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
             </label>
-            <label>
-              Hasta
-              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            <label className="fx-label">
+              <span>Hasta</span>
+              <input className="fx-input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
             </label>
           </div>
-          <button type="button" className="btn primary" onClick={loadRates} disabled={loading}>
-            {loading ? 'Cargando...' : 'Recargar histórico'}
+          <button type="button" className="fx-btn fx-btn--primary" onClick={loadRates} disabled={loading}>
+            {loading ? '⏳ Cargando…' : '↻ Recargar histórico'}
           </button>
         </section>
 
         <section className="fx-card">
-          <h4>Alta manual / BCE por día</h4>
+          <h4 className="fx-card-title">✏️ Alta manual / BCE por día</h4>
           <form className="fx-form-grid" onSubmit={submitManual}>
-            <label>
-              Fecha
-              <input type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} required />
+            <label className="fx-label">
+              <span>Fecha</span>
+              <input className="fx-input" type="date" value={manualDate} onChange={(e) => setManualDate(e.target.value)} required />
             </label>
-            <label>
-              Tipo de cambio
-              <input type="number" step="0.000001" min="0" value={manualRate} onChange={(e) => setManualRate(e.target.value)} required />
+            <label className="fx-label">
+              <span>Tipo de cambio</span>
+              <input className="fx-input" type="number" step="0.000001" min="0" value={manualRate} onChange={(e) => setManualRate(e.target.value)} required />
             </label>
-            <label>
-              Fuente
-              <input value={manualSource} onChange={(e) => setManualSource(e.target.value)} />
+            <label className="fx-label">
+              <span>Fuente</span>
+              <input className="fx-input" value={manualSource} onChange={(e) => setManualSource(e.target.value)} />
             </label>
             <div className="fx-actions">
-              <button type="submit" className="btn primary" disabled={saving}>{saving ? 'Guardando...' : 'Guardar manual'}</button>
-              <button type="button" className="btn secondary" disabled={saving} onClick={refreshFromEcb}>Importar BCE (día)</button>
+              <button type="submit" className="fx-btn fx-btn--primary" disabled={saving}>
+                {saving ? '⏳ Guardando…' : '💾 Guardar manual'}
+              </button>
+              <button type="button" className="fx-btn fx-btn--secondary" disabled={saving} onClick={refreshFromEcb}>
+                🏦 Importar BCE
+              </button>
             </div>
           </form>
         </section>
       </div>
 
-      {error && <p className="state error">{error}</p>}
-      {success && <p className="state">{success}</p>}
+      {/* ── Feedback ─────────────────────────────────────────────────────── */}
+      {error   && <p className="fx-alert fx-alert--error">{error}</p>}
+      {success && <p className="fx-alert fx-alert--success">{success}</p>}
 
+      {/* ── Table ────────────────────────────────────────────────────────── */}
       <div className="fx-table-wrap">
         <table className="fx-table">
           <thead>
             <tr>
               <th>Fecha</th>
               <th>Par</th>
-              <th>Rate</th>
+              <th className="fx-right">Rate</th>
               <th>Fuente</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="fx-empty">No hay registros para el filtro actual.</td>
+                <td colSpan={5} className="fx-empty">No hay registros para el filtro actual.</td>
               </tr>
             ) : (
               rows.map((row) => (
-                <tr key={`${row.fromCurrency}-${row.toCurrency}-${row.asOf}`}>
-                  <td>{fmtDateDdMmYyyy(row.asOf)}</td>
-                  <td>{row.fromCurrency}/{row.toCurrency}</td>
-                  <td>{fmtRate(row.rate)}</td>
-                  <td>{row.source || '—'}</td>
+                <tr key={`${row.fromCurrency}-${row.toCurrency}-${row.asOf}`} className="fx-row">
+                  <td className="fx-mono">{fmtDateDdMmYyyy(row.asOf)}</td>
+                  <td>
+                    <span className="fx-pair">
+                      <strong>{row.fromCurrency}</strong>
+                      <span className="fx-arrow">→</span>
+                      <strong>{row.toCurrency}</strong>
+                    </span>
+                  </td>
+                  <td className="fx-right fx-mono fx-rate-cell">{fmtRate(row.rate)}</td>
+                  <td>
+                    <span className={`fx-source-badge ${row.source === 'MANUAL' ? 'fx-source-manual' : 'fx-source-ecb'}`}>
+                      {row.source || '—'}
+                    </span>
+                  </td>
+                  <td className="fx-action-cell">
+                    {row.source === 'MANUAL' && (
+                      <button
+                        type="button"
+                        className="fx-btn-delete"
+                        title="Eliminar registro"
+                        disabled={deletingId === row.id}
+                        onClick={() => handleDelete(row)}
+                      >
+                        {deletingId === row.id ? '⏳' : '🗑'}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))
             )}

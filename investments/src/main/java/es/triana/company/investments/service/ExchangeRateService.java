@@ -66,6 +66,13 @@ public class ExchangeRateService {
         return toDto(saved);
     }
 
+    @Transactional
+    public void deleteRate(Long id) {
+        ExchangeRate entity = exchangeRateRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Exchange rate not found: " + id));
+        exchangeRateRepository.delete(entity);
+    }
+
     private ExchangeRateDTO toDto(ExchangeRate rate) {
         return new ExchangeRateDTO(
                 rate.getId(),
