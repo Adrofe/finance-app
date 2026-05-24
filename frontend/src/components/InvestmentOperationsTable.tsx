@@ -6,6 +6,7 @@ import { useInvestmentOperations } from '../hooks/useInvestmentOperations';
 import { CatalogService, type TransactionCategory } from '../services/catalogService';
 import { fetchInstruments, fetchInvestmentTypes, fetchPlatforms } from '../services/investmentCatalogService';
 import { deleteTransaction } from '../services/transactionsService';
+import { fetchExchangeRates } from '../services/exchangeRatesService';
 import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import type { CreateTransactionRequest, Transaction } from '../types/banking';
 import type {
@@ -120,6 +121,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [showIntegratedTransactionModal, setShowIntegratedTransactionModal] = useState(false);
+  const [integratedEurRate, setIntegratedEurRate] = useState<number | null>(null);
   const [datePreset, setDatePreset] = useState<DatePreset>('ALL');
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState('');
@@ -336,16 +338,36 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     const { payload } = getOperationDraft();
     if (!payload) return null;
     const grossAmount = payload.quantity * payload.unitPrice;
-    return payload.type === 'BUY'
+    const rawAmount = payload.type === 'BUY'
       ? -(grossAmount + (payload.fees ?? 0))
       : grossAmount - (payload.fees ?? 0);
-  }, [form]);
+    // Convert to EUR if the operation is in a foreign currency and we have the rate
+    if (form.currency !== 'EUR' && integratedEurRate !== null && integratedEurRate > 0) {
+      return rawAmount / integratedEurRate;
+    }
+    return rawAmount;
+  }, [form, integratedEurRate]);
 
-  const openIntegratedTransactionModal = () => {
+  const openIntegratedTransactionModal = async () => {
     if (editingId) return;
     setFormError(null);
     if (!buildOperationDraft()) {
       return;
+    }
+    if (form.currency !== 'EUR') {
+      try {
+        const rates = await fetchExchangeRates(token, {
+          fromCurrency: 'EUR',
+          toCurrency: form.currency.toUpperCase(),
+          from: form.operationDate,
+          to: form.operationDate,
+        });
+        setIntegratedEurRate(rates.length > 0 ? rates[0].rate : null);
+      } catch {
+        setIntegratedEurRate(null);
+      }
+    } else {
+      setIntegratedEurRate(1);
     }
     setShowIntegratedTransactionModal(true);
   };
@@ -443,10 +465,14 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
 
   const integratedTransactionDescription = useMemo(() => {
     const label = selectedInstrument?.symbol || selectedInstrument?.name || form.positionName.trim() || 'inversión';
-    return form.type === 'BUY'
+    const baseDesc = form.type === 'BUY'
       ? `Compra de ${label}`
       : `Venta de ${label}`;
-  }, [form.positionName, form.type, selectedInstrument]);
+    if (form.currency !== 'EUR' && integratedEurRate !== null && integratedEurRate > 0) {
+      return `${baseDesc} (cambio ${form.currency}/EUR ${integratedEurRate.toFixed(4)})`;
+    }
+    return baseDesc;
+  }, [form.positionName, form.type, form.currency, selectedInstrument, integratedEurRate]);
 
   const selectedInvestment = selectedInstrumentId
     ? investments.find((investment) => {
@@ -810,7 +836,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
             amount: integratedCashAmount ?? undefined,
             bookingDate: form.operationDate,
             valueDate: form.operationDate,
-            currency: form.currency,
+            currency: (form.currency !== 'EUR' && integratedEurRate !== null && integratedEurRate > 0) ? 'EUR' : form.currency,
             description: integratedTransactionDescription,
             categoryId: integratedCategoryId,
           }}
