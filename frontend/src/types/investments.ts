@@ -158,3 +158,11 @@ export type PriceRefreshResult = {
   instrumentIds: number[];
   mode: string;
 };
+
+export type PriceUpdateDraft = {
+  instrumentId: number;
+  price: number;
+  asOf?: string;
+  source?: string;
+  currency?: string;
+};

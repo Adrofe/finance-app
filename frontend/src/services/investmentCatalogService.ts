@@ -1,6 +1,12 @@
 import axios from 'axios';
 import type { ApiResponse } from '../types/api';
-import type { InvestmentInstrument, InvestmentPlatform, InvestmentType, PriceRefreshResult } from '../types/investments';
+import type {
+  InvestmentInstrument,
+  InvestmentPlatform,
+  InvestmentType,
+  PriceRefreshResult,
+  PriceUpdateDraft,
+} from '../types/investments';
 
 const BASE = '/v1/api/investments/catalog';
 const INVESTMENTS_BASE = '/v1/api/investments';
@@ -58,5 +64,14 @@ export async function deletePlatform(token: string, id: number): Promise<void> {
 
 export async function refreshInstrumentPrices(token: string): Promise<PriceRefreshResult> {
   const res = await axios.post<ApiResponse<PriceRefreshResult>>(`${INVESTMENTS_BASE}/prices/refresh/auto`, undefined, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function addManualInstrumentPrice(token: string, payload: PriceUpdateDraft): Promise<PriceRefreshResult> {
+  const res = await axios.post<ApiResponse<PriceRefreshResult>>(
+    `${INVESTMENTS_BASE}/prices/refresh`,
+    [payload],
+    { headers: headers(token) },
+  );
   return res.data.data;
 }

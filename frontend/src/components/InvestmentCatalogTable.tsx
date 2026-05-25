@@ -68,6 +68,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
     refreshPrices,
+    addManualPrice,
     addPlatform, editPlatform, removePlatform,
   } = useInvestmentCatalog(token, onUnauthorized);
 
@@ -82,6 +83,9 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [deleting, setDeleting]           = useState(false);
   const [refreshingPrices, setRefreshingPrices] = useState(false);
   const [refreshMessage, setRefreshMessage]     = useState<string | null>(null);
+  const [showManualPrice, setShowManualPrice]   = useState(false);
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [manualError, setManualError]           = useState<string | null>(null);
   const [searchQuery, setSearchQuery]           = useState('');
   const [sortKey, setSortKey]                   = useState<SortColKey>('name');
   const [sortDir, setSortDir]                   = useState<'asc' | 'desc'>('asc');
@@ -100,6 +104,14 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [platForm, setPlatForm] = useState({ ...EMPTY_PLATFORM });
   const onPlatChange = (k: keyof typeof EMPTY_PLATFORM, v: string) =>
     setPlatForm(s => ({ ...s, [k]: v }));
+
+  const [manualPriceForm, setManualPriceForm] = useState(() => ({
+    instrumentId: '',
+    price: '',
+    asOfDate: new Date().toISOString().split('T')[0],
+  }));
+  const [manualAssetQuery, setManualAssetQuery] = useState('');
+  const [manualAssetDropdownOpen, setManualAssetDropdownOpen] = useState(false);
 
   // ── filtered / sorted data ────────────────────────────────────────────────
   const filteredInstruments = useMemo(() => {
@@ -140,6 +152,8 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
 
   // ── open/close form ───────────────────────────────────────────────────────
   const openCreate = () => {
+    setShowManualPrice(false);
+    setManualError(null);
     setEditingId(null);
     setFormError(null);
     if (section === 'instruments') setInstrForm({ ...EMPTY_INSTRUMENT });
@@ -148,6 +162,8 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   };
 
   const openEdit = (item: InvestmentInstrument | InvestmentPlatform) => {
+    setShowManualPrice(false);
+    setManualError(null);
     setEditingId(item.id);
     setFormError(null);
     if (section === 'instruments') {
@@ -171,6 +187,27 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   };
 
   const closeForm = () => { setShowForm(false); setEditingId(null); setFormError(null); };
+
+  const openManualPrice = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setFormError(null);
+    setManualError(null);
+    setManualPriceForm({
+      instrumentId: '',
+      price: '',
+      asOfDate: new Date().toISOString().split('T')[0],
+    });
+    setManualAssetQuery('');
+    setManualAssetDropdownOpen(false);
+    setShowManualPrice(true);
+  };
+
+  const closeManualPrice = () => {
+    setShowManualPrice(false);
+    setManualError(null);
+    setManualAssetDropdownOpen(false);
+  };
 
   // ── submit handlers ───────────────────────────────────────────────────────
   const submitInstrument = async (e: React.FormEvent) => {
@@ -244,6 +281,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     setSection(s);
     setSearchQuery('');
     closeForm();
+    closeManualPrice();
     setConfirmDelete(null);
     setRefreshMessage(null);
   };
@@ -266,7 +304,70 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     }
   };
 
+  const submitManualPrice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setManualError(null);
+
+    const selectedInstrument = instruments.find(i => i.id === Number(manualPriceForm.instrumentId));
+    if (!selectedInstrument) {
+      setManualError('Selecciona un activo.');
+      return;
+    }
+    const price = Number(manualPriceForm.price);
+    if (!Number.isFinite(price) || price <= 0) {
+      setManualError('El precio debe ser mayor que 0.');
+      return;
+    }
+    if (!manualPriceForm.asOfDate) {
+      setManualError('Selecciona una fecha válida.');
+      return;
+    }
+
+    setManualSubmitting(true);
+    try {
+      const result = await addManualPrice({
+        instrumentId: selectedInstrument.id,
+        price,
+        currency: selectedInstrument.currency,
+        source: 'MANUAL_UI',
+        asOf: `${manualPriceForm.asOfDate}T12:00:00`,
+      });
+
+      setRefreshMessage(
+        result.updatedInstruments > 0
+          ? `Precio manual guardado para ${selectedInstrument.symbol}.`
+          : 'No se pudo actualizar el precio manual.',
+      );
+      setShowManualPrice(false);
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setManualError(eRes?.response?.data?.message || eRes?.message || 'Error guardando precio manual');
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
+
   if (loading) return <div className="ict-empty">Cargando catálogo…</div>;
+
+  const selectedManualInstrument = instruments.find(i => i.id === Number(manualPriceForm.instrumentId));
+  const selectedManualType = selectedManualInstrument
+    ? types.find(t => t.id === selectedManualInstrument.typeId)
+    : undefined;
+  const selectedManualVisual = getInvestmentTypeVisual(selectedManualType?.code, selectedManualType?.name);
+  const manualFilteredInstruments = useMemo(() => {
+    const query = manualAssetQuery.trim().toLowerCase();
+    const sorted = instruments.slice().sort((a, b) => a.name.localeCompare(b.name));
+    if (!query) {
+      return sorted.slice(0, 40);
+    }
+    return sorted
+      .filter(i =>
+        i.name.toLowerCase().includes(query) ||
+        i.symbol.toLowerCase().includes(query) ||
+        i.code.toLowerCase().includes(query),
+      )
+      .slice(0, 40);
+  }, [instruments, manualAssetQuery]);
 
   return (
     <div className="ict-wrapper">
@@ -337,6 +438,16 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
           {section === 'instruments' && (
             <button
               type="button"
+              className="ict-btn-manual"
+              onClick={openManualPrice}
+              disabled={showManualPrice}
+            >
+              + Añadir precio manual
+            </button>
+          )}
+          {section === 'instruments' && (
+            <button
+              type="button"
               className="ict-btn-refresh"
               onClick={handleRefreshPrices}
               disabled={refreshingPrices}
@@ -366,6 +477,110 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         <div className="ict-toast-info" role="status">
           <span>{refreshMessage}</span>
           <button type="button" onClick={() => setRefreshMessage(null)}>Cerrar</button>
+        </div>
+      )}
+
+      {/* ══ MANUAL PRICE MODAL ══ */}
+      {showManualPrice && section === 'instruments' && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal ict-manual-price-modal">
+            <div className="modal-header">
+              <h4>Añadir precio manual</h4>
+              <button className="modal-close" type="button" onClick={closeManualPrice}>✕</button>
+            </div>
+            <form onSubmit={submitManualPrice} className="modal-body">
+              <div className="modal-row">
+                <label>Activo *</label>
+                <div className="ict-manual-combo">
+                  <input
+                    type="text"
+                    className="ict-manual-input"
+                    placeholder="Buscar por símbolo, nombre o código…"
+                    value={manualAssetQuery}
+                    onChange={(e) => {
+                      setManualAssetQuery(e.target.value);
+                      setManualAssetDropdownOpen(true);
+                      if (manualPriceForm.instrumentId) {
+                        setManualPriceForm(s => ({ ...s, instrumentId: '' }));
+                      }
+                    }}
+                    onFocus={() => setManualAssetDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setManualAssetDropdownOpen(false), 140)}
+                  />
+                  {manualAssetDropdownOpen && (
+                    <div className="ict-manual-dropdown">
+                      {manualFilteredInstruments.length === 0 ? (
+                        <div className="ict-manual-option-empty">Sin resultados</div>
+                      ) : (
+                        manualFilteredInstruments.map((instrument) => (
+                          <div
+                            key={instrument.id}
+                            className={`ict-manual-option${manualPriceForm.instrumentId === String(instrument.id) ? ' selected' : ''}`}
+                            onMouseDown={() => {
+                              setManualPriceForm(s => ({ ...s, instrumentId: String(instrument.id) }));
+                              setManualAssetQuery(`${instrument.symbol} · ${instrument.name}`);
+                              setManualAssetDropdownOpen(false);
+                            }}
+                          >
+                            <span className="ict-manual-option-symbol">{instrument.symbol}</span>
+                            <span className="ict-manual-option-name">{instrument.name}</span>
+                            <span className="ict-manual-option-code">{instrument.code}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+                {!manualPriceForm.instrumentId && (
+                  <span className="ict-manual-help">Selecciona un activo de la lista para guardar el precio.</span>
+                )}
+              </div>
+
+              {selectedManualInstrument && (
+                <div className="ict-manual-preview">
+                  <span className="ict-manual-preview__type" style={{ background: selectedManualVisual.background, color: selectedManualVisual.color }}>
+                    {selectedManualVisual.emoji} {selectedManualType?.code ?? 'TYPE'}
+                  </span>
+                  <strong>{selectedManualInstrument.symbol}</strong>
+                  <span>{selectedManualInstrument.name}</span>
+                  <span className="ict-manual-preview__currency">Moneda: {selectedManualInstrument.currency}</span>
+                </div>
+              )}
+
+              <div className="ict-manual-grid">
+                <div className="modal-row">
+                  <label>Fecha *</label>
+                  <input
+                    type="date"
+                    required
+                    value={manualPriceForm.asOfDate}
+                    onChange={e => setManualPriceForm(s => ({ ...s, asOfDate: e.target.value }))}
+                  />
+                </div>
+                <div className="modal-row">
+                  <label>Precio *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    required
+                    placeholder="0.00"
+                    value={manualPriceForm.price}
+                    onChange={e => setManualPriceForm(s => ({ ...s, price: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {manualError && <div className="modal-error">{manualError}</div>}
+
+              <div className="modal-actions">
+                <button className="at-btn-primary" type="submit" disabled={manualSubmitting}>
+                  {manualSubmitting ? 'Guardando…' : 'Guardar precio'}
+                </button>
+                <button className="at-btn-secondary" type="button" onClick={closeManualPrice}>Cancelar</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
