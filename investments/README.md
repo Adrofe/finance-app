@@ -194,6 +194,7 @@ spring.flyway.baseline-on-migrate=true
 
 # Precios de mercado (TwelveData)
 investments.prices.auto-refresh-cron=${INVESTMENTS_PRICES_AUTO_REFRESH_CRON:0 0 */12 * * *}
+investments.prices.auto-refresh-excluded-type-codes=${INVESTMENTS_PRICES_AUTO_REFRESH_EXCLUDED_TYPE_CODES:FUND,ETF}
 investments.prices.crypto.quote-currency=${INVESTMENTS_PRICES_CRYPTO_QUOTE_CURRENCY:USD}
 investments.prices.providers.twelvedata.time-series-url=${INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_TIME_SERIES_URL}
 investments.prices.providers.twelvedata.api-key=${INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_API_KEY}
@@ -225,6 +226,7 @@ logging.file.name=investments.log
 | `DATABASE_PASSWORD` | **Sí** | — | Contraseña de base de datos |
 | `DATABASE_SCHEMA` | No | `investments` | Schema PostgreSQL |
 | `INVESTMENTS_PRICES_AUTO_REFRESH_CRON` | No | `0 0 */12 * * *` | Cron de refresco automático de precios |
+| `INVESTMENTS_PRICES_AUTO_REFRESH_EXCLUDED_TYPE_CODES` | No | `FUND,ETF` | Tipos excluidos del refresco automático (CSV por código de tipo) |
 | `INVESTMENTS_PRICES_CRYPTO_QUOTE_CURRENCY` | No | `USD` | Moneda de cotización para criptomonedas |
 | `INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_TIME_SERIES_URL` | **Sí** | — | URL de la API TwelveData |
 | `INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_API_KEY` | **Sí** | — | API Key de TwelveData |
@@ -243,6 +245,7 @@ DATABASE_USERNAME=postgres
 DATABASE_PASSWORD=postgres
 DATABASE_SCHEMA=investments
 INVESTMENTS_PRICES_AUTO_REFRESH_CRON=0 0 */12 * * *
+INVESTMENTS_PRICES_AUTO_REFRESH_EXCLUDED_TYPE_CODES=FUND,ETF
 INVESTMENTS_PRICES_CRYPTO_QUOTE_CURRENCY=USD
 INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_TIME_SERIES_URL=https://api.twelvedata.com/time_series
 INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_API_KEY=<TU_API_KEY>
