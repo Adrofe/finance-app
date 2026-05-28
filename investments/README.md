@@ -200,6 +200,9 @@ investments.prices.providers.twelvedata.time-series-url=${INVESTMENTS_PRICES_PRO
 investments.prices.providers.twelvedata.api-key=${INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_API_KEY}
 investments.prices.providers.twelvedata.interval=${INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_INTERVAL:1day}
 investments.prices.providers.twelvedata.outputsize=${INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_OUTPUTSIZE:1}
+investments.prices.scraper.enabled=${INVESTMENTS_PRICES_SCRAPER_ENABLED:false}
+investments.prices.scraper.yahoo-url=${INVESTMENTS_PRICES_SCRAPER_YAHOO_URL:https://finance.yahoo.com/quote/}
+investments.prices.scraper.user-agent=${INVESTMENTS_PRICES_SCRAPER_USER_AGENT:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36}
 
 # Tipos de cambio ECB
 investments.exchange-rates.refresh-cron=${INVESTMENTS_EXCHANGE_RATES_REFRESH_CRON:0 30 15 * * MON-FRI}
@@ -232,6 +235,10 @@ logging.file.name=investments.log
 | `INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_API_KEY` | **Sí** | — | API Key de TwelveData |
 | `INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_INTERVAL` | No | `1day` | Intervalo de la serie temporal |
 | `INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_OUTPUTSIZE` | No | `1` | Número de velas a obtener |
+| `INVESTMENTS_PRICES_SCRAPER_ENABLED` | No | `false` | Activa fallback scraping (uso personal) cuando falla TwelveData |
+| `INVESTMENTS_PRICES_SCRAPER_YAHOO_URL` | No | `https://finance.yahoo.com/quote/` | URL base para scraping de cotizaciones |
+| `INVESTMENTS_PRICES_SCRAPER_USER_AGENT` | No | Chrome UA | User-Agent enviado al proveedor web |
+| `scraper_url` (campo en `investment_instruments`) | Sí (si quieres override) | `null` | URL específica por asset para scraping, editable desde catálogo |
 | `INVESTMENTS_EXCHANGE_RATES_REFRESH_CRON` | No | `0 30 15 * * MON-FRI` | Cron de refresco de divisas |
 | `INVESTMENTS_EXCHANGE_RATES_PROVIDER_ECB_DAILY_URL` | **Sí** | — | URL feed XML ECB diario |
 | `INVESTMENTS_EXCHANGE_RATES_PROVIDER_ECB_HIST90D_URL` | **Sí** | — | URL feed XML ECB 90 días |
@@ -251,6 +258,9 @@ INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_TIME_SERIES_URL=https://api.twelvedata.co
 INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_API_KEY=<TU_API_KEY>
 INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_INTERVAL=1day
 INVESTMENTS_PRICES_PROVIDER_TWELVEDATA_OUTPUTSIZE=1
+INVESTMENTS_PRICES_SCRAPER_ENABLED=true
+INVESTMENTS_PRICES_SCRAPER_YAHOO_URL=https://finance.yahoo.com/quote/
+INVESTMENTS_PRICES_SCRAPER_USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36
 INVESTMENTS_EXCHANGE_RATES_REFRESH_CRON=0 30 15 * * MON-FRI
 INVESTMENTS_EXCHANGE_RATES_PROVIDER_ECB_DAILY_URL=https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml
 INVESTMENTS_EXCHANGE_RATES_PROVIDER_ECB_HIST90D_URL=https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml

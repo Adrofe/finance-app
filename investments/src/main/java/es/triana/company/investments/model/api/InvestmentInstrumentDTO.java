@@ -49,4 +49,7 @@ public class InvestmentInstrumentDTO {
     private String lastPriceSource;
 
     private LocalDateTime lastPriceAt;
+
+    @Size(max = 500, message = "scraperUrl max length is 500")
+    private String scraperUrl;
 }

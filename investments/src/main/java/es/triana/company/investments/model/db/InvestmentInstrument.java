@@ -52,4 +52,7 @@ public class InvestmentInstrument {
 
     @Column(name = "last_price_at")
     private LocalDateTime lastPriceAt;
+
+    @Column(name = "scraper_url", length = 500)
+    private String scraperUrl;
 }

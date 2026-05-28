@@ -68,6 +68,7 @@ public class InvestmentCatalogService {
                     .lastPrice(request.getLastPrice())
                     .lastPriceSource(trimToNull(request.getLastPriceSource()))
                     .lastPriceAt(request.getLastPriceAt())
+                    .scraperUrl(trimToNull(request.getScraperUrl()))
                     .build();
 
             InvestmentInstrumentDTO savedInstrument = toInstrumentDto(investmentInstrumentRepository.save(instrument));
@@ -101,6 +102,7 @@ public class InvestmentCatalogService {
             instrument.setLastPrice(request.getLastPrice());
             instrument.setLastPriceSource(trimToNull(request.getLastPriceSource()));
             instrument.setLastPriceAt(request.getLastPriceAt());
+            instrument.setScraperUrl(trimToNull(request.getScraperUrl()));
 
             InvestmentInstrumentDTO updatedInstrument = toInstrumentDto(investmentInstrumentRepository.save(instrument));
             LOG.info("Instrument updated successfully. id={} code={} symbol={}",
@@ -219,6 +221,7 @@ public class InvestmentCatalogService {
                 .lastPrice(instrument.getLastPrice())
                 .lastPriceSource(instrument.getLastPriceSource())
                 .lastPriceAt(instrument.getLastPriceAt())
+                .scraperUrl(instrument.getScraperUrl())
                 .build();
     }
 
@@ -270,7 +273,7 @@ public class InvestmentCatalogService {
             return "request=null";
         }
         return String.format(
-                "typeId=%s, code=%s, symbol=%s, name=%s, market=%s, currency=%s, lastPrice=%s, lastPriceSource=%s, lastPriceAt=%s",
+                "typeId=%s, code=%s, symbol=%s, name=%s, market=%s, currency=%s, lastPrice=%s, lastPriceSource=%s, lastPriceAt=%s, scraperUrl=%s",
                 request.getTypeId(),
                 request.getCode(),
                 request.getSymbol(),
@@ -279,6 +282,7 @@ public class InvestmentCatalogService {
                 request.getCurrency(),
                 request.getLastPrice(),
                 request.getLastPriceSource(),
-                request.getLastPriceAt());
+                request.getLastPriceAt(),
+                request.getScraperUrl());
     }
 }
