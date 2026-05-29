@@ -33,6 +33,7 @@ const EMPTY_INSTRUMENT = {
   lastPrice: '',
   lastPriceSource: '',
   lastPriceAt: '',
+  scraperUrl: '',
 };
 
 // ─── Platform form state ──────────────────────────────────────────────────────
@@ -178,6 +179,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPrice: i.lastPrice != null ? String(i.lastPrice) : '',
         lastPriceSource: i.lastPriceSource ?? '',
         lastPriceAt: i.lastPriceAt ? i.lastPriceAt.slice(0, 16) : '',
+        scraperUrl: i.scraperUrl ?? '',
       });
     } else {
       const p = item as InvestmentPlatform;
@@ -225,6 +227,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPrice: instrForm.lastPrice !== '' ? Number(instrForm.lastPrice) : undefined,
         lastPriceSource: instrForm.lastPriceSource.trim() || undefined,
         lastPriceAt: instrForm.lastPriceAt || undefined,
+        scraperUrl: instrForm.scraperUrl.trim() || undefined,
       };
       if (editingId) await editInstrument(editingId, payload);
       else await addInstrument(payload);
@@ -347,8 +350,6 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     }
   };
 
-  if (loading) return <div className="ict-empty">Cargando catálogo…</div>;
-
   const selectedManualInstrument = instruments.find(i => i.id === Number(manualPriceForm.instrumentId));
   const selectedManualType = selectedManualInstrument
     ? types.find(t => t.id === selectedManualInstrument.typeId)
@@ -368,6 +369,8 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       )
       .slice(0, 40);
   }, [instruments, manualAssetQuery]);
+
+  if (loading) return <div className="ict-empty">Cargando catálogo…</div>;
 
   return (
     <div className="ict-wrapper">
@@ -707,6 +710,16 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                   onChange={e => onInstrChange('lastPriceAt', e.target.value)}
                 />
               </div>
+              <div className="modal-row">
+                <label>Scraper URL</label>
+                <input
+                  type="url"
+                  maxLength={500}
+                  placeholder="https://..."
+                  value={instrForm.scraperUrl}
+                  onChange={e => onInstrChange('scraperUrl', e.target.value)}
+                />
+              </div>
               {formError && <div className="modal-error">{formError}</div>}
               <div className="modal-actions">
                 <button className="at-btn-primary" type="submit" disabled={submitting}>
@@ -810,12 +823,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 <th className="ict-th ict-th--right">Last price</th>
                 <th className="ict-th">Source</th>
                 <th className="ict-th">Price date</th>
+                <th className="ict-th">Scraper</th>
                 <th className="ict-th ict-th--actions" aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
               {filteredInstruments.length === 0 && (
-                <tr><td colSpan={10} className="ict-empty">
+                <tr><td colSpan={11} className="ict-empty">
                   {instruments.length === 0
                     ? 'No hay activos. Añade uno para empezar.'
                     : 'Ningún activo coincide con la búsqueda.'}
@@ -848,6 +862,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                     <td className="ict-td ict-td--right"><span className="ict-price">{fmtPrice(instr.lastPrice)}</span></td>
                     <td className="ict-td"><span className="ict-muted">{instr.lastPriceSource ?? '—'}</span></td>
                     <td className="ict-td"><span className="ict-muted">{fmtDate(instr.lastPriceAt)}</span></td>
+                    <td className="ict-td">
+                      {instr.scraperUrl ? (
+                        <a className="ict-scraper-link" href={instr.scraperUrl} target="_blank" rel="noreferrer">🔗 URL</a>
+                      ) : (
+                        <span className="ict-muted">—</span>
+                      )}
+                    </td>
                     <td className="ict-td">
                       <div className="ict-actions">
                         <button

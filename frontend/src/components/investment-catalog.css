@@ -325,6 +325,17 @@
   font-size: 12px;
 }
 
+.ict-scraper-link {
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.ict-scraper-link:hover {
+  text-decoration: underline;
+}
+
 /* ─── Action buttons ──────────────────────────────────────────────────────── */
 
 .ict-actions {

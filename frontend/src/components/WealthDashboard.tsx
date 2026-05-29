@@ -47,12 +47,20 @@ const fmtDate = (dateStr: string) =>
 const fmtShortDate = (dateStr: string) =>
   new Date(dateStr + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
 
+const toDateMillis = (dateStr: string) =>
+  new Date(dateStr + 'T00:00:00').getTime();
+
 export function WealthDashboard({ snapshots, onRefresh, refreshing }: Props) {
   const [selectedType, setSelectedType] = useState<WealthItemType | null>(null);
   const [evolutionMode, setEvolutionMode] = useState<'total' | 'categorized'>('total');
 
-  const latest  = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
-  const previous = snapshots.length > 1 ? snapshots[snapshots.length - 2] : null;
+  const timelineSnapshots = useMemo(
+    () => [...snapshots].sort((a, b) => a.snapshotDate.localeCompare(b.snapshotDate)),
+    [snapshots],
+  );
+
+  const latest  = timelineSnapshots.length > 0 ? timelineSnapshots[timelineSnapshots.length - 1] : null;
+  const previous = timelineSnapshots.length > 1 ? timelineSnapshots[timelineSnapshots.length - 2] : null;
 
   const delta = useMemo(() => {
     if (!latest || !previous) return null;
@@ -63,23 +71,28 @@ export function WealthDashboard({ snapshots, onRefresh, refreshing }: Props) {
 
   const lineData = useMemo(() => {
     const config = selectedType ? TYPE_CONFIGS.find((c) => c.type === selectedType) : null;
-    return snapshots.map((s) => ({
-      date:  fmtShortDate(s.snapshotDate),
+    return timelineSnapshots.map((s) => ({
+      timestamp: toDateMillis(s.snapshotDate),
+      dateLabel: fmtShortDate(s.snapshotDate),
       value: config ? ((s[config.valueKey] as number) ?? 0) : s.totalValue,
     }));
-  }, [snapshots, selectedType]);
+  }, [timelineSnapshots, selectedType]);
 
   const categorizedData = useMemo(() => {
-    return snapshots.map((s) => {
+    return timelineSnapshots.map((s) => {
       const row: Record<string, number | string> = {
-        date: fmtShortDate(s.snapshotDate),
+        timestamp: toDateMillis(s.snapshotDate),
+        dateLabel: fmtShortDate(s.snapshotDate),
       };
       TYPE_CONFIGS.forEach((c) => {
         row[c.type] = (s[c.valueKey] as number) ?? 0;
       });
       return row;
     });
-  }, [snapshots]);
+  }, [timelineSnapshots]);
+
+  const axisDateFormatter = (value: number) =>
+    new Date(value).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' });
 
   const pieData = useMemo(() => {
     if (!latest) return [];
@@ -206,13 +219,21 @@ export function WealthDashboard({ snapshots, onRefresh, refreshing }: Props) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e8eef5" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <XAxis
+                dataKey="timestamp"
+                type="number"
+                scale="time"
+                domain={['dataMin', 'dataMax']}
+                tick={{ fontSize: 11 }}
+                tickFormatter={(value) => axisDateFormatter(Number(value))}
+              />
               <YAxis
                 tick={{ fontSize: 11 }}
                 tickFormatter={(v) => `${(Number(v) / 1000).toFixed(0)}k`}
                 width={52}
               />
               <Tooltip
+                labelFormatter={(label) => fmtDate(new Date(Number(label)).toISOString().slice(0, 10))}
                 formatter={(v, name) => {
                   const conf = TYPE_CONFIGS.find((c) => c.type === name);
                   return [fmtMoney(Number(v), latest!.currency), conf ? `${conf.icon} ${conf.label}` : 'Valor'];

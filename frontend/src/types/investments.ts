@@ -19,6 +19,7 @@ export type InvestmentInstrument = {
   lastPrice?: number;
   lastPriceSource?: string;
   lastPriceAt?: string;
+  scraperUrl?: string;
 };
 
 export type InvestmentPlatform = {
