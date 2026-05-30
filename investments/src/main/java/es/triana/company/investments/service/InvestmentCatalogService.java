@@ -69,6 +69,10 @@ public class InvestmentCatalogService {
                     .lastPriceSource(trimToNull(request.getLastPriceSource()))
                     .lastPriceAt(request.getLastPriceAt())
                     .scraperUrl(trimToNull(request.getScraperUrl()))
+                    .countryCode(normalizeCountryCode(request.getCountryCode()))
+                    .region(trimToNull(request.getRegion()))
+                    .sector(trimToNull(request.getSector()))
+                    .industry(trimToNull(request.getIndustry()))
                     .build();
 
             InvestmentInstrumentDTO savedInstrument = toInstrumentDto(investmentInstrumentRepository.save(instrument));
@@ -103,6 +107,10 @@ public class InvestmentCatalogService {
             instrument.setLastPriceSource(trimToNull(request.getLastPriceSource()));
             instrument.setLastPriceAt(request.getLastPriceAt());
             instrument.setScraperUrl(trimToNull(request.getScraperUrl()));
+            instrument.setCountryCode(normalizeCountryCode(request.getCountryCode()));
+            instrument.setRegion(trimToNull(request.getRegion()));
+            instrument.setSector(trimToNull(request.getSector()));
+            instrument.setIndustry(trimToNull(request.getIndustry()));
 
             InvestmentInstrumentDTO updatedInstrument = toInstrumentDto(investmentInstrumentRepository.save(instrument));
             LOG.info("Instrument updated successfully. id={} code={} symbol={}",
@@ -222,6 +230,10 @@ public class InvestmentCatalogService {
                 .lastPriceSource(instrument.getLastPriceSource())
                 .lastPriceAt(instrument.getLastPriceAt())
                 .scraperUrl(instrument.getScraperUrl())
+                .countryCode(instrument.getCountryCode())
+                .region(instrument.getRegion())
+                .sector(instrument.getSector())
+                .industry(instrument.getIndustry())
                 .build();
     }
 
@@ -253,6 +265,18 @@ public class InvestmentCatalogService {
         return normalized;
     }
 
+    private String normalizeCountryCode(String countryCode) {
+        String normalized = trimToNull(countryCode);
+        if (normalized == null) {
+            return null;
+        }
+        normalized = normalized.toUpperCase(Locale.ROOT);
+        if (normalized.length() != 2) {
+            throw new InvestmentValidationException("countryCode must be exactly 2 letters");
+        }
+        return normalized;
+    }
+
     private String trimRequired(String value, String fieldName) {
         if (value == null || value.trim().isEmpty()) {
             throw new InvestmentValidationException(fieldName + " is required");
@@ -273,7 +297,7 @@ public class InvestmentCatalogService {
             return "request=null";
         }
         return String.format(
-                "typeId=%s, code=%s, symbol=%s, name=%s, market=%s, currency=%s, lastPrice=%s, lastPriceSource=%s, lastPriceAt=%s, scraperUrl=%s",
+            "typeId=%s, code=%s, symbol=%s, name=%s, market=%s, currency=%s, lastPrice=%s, lastPriceSource=%s, lastPriceAt=%s, scraperUrl=%s, countryCode=%s, region=%s, sector=%s, industry=%s",
                 request.getTypeId(),
                 request.getCode(),
                 request.getSymbol(),
@@ -283,6 +307,10 @@ public class InvestmentCatalogService {
                 request.getLastPrice(),
                 request.getLastPriceSource(),
                 request.getLastPriceAt(),
-                request.getScraperUrl());
+            request.getScraperUrl(),
+            request.getCountryCode(),
+            request.getRegion(),
+            request.getSector(),
+            request.getIndustry());
     }
 }

@@ -55,4 +55,16 @@ public class InvestmentInstrument {
 
     @Column(name = "scraper_url", length = 500)
     private String scraperUrl;
+
+    @Column(name = "country_code", length = 2)
+    private String countryCode;
+
+    @Column(name = "region", length = 80)
+    private String region;
+
+    @Column(name = "sector", length = 100)
+    private String sector;
+
+    @Column(name = "industry", length = 120)
+    private String industry;
 }
