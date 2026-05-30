@@ -34,6 +34,10 @@ const EMPTY_INSTRUMENT = {
   lastPriceSource: '',
   lastPriceAt: '',
   scraperUrl: '',
+  countryCode: '',
+  region: '',
+  sector: '',
+  industry: '',
 };
 
 // ─── Platform form state ──────────────────────────────────────────────────────
@@ -53,7 +57,7 @@ const getTypeLabel = (type: InvestmentType) => {
 };
 
 // ─── Sort helpers ─────────────────────────────────────────────────────────────
-type SortColKey = 'name' | 'symbol' | 'code' | 'market' | 'currency';
+type SortColKey = 'name' | 'symbol' | 'code' | 'market' | 'currency' | 'countryCode' | 'region' | 'sector' | 'industry';
 
 const SortIcon = ({ col, active, dir }: { col: SortColKey; active: SortColKey; dir: 'asc' | 'desc' }) => (
   col !== active
@@ -122,6 +126,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       i.name.toLowerCase().includes(q) ||
       i.symbol.toLowerCase().includes(q) ||
       i.code.toLowerCase().includes(q) ||
+      (i.countryCode ?? '').toLowerCase().includes(q) ||
+      (i.region ?? '').toLowerCase().includes(q) ||
+      (i.sector ?? '').toLowerCase().includes(q) ||
+      (i.industry ?? '').toLowerCase().includes(q) ||
       (types.find(t => t.id === i.typeId)?.name ?? '').toLowerCase().includes(q)
     );
     return [...list].sort((a, b) => {
@@ -129,11 +137,19 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                : sortKey === 'code'     ? a.code
                : sortKey === 'market'   ? (a.market ?? '')
                : sortKey === 'currency' ? a.currency
+               : sortKey === 'countryCode' ? (a.countryCode ?? '')
+               : sortKey === 'region' ? (a.region ?? '')
+               : sortKey === 'sector' ? (a.sector ?? '')
+               : sortKey === 'industry' ? (a.industry ?? '')
                : a.name;
       const bv = sortKey === 'symbol'   ? b.symbol
                : sortKey === 'code'     ? b.code
                : sortKey === 'market'   ? (b.market ?? '')
                : sortKey === 'currency' ? b.currency
+               : sortKey === 'countryCode' ? (b.countryCode ?? '')
+               : sortKey === 'region' ? (b.region ?? '')
+               : sortKey === 'sector' ? (b.sector ?? '')
+               : sortKey === 'industry' ? (b.industry ?? '')
                : b.name;
       return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
     });
@@ -180,6 +196,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPriceSource: i.lastPriceSource ?? '',
         lastPriceAt: i.lastPriceAt ? i.lastPriceAt.slice(0, 16) : '',
         scraperUrl: i.scraperUrl ?? '',
+        countryCode: i.countryCode ?? '',
+        region: i.region ?? '',
+        sector: i.sector ?? '',
+        industry: i.industry ?? '',
       });
     } else {
       const p = item as InvestmentPlatform;
@@ -228,6 +248,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPriceSource: instrForm.lastPriceSource.trim() || undefined,
         lastPriceAt: instrForm.lastPriceAt || undefined,
         scraperUrl: instrForm.scraperUrl.trim() || undefined,
+        countryCode: instrForm.countryCode.trim().toUpperCase() || undefined,
+        region: instrForm.region.trim() || undefined,
+        sector: instrForm.sector.trim() || undefined,
+        industry: instrForm.industry.trim() || undefined,
       };
       if (editingId) await editInstrument(editingId, payload);
       else await addInstrument(payload);
@@ -720,6 +744,42 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                   onChange={e => onInstrChange('scraperUrl', e.target.value)}
                 />
               </div>
+              <div className="modal-row">
+                <label>Country (ISO2)</label>
+                <input
+                  maxLength={2}
+                  placeholder="ES, US, IE..."
+                  value={instrForm.countryCode}
+                  onChange={e => onInstrChange('countryCode', e.target.value.toUpperCase())}
+                />
+              </div>
+              <div className="modal-row">
+                <label>Region</label>
+                <input
+                  maxLength={80}
+                  placeholder="Europe, North America..."
+                  value={instrForm.region}
+                  onChange={e => onInstrChange('region', e.target.value)}
+                />
+              </div>
+              <div className="modal-row">
+                <label>Sector</label>
+                <input
+                  maxLength={100}
+                  placeholder="Technology, Financials..."
+                  value={instrForm.sector}
+                  onChange={e => onInstrChange('sector', e.target.value)}
+                />
+              </div>
+              <div className="modal-row">
+                <label>Industry</label>
+                <input
+                  maxLength={120}
+                  placeholder="Semiconductors, Banks..."
+                  value={instrForm.industry}
+                  onChange={e => onInstrChange('industry', e.target.value)}
+                />
+              </div>
               {formError && <div className="modal-error">{formError}</div>}
               <div className="modal-actions">
                 <button className="at-btn-primary" type="submit" disabled={submitting}>
@@ -820,6 +880,18 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 <th className="ict-th ict-th-sortable" onClick={() => toggleSort('currency')}>
                   Currency <SortIcon col="currency" active={sortKey} dir={sortDir} />
                 </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('countryCode')}>
+                  Country <SortIcon col="countryCode" active={sortKey} dir={sortDir} />
+                </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('region')}>
+                  Region <SortIcon col="region" active={sortKey} dir={sortDir} />
+                </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('sector')}>
+                  Sector <SortIcon col="sector" active={sortKey} dir={sortDir} />
+                </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('industry')}>
+                  Industry <SortIcon col="industry" active={sortKey} dir={sortDir} />
+                </th>
                 <th className="ict-th ict-th--right">Last price</th>
                 <th className="ict-th">Source</th>
                 <th className="ict-th">Price date</th>
@@ -829,7 +901,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
             </thead>
             <tbody>
               {filteredInstruments.length === 0 && (
-                <tr><td colSpan={11} className="ict-empty">
+                <tr><td colSpan={15} className="ict-empty">
                   {instruments.length === 0
                     ? 'No hay activos. Añade uno para empezar.'
                     : 'Ningún activo coincide con la búsqueda.'}
@@ -859,6 +931,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                     </td>
                     <td className="ict-td"><span className="ict-muted">{instr.market ?? '—'}</span></td>
                     <td className="ict-td"><span className="ict-badge" style={{ background: '#f5f3ff', color: '#5b21b6', borderColor: '#ddd6fe' }}>{instr.currency}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.countryCode ?? '—'}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.region ?? '—'}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.sector ?? '—'}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.industry ?? '—'}</span></td>
                     <td className="ict-td ict-td--right"><span className="ict-price">{fmtPrice(instr.lastPrice)}</span></td>
                     <td className="ict-td"><span className="ict-muted">{instr.lastPriceSource ?? '—'}</span></td>
                     <td className="ict-td"><span className="ict-muted">{fmtDate(instr.lastPriceAt)}</span></td>
