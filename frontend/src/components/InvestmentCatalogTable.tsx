@@ -71,15 +71,20 @@ const SortIcon = ({ col, active, dir }: { col: SortColKey; active: SortColKey; d
 
 export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized }) => {
   const {
-    types, instruments, platforms,
+    types, countries, regions, sectors, industries, instruments, platforms,
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
     refreshPrices,
     addManualPrice,
     addPlatform, editPlatform, removePlatform,
+    addCountry, editCountry, removeCountry,
+    addRegion, editRegion, removeRegion,
+    addSector, editSector, removeSector,
+    addIndustry, editIndustry, removeIndustry,
   } = useInvestmentCatalog(token, onUnauthorized);
 
   const [section, setSection] = useState<Section>('instruments');
+  const [classificationKind, setClassificationKind] = useState<ClassificationKind>('countries');
 
   // ── shared modal state ────────────────────────────────────────────────────
   const [showForm, setShowForm]           = useState(false);
@@ -111,6 +116,29 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [platForm, setPlatForm] = useState({ ...EMPTY_PLATFORM });
   const onPlatChange = (k: keyof typeof EMPTY_PLATFORM, v: string) =>
     setPlatForm(s => ({ ...s, [k]: v }));
+
+  // ── classification form ───────────────────────────────────────────────────
+  const [classForm, setClassForm] = useState({ ...EMPTY_CLASSIFICATION });
+  const onClassChange = (k: keyof typeof EMPTY_CLASSIFICATION, v: string) =>
+    setClassForm(s => ({ ...s, [k]: v }));
+
+  const classificationItems = useMemo<CatalogOption[]>(() => {
+    switch (classificationKind) {
+      case 'countries': return countries;
+      case 'regions': return regions;
+      case 'sectors': return sectors;
+      case 'industries': return industries;
+    }
+  }, [classificationKind, countries, regions, sectors, industries]);
+
+  const classificationLabel = useMemo(() => {
+    switch (classificationKind) {
+      case 'countries': return 'Country';
+      case 'regions': return 'Region';
+      case 'sectors': return 'Sector';
+      case 'industries': return 'Industry';
+    }
+  }, [classificationKind]);
 
   const [manualPriceForm, setManualPriceForm] = useState(() => ({
     instrumentId: '',
@@ -164,6 +192,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     );
   }, [platforms, searchQuery]);
 
+  const filteredClassifications = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return classificationItems.filter(item =>
+      !q || item.name.toLowerCase().includes(q) || item.code.toLowerCase().includes(q)
+    );
+  }, [classificationItems, searchQuery]);
+
   const toggleSort = (col: SortColKey) => {
     if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(col); setSortDir('asc'); }
@@ -176,11 +211,12 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     setEditingId(null);
     setFormError(null);
     if (section === 'instruments') setInstrForm({ ...EMPTY_INSTRUMENT });
-    else setPlatForm({ ...EMPTY_PLATFORM });
+    else if (section === 'platforms') setPlatForm({ ...EMPTY_PLATFORM });
+    else setClassForm({ ...EMPTY_CLASSIFICATION });
     setShowForm(true);
   };
 
-  const openEdit = (item: InvestmentInstrument | InvestmentPlatform) => {
+  const openEdit = (item: InvestmentInstrument | InvestmentPlatform | CatalogOption) => {
     setShowManualPrice(false);
     setManualError(null);
     setEditingId(item.id);
@@ -291,13 +327,50 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     }
   };
 
+  const submitClassification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setSubmitting(true);
+    try {
+      const payload: Omit<CatalogOption, 'id'> = {
+        code: classForm.code.trim(),
+        name: classForm.name.trim(),
+      };
+
+      if (classificationKind === 'countries') {
+        if (editingId) await editCountry(editingId, payload);
+        else await addCountry(payload);
+      } else if (classificationKind === 'regions') {
+        if (editingId) await editRegion(editingId, payload);
+        else await addRegion(payload);
+      } else if (classificationKind === 'sectors') {
+        if (editingId) await editSector(editingId, payload);
+        else await addSector(payload);
+      } else {
+        if (editingId) await editIndustry(editingId, payload);
+        else await addIndustry(payload);
+      }
+
+      closeForm();
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setFormError(eRes?.response?.data?.message || eRes?.message || `Error saving ${classificationLabel.toLowerCase()}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ── delete handler ────────────────────────────────────────────────────────
   const handleDelete = async () => {
     if (!confirmDelete) return;
     setDeleting(true);
     try {
       if (section === 'instruments') await removeInstrument(confirmDelete.id);
-      else await removePlatform(confirmDelete.id);
+      else if (section === 'platforms') await removePlatform(confirmDelete.id);
+      else if (classificationKind === 'countries') await removeCountry(confirmDelete.id);
+      else if (classificationKind === 'regions') await removeRegion(confirmDelete.id);
+      else if (classificationKind === 'sectors') await removeSector(confirmDelete.id);
+      else await removeIndustry(confirmDelete.id);
       setConfirmDelete(null);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } }; message?: string };
@@ -422,6 +495,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         >
           🏦 Platforms
         </button>
+        <button
+          type="button"
+          className={`ict-toggle-btn${section === 'classifications' ? ' active' : ''}`}
+          onClick={() => switchSection('classifications')}
+        >
+          🌍 Classifications
+        </button>
       </div>
 
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
@@ -463,7 +543,9 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
             className="ict-search"
             placeholder={section === 'instruments'
               ? 'Buscar por nombre, símbolo, código o tipo…'
-              : 'Buscar plataforma…'}
+              : section === 'platforms'
+                ? 'Buscar plataforma…'
+                : 'Buscar clasificación…'}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
@@ -494,7 +576,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
             className={`ict-btn-add${showForm ? ' ict-btn-add--cancel' : ''}`}
             onClick={showForm ? closeForm : openCreate}
           >
-            {showForm ? '✕ Cancelar' : section === 'instruments' ? '+ Nuevo activo' : '+ Nueva plataforma'}
+            {showForm
+              ? '✕ Cancelar'
+              : section === 'instruments'
+                ? '+ Nuevo activo'
+                : section === 'platforms'
+                  ? '+ Nueva plataforma'
+                  : `+ Nuevo ${classificationLabel}`}
           </button>
         </div>
       </div>
@@ -856,6 +944,47 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         </div>
       )}
 
+      {/* ══ CLASSIFICATION FORM MODAL ══ */}
+      {showForm && section === 'classifications' && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <h4>{editingId ? `Edit ${classificationLabel}` : `New ${classificationLabel}`}</h4>
+              <button className="modal-close" type="button" onClick={closeForm}>✕</button>
+            </div>
+            <form onSubmit={submitClassification} className="modal-body">
+              <div className="modal-row">
+                <label>Code *</label>
+                <input
+                  required
+                  maxLength={classificationKind === 'countries' ? 2 : classificationKind === 'regions' ? 40 : classificationKind === 'sectors' ? 60 : 80}
+                  placeholder={`e.g. ${classificationKind === 'countries' ? 'US' : 'TECH'}`}
+                  value={classForm.code}
+                  onChange={e => onClassChange('code', e.target.value.toUpperCase())}
+                />
+              </div>
+              <div className="modal-row">
+                <label>Name *</label>
+                <input
+                  required
+                  maxLength={classificationKind === 'countries' ? 120 : classificationKind === 'regions' ? 120 : classificationKind === 'sectors' ? 140 : 180}
+                  placeholder={`Display name for ${classificationLabel.toLowerCase()}`}
+                  value={classForm.name}
+                  onChange={e => onClassChange('name', e.target.value)}
+                />
+              </div>
+              {formError && <div className="modal-error">{formError}</div>}
+              <div className="modal-actions">
+                <button className="at-btn-primary" type="submit" disabled={submitting}>
+                  {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Create'}
+                </button>
+                <button className="at-btn-secondary" type="button" onClick={closeForm}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ══ DELETE CONFIRM MODAL ══ */}
       {confirmDelete && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -1036,6 +1165,46 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* ══ CLASSIFICATION TABLE ══ */}
+      {section === 'classifications' && (
+        <>
+          <div className="ict-section-toggle" style={{ marginTop: '-4px' }}>
+            <button type="button" className={`ict-toggle-btn${classificationKind === 'countries' ? ' active' : ''}`} onClick={() => setClassificationKind('countries')}>Countries</button>
+            <button type="button" className={`ict-toggle-btn${classificationKind === 'regions' ? ' active' : ''}`} onClick={() => setClassificationKind('regions')}>Regions</button>
+            <button type="button" className={`ict-toggle-btn${classificationKind === 'sectors' ? ' active' : ''}`} onClick={() => setClassificationKind('sectors')}>Sectors</button>
+            <button type="button" className={`ict-toggle-btn${classificationKind === 'industries' ? ' active' : ''}`} onClick={() => setClassificationKind('industries')}>Industries</button>
+          </div>
+          <div className="ict-container">
+            <table className="ict-table">
+              <thead>
+                <tr>
+                  <th className="ict-th">Code</th>
+                  <th className="ict-th">Name</th>
+                  <th className="ict-th ict-th--actions" aria-label="Actions"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClassifications.length === 0 && (
+                  <tr><td colSpan={3} className="ict-empty">No hay elementos para este catálogo.</td></tr>
+                )}
+                {filteredClassifications.map(item => (
+                  <tr key={item.id} className="ict-row">
+                    <td className="ict-td"><span className="ict-code">{item.code}</span></td>
+                    <td className="ict-td"><span className="ict-name">{item.name}</span></td>
+                    <td className="ict-td">
+                      <div className="ict-actions">
+                        <button type="button" className="ict-btn-icon" title="Edit" onClick={() => openEdit(item)}>✏️</button>
+                        <button type="button" className="ict-btn-icon ict-btn-icon--danger" title="Delete" onClick={() => setConfirmDelete({ id: item.id, name: item.name })}>🗑</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
