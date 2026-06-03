@@ -6,7 +6,7 @@ import {
   INVESTMENT_MARKET_OPTIONS,
   INVESTMENT_PRICE_SOURCE_OPTIONS,
 } from '../constants/visualConfig';
-import type { InvestmentInstrument, InvestmentPlatform, InvestmentType } from '../types/investments';
+import type { CatalogOption, InvestmentInstrument, InvestmentPlatform, InvestmentType } from '../types/investments';
 import './investment-catalog.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -19,7 +19,8 @@ const fmtPrice = (n?: number) =>
 const fmtDate = (s?: string) =>
   s ? new Date(s).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-type Section = 'instruments' | 'platforms';
+type Section = 'instruments' | 'platforms' | 'classifications';
+type ClassificationKind = 'countries' | 'regions' | 'sectors' | 'industries';
 
 // ─── Instrument form state ────────────────────────────────────────────────────
 
@@ -34,15 +35,16 @@ const EMPTY_INSTRUMENT = {
   lastPriceSource: '',
   lastPriceAt: '',
   scraperUrl: '',
-  countryCode: '',
-  region: '',
-  sector: '',
-  industry: '',
+  countryId: '',
+  regionId: '',
+  sectorId: '',
+  industryId: '',
 };
 
 // ─── Platform form state ──────────────────────────────────────────────────────
 
 const EMPTY_PLATFORM = { code: '', name: '' };
+const EMPTY_CLASSIFICATION = { code: '', name: '' };
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -126,10 +128,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       i.name.toLowerCase().includes(q) ||
       i.symbol.toLowerCase().includes(q) ||
       i.code.toLowerCase().includes(q) ||
-      (i.countryCode ?? '').toLowerCase().includes(q) ||
-      (i.region ?? '').toLowerCase().includes(q) ||
-      (i.sector ?? '').toLowerCase().includes(q) ||
-      (i.industry ?? '').toLowerCase().includes(q) ||
+      (i.countryName ?? i.countryCode ?? '').toLowerCase().includes(q) ||
+      (i.regionName ?? i.regionCode ?? '').toLowerCase().includes(q) ||
+      (i.sectorName ?? i.sectorCode ?? '').toLowerCase().includes(q) ||
+      (i.industryName ?? i.industryCode ?? '').toLowerCase().includes(q) ||
       (types.find(t => t.id === i.typeId)?.name ?? '').toLowerCase().includes(q)
     );
     return [...list].sort((a, b) => {
@@ -137,19 +139,19 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                : sortKey === 'code'     ? a.code
                : sortKey === 'market'   ? (a.market ?? '')
                : sortKey === 'currency' ? a.currency
-               : sortKey === 'countryCode' ? (a.countryCode ?? '')
-               : sortKey === 'region' ? (a.region ?? '')
-               : sortKey === 'sector' ? (a.sector ?? '')
-               : sortKey === 'industry' ? (a.industry ?? '')
+               : sortKey === 'countryCode' ? (a.countryName ?? a.countryCode ?? '')
+               : sortKey === 'region' ? (a.regionName ?? a.regionCode ?? '')
+               : sortKey === 'sector' ? (a.sectorName ?? a.sectorCode ?? '')
+               : sortKey === 'industry' ? (a.industryName ?? a.industryCode ?? '')
                : a.name;
       const bv = sortKey === 'symbol'   ? b.symbol
                : sortKey === 'code'     ? b.code
                : sortKey === 'market'   ? (b.market ?? '')
                : sortKey === 'currency' ? b.currency
-               : sortKey === 'countryCode' ? (b.countryCode ?? '')
-               : sortKey === 'region' ? (b.region ?? '')
-               : sortKey === 'sector' ? (b.sector ?? '')
-               : sortKey === 'industry' ? (b.industry ?? '')
+               : sortKey === 'countryCode' ? (b.countryName ?? b.countryCode ?? '')
+               : sortKey === 'region' ? (b.regionName ?? b.regionCode ?? '')
+               : sortKey === 'sector' ? (b.sectorName ?? b.sectorCode ?? '')
+               : sortKey === 'industry' ? (b.industryName ?? b.industryCode ?? '')
                : b.name;
       return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
     });
@@ -196,14 +198,19 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPriceSource: i.lastPriceSource ?? '',
         lastPriceAt: i.lastPriceAt ? i.lastPriceAt.slice(0, 16) : '',
         scraperUrl: i.scraperUrl ?? '',
-        countryCode: i.countryCode ?? '',
-        region: i.region ?? '',
-        sector: i.sector ?? '',
-        industry: i.industry ?? '',
+        countryId: i.countryId != null ? String(i.countryId) : '',
+        regionId: i.regionId != null ? String(i.regionId) : '',
+        sectorId: i.sectorId != null ? String(i.sectorId) : '',
+        industryId: i.industryId != null ? String(i.industryId) : '',
       });
     } else {
-      const p = item as InvestmentPlatform;
-      setPlatForm({ code: p.code, name: p.name });
+      if (section === 'platforms') {
+        const p = item as InvestmentPlatform;
+        setPlatForm({ code: p.code, name: p.name });
+      } else {
+        const c = item as unknown as CatalogOption;
+        setClassForm({ code: c.code, name: c.name });
+      }
     }
     setShowForm(true);
   };
@@ -248,10 +255,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPriceSource: instrForm.lastPriceSource.trim() || undefined,
         lastPriceAt: instrForm.lastPriceAt || undefined,
         scraperUrl: instrForm.scraperUrl.trim() || undefined,
-        countryCode: instrForm.countryCode.trim().toUpperCase() || undefined,
-        region: instrForm.region.trim() || undefined,
-        sector: instrForm.sector.trim() || undefined,
-        industry: instrForm.industry.trim() || undefined,
+        countryId: instrForm.countryId ? Number(instrForm.countryId) : undefined,
+        regionId: instrForm.regionId ? Number(instrForm.regionId) : undefined,
+        sectorId: instrForm.sectorId ? Number(instrForm.sectorId) : undefined,
+        industryId: instrForm.industryId ? Number(instrForm.industryId) : undefined,
       };
       if (editingId) await editInstrument(editingId, payload);
       else await addInstrument(payload);
@@ -745,40 +752,56 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 />
               </div>
               <div className="modal-row">
-                <label>Country (ISO2)</label>
-                <input
-                  maxLength={2}
-                  placeholder="ES, US, IE..."
-                  value={instrForm.countryCode}
-                  onChange={e => onInstrChange('countryCode', e.target.value.toUpperCase())}
-                />
+                <label>Country</label>
+                <select
+                  className="modal-select"
+                  value={instrForm.countryId}
+                  onChange={e => onInstrChange('countryId', e.target.value)}
+                >
+                  <option value="">-- Select country --</option>
+                  {countries.map(option => (
+                    <option key={option.id} value={option.id}>{option.name} ({option.code})</option>
+                  ))}
+                </select>
               </div>
               <div className="modal-row">
                 <label>Region</label>
-                <input
-                  maxLength={80}
-                  placeholder="Europe, North America..."
-                  value={instrForm.region}
-                  onChange={e => onInstrChange('region', e.target.value)}
-                />
+                <select
+                  className="modal-select"
+                  value={instrForm.regionId}
+                  onChange={e => onInstrChange('regionId', e.target.value)}
+                >
+                  <option value="">-- Select region --</option>
+                  {regions.map(option => (
+                    <option key={option.id} value={option.id}>{option.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="modal-row">
                 <label>Sector</label>
-                <input
-                  maxLength={100}
-                  placeholder="Technology, Financials..."
-                  value={instrForm.sector}
-                  onChange={e => onInstrChange('sector', e.target.value)}
-                />
+                <select
+                  className="modal-select"
+                  value={instrForm.sectorId}
+                  onChange={e => onInstrChange('sectorId', e.target.value)}
+                >
+                  <option value="">-- Select sector --</option>
+                  {sectors.map(option => (
+                    <option key={option.id} value={option.id}>{option.name}</option>
+                  ))}
+                </select>
               </div>
               <div className="modal-row">
                 <label>Industry</label>
-                <input
-                  maxLength={120}
-                  placeholder="Semiconductors, Banks..."
-                  value={instrForm.industry}
-                  onChange={e => onInstrChange('industry', e.target.value)}
-                />
+                <select
+                  className="modal-select"
+                  value={instrForm.industryId}
+                  onChange={e => onInstrChange('industryId', e.target.value)}
+                >
+                  <option value="">-- Select industry --</option>
+                  {industries.map(option => (
+                    <option key={option.id} value={option.id}>{option.name}</option>
+                  ))}
+                </select>
               </div>
               {formError && <div className="modal-error">{formError}</div>}
               <div className="modal-actions">
@@ -931,10 +954,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                     </td>
                     <td className="ict-td"><span className="ict-muted">{instr.market ?? '—'}</span></td>
                     <td className="ict-td"><span className="ict-badge" style={{ background: '#f5f3ff', color: '#5b21b6', borderColor: '#ddd6fe' }}>{instr.currency}</span></td>
-                    <td className="ict-td"><span className="ict-muted">{instr.countryCode ?? '—'}</span></td>
-                    <td className="ict-td"><span className="ict-muted">{instr.region ?? '—'}</span></td>
-                    <td className="ict-td"><span className="ict-muted">{instr.sector ?? '—'}</span></td>
-                    <td className="ict-td"><span className="ict-muted">{instr.industry ?? '—'}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.countryName ?? instr.countryCode ?? '—'}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.regionName ?? instr.regionCode ?? '—'}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.sectorName ?? instr.sectorCode ?? '—'}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.industryName ?? instr.industryCode ?? '—'}</span></td>
                     <td className="ict-td ict-td--right"><span className="ict-price">{fmtPrice(instr.lastPrice)}</span></td>
                     <td className="ict-td"><span className="ict-muted">{instr.lastPriceSource ?? '—'}</span></td>
                     <td className="ict-td"><span className="ict-muted">{fmtDate(instr.lastPriceAt)}</span></td>

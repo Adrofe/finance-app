@@ -111,10 +111,10 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
           pnl: current - position.investedAmount,
           pnlPct: position.investedAmount > 0 ? ((current - position.investedAmount) / position.investedAmount) * 100 : 0,
           platforms: [platformName],
-          countryCode: instrumentMeta?.countryCode ?? '',
-          region: instrumentMeta?.region ?? '',
-          sector: instrumentMeta?.sector ?? '',
-          industry: instrumentMeta?.industry ?? '',
+          countryCode: instrumentMeta?.countryCode ?? instrumentMeta?.countryName ?? '',
+          region: instrumentMeta?.regionName ?? instrumentMeta?.regionCode ?? '',
+          sector: instrumentMeta?.sectorName ?? instrumentMeta?.sectorCode ?? '',
+          industry: instrumentMeta?.industryName ?? instrumentMeta?.industryCode ?? '',
         });
         continue;
       }
