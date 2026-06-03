@@ -2,19 +2,31 @@ package es.triana.company.investments.service;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+import es.triana.company.investments.model.api.CatalogOptionDTO;
 import es.triana.company.investments.model.api.InvestmentInstrumentDTO;
 import es.triana.company.investments.model.api.InvestmentPlatformDTO;
+import es.triana.company.investments.model.db.InvestmentCountryCatalog;
+import es.triana.company.investments.model.db.InvestmentIndustryCatalog;
 import es.triana.company.investments.model.db.InvestmentInstrument;
 import es.triana.company.investments.model.db.InvestmentPlatform;
+import es.triana.company.investments.model.db.InvestmentRegionCatalog;
+import es.triana.company.investments.model.db.InvestmentSectorCatalog;
 import es.triana.company.investments.model.db.InvestmentTypeCatalog;
+import es.triana.company.investments.repository.InvestmentCountryCatalogRepository;
+import es.triana.company.investments.repository.InvestmentIndustryCatalogRepository;
 import es.triana.company.investments.repository.InvestmentInstrumentRepository;
 import es.triana.company.investments.repository.InvestmentPlatformRepository;
+import es.triana.company.investments.repository.InvestmentRegionCatalogRepository;
+import es.triana.company.investments.repository.InvestmentSectorCatalogRepository;
 import es.triana.company.investments.repository.InvestmentTypeCatalogRepository;
 import es.triana.company.investments.service.exception.CatalogNotFoundException;
 import es.triana.company.investments.service.exception.InvestmentValidationException;
@@ -27,17 +39,36 @@ public class InvestmentCatalogService {
     private final InvestmentInstrumentRepository investmentInstrumentRepository;
     private final InvestmentPlatformRepository investmentPlatformRepository;
     private final InvestmentTypeCatalogRepository investmentTypeCatalogRepository;
+    private final InvestmentCountryCatalogRepository investmentCountryCatalogRepository;
+    private final InvestmentRegionCatalogRepository investmentRegionCatalogRepository;
+    private final InvestmentSectorCatalogRepository investmentSectorCatalogRepository;
+    private final InvestmentIndustryCatalogRepository investmentIndustryCatalogRepository;
 
-    public InvestmentCatalogService(InvestmentInstrumentRepository investmentInstrumentRepository, InvestmentPlatformRepository investmentPlatformRepository, InvestmentTypeCatalogRepository investmentTypeCatalogRepository) {
+    public InvestmentCatalogService(InvestmentInstrumentRepository investmentInstrumentRepository,
+            InvestmentPlatformRepository investmentPlatformRepository,
+            InvestmentTypeCatalogRepository investmentTypeCatalogRepository,
+            InvestmentCountryCatalogRepository investmentCountryCatalogRepository,
+            InvestmentRegionCatalogRepository investmentRegionCatalogRepository,
+            InvestmentSectorCatalogRepository investmentSectorCatalogRepository,
+            InvestmentIndustryCatalogRepository investmentIndustryCatalogRepository) {
         this.investmentInstrumentRepository = investmentInstrumentRepository;
         this.investmentPlatformRepository = investmentPlatformRepository;
         this.investmentTypeCatalogRepository = investmentTypeCatalogRepository;
+        this.investmentCountryCatalogRepository = investmentCountryCatalogRepository;
+        this.investmentRegionCatalogRepository = investmentRegionCatalogRepository;
+        this.investmentSectorCatalogRepository = investmentSectorCatalogRepository;
+        this.investmentIndustryCatalogRepository = investmentIndustryCatalogRepository;
     }
 
     public List<InvestmentInstrumentDTO> getAllInstruments() {
+        Map<Long, CatalogOptionDTO> countries = loadCountryCatalogMap();
+        Map<Long, CatalogOptionDTO> regions = loadRegionCatalogMap();
+        Map<Long, CatalogOptionDTO> sectors = loadSectorCatalogMap();
+        Map<Long, CatalogOptionDTO> industries = loadIndustryCatalogMap();
+
         return investmentInstrumentRepository.findAllByOrderByNameAsc()
                 .stream()
-                .map(this::toInstrumentDto)
+                .map(instrument -> toInstrumentDto(instrument, countries, regions, sectors, industries))
                 .toList();
     }
 
@@ -45,8 +76,160 @@ public class InvestmentCatalogService {
         return investmentTypeCatalogRepository.findAll();
     }
 
+    public List<CatalogOptionDTO> getAllCountries() {
+        return investmentCountryCatalogRepository.findAllByOrderByNameAsc().stream()
+                .map(this::toCatalogOption)
+                .toList();
+    }
+
+    public List<CatalogOptionDTO> getAllRegions() {
+        return investmentRegionCatalogRepository.findAllByOrderByNameAsc().stream()
+                .map(this::toCatalogOption)
+                .toList();
+    }
+
+    public List<CatalogOptionDTO> getAllSectors() {
+        return investmentSectorCatalogRepository.findAllByOrderByNameAsc().stream()
+                .map(this::toCatalogOption)
+                .toList();
+    }
+
+    public List<CatalogOptionDTO> getAllIndustries() {
+        return investmentIndustryCatalogRepository.findAllByOrderByNameAsc().stream()
+                .map(this::toCatalogOption)
+                .toList();
+    }
+
+    public CatalogOptionDTO createCountry(CatalogOptionDTO request) {
+        String code = normalizeCodeWithLength(request.getCode(), "country code", 2);
+        String name = trimRequired(request.getName(), "country name");
+        if (investmentCountryCatalogRepository.existsByCodeIgnoreCase(code)) {
+            throw new InvestmentValidationException("Country code already exists: " + code);
+        }
+        InvestmentCountryCatalog saved = investmentCountryCatalogRepository.save(
+                InvestmentCountryCatalog.builder().code(code).name(name).build());
+        return toCatalogOption(saved);
+    }
+
+    public CatalogOptionDTO updateCountry(Long id, CatalogOptionDTO request) {
+        InvestmentCountryCatalog entity = findCountry(id);
+        String code = normalizeCodeWithLength(request.getCode(), "country code", 2);
+        String name = trimRequired(request.getName(), "country name");
+        if (investmentCountryCatalogRepository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
+            throw new InvestmentValidationException("Country code already exists: " + code);
+        }
+        entity.setCode(code);
+        entity.setName(name);
+        return toCatalogOption(investmentCountryCatalogRepository.save(entity));
+    }
+
+    public void deleteCountry(Long id) {
+        findCountry(id);
+        if (investmentInstrumentRepository.existsByCountryId(id)) {
+            throw new InvestmentValidationException("Country " + id + " cannot be deleted because it is referenced by instruments.");
+        }
+        investmentCountryCatalogRepository.deleteById(id);
+    }
+
+    public CatalogOptionDTO createRegion(CatalogOptionDTO request) {
+        String code = normalizeCodeWithLength(request.getCode(), "region code", 40);
+        String name = trimRequired(request.getName(), "region name");
+        if (investmentRegionCatalogRepository.existsByCodeIgnoreCase(code)) {
+            throw new InvestmentValidationException("Region code already exists: " + code);
+        }
+        InvestmentRegionCatalog saved = investmentRegionCatalogRepository.save(
+                InvestmentRegionCatalog.builder().code(code).name(name).build());
+        return toCatalogOption(saved);
+    }
+
+    public CatalogOptionDTO updateRegion(Long id, CatalogOptionDTO request) {
+        InvestmentRegionCatalog entity = findRegion(id);
+        String code = normalizeCodeWithLength(request.getCode(), "region code", 40);
+        String name = trimRequired(request.getName(), "region name");
+        if (investmentRegionCatalogRepository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
+            throw new InvestmentValidationException("Region code already exists: " + code);
+        }
+        entity.setCode(code);
+        entity.setName(name);
+        return toCatalogOption(investmentRegionCatalogRepository.save(entity));
+    }
+
+    public void deleteRegion(Long id) {
+        findRegion(id);
+        if (investmentInstrumentRepository.existsByRegionId(id)) {
+            throw new InvestmentValidationException("Region " + id + " cannot be deleted because it is referenced by instruments.");
+        }
+        investmentRegionCatalogRepository.deleteById(id);
+    }
+
+    public CatalogOptionDTO createSector(CatalogOptionDTO request) {
+        String code = normalizeCodeWithLength(request.getCode(), "sector code", 60);
+        String name = trimRequired(request.getName(), "sector name");
+        if (investmentSectorCatalogRepository.existsByCodeIgnoreCase(code)) {
+            throw new InvestmentValidationException("Sector code already exists: " + code);
+        }
+        InvestmentSectorCatalog saved = investmentSectorCatalogRepository.save(
+                InvestmentSectorCatalog.builder().code(code).name(name).build());
+        return toCatalogOption(saved);
+    }
+
+    public CatalogOptionDTO updateSector(Long id, CatalogOptionDTO request) {
+        InvestmentSectorCatalog entity = findSector(id);
+        String code = normalizeCodeWithLength(request.getCode(), "sector code", 60);
+        String name = trimRequired(request.getName(), "sector name");
+        if (investmentSectorCatalogRepository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
+            throw new InvestmentValidationException("Sector code already exists: " + code);
+        }
+        entity.setCode(code);
+        entity.setName(name);
+        return toCatalogOption(investmentSectorCatalogRepository.save(entity));
+    }
+
+    public void deleteSector(Long id) {
+        findSector(id);
+        if (investmentInstrumentRepository.existsBySectorId(id)) {
+            throw new InvestmentValidationException("Sector " + id + " cannot be deleted because it is referenced by instruments.");
+        }
+        investmentSectorCatalogRepository.deleteById(id);
+    }
+
+    public CatalogOptionDTO createIndustry(CatalogOptionDTO request) {
+        String code = normalizeCodeWithLength(request.getCode(), "industry code", 80);
+        String name = trimRequired(request.getName(), "industry name");
+        if (investmentIndustryCatalogRepository.existsByCodeIgnoreCase(code)) {
+            throw new InvestmentValidationException("Industry code already exists: " + code);
+        }
+        InvestmentIndustryCatalog saved = investmentIndustryCatalogRepository.save(
+                InvestmentIndustryCatalog.builder().code(code).name(name).build());
+        return toCatalogOption(saved);
+    }
+
+    public CatalogOptionDTO updateIndustry(Long id, CatalogOptionDTO request) {
+        InvestmentIndustryCatalog entity = findIndustry(id);
+        String code = normalizeCodeWithLength(request.getCode(), "industry code", 80);
+        String name = trimRequired(request.getName(), "industry name");
+        if (investmentIndustryCatalogRepository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
+            throw new InvestmentValidationException("Industry code already exists: " + code);
+        }
+        entity.setCode(code);
+        entity.setName(name);
+        return toCatalogOption(investmentIndustryCatalogRepository.save(entity));
+    }
+
+    public void deleteIndustry(Long id) {
+        findIndustry(id);
+        if (investmentInstrumentRepository.existsByIndustryId(id)) {
+            throw new InvestmentValidationException("Industry " + id + " cannot be deleted because it is referenced by instruments.");
+        }
+        investmentIndustryCatalogRepository.deleteById(id);
+    }
+
     public InvestmentInstrumentDTO getInstrumentById(Long id) {
-        return toInstrumentDto(findInstrument(id));
+        Map<Long, CatalogOptionDTO> countries = loadCountryCatalogMap();
+        Map<Long, CatalogOptionDTO> regions = loadRegionCatalogMap();
+        Map<Long, CatalogOptionDTO> sectors = loadSectorCatalogMap();
+        Map<Long, CatalogOptionDTO> industries = loadIndustryCatalogMap();
+        return toInstrumentDto(findInstrument(id), countries, regions, sectors, industries);
     }
 
     public InvestmentInstrumentDTO createInstrument(InvestmentInstrumentDTO request) {
@@ -69,13 +252,23 @@ public class InvestmentCatalogService {
                     .lastPriceSource(trimToNull(request.getLastPriceSource()))
                     .lastPriceAt(request.getLastPriceAt())
                     .scraperUrl(trimToNull(request.getScraperUrl()))
-                    .countryCode(normalizeCountryCode(request.getCountryCode()))
-                    .region(trimToNull(request.getRegion()))
-                    .sector(trimToNull(request.getSector()))
-                    .industry(trimToNull(request.getIndustry()))
+                        .countryId(validateCatalogId(request.getCountryId(), investmentCountryCatalogRepository::existsById, "countryId"))
+                        .regionId(validateCatalogId(request.getRegionId(), investmentRegionCatalogRepository::existsById, "regionId"))
+                        .sectorId(validateCatalogId(request.getSectorId(), investmentSectorCatalogRepository::existsById, "sectorId"))
+                        .industryId(validateCatalogId(request.getIndustryId(), investmentIndustryCatalogRepository::existsById, "industryId"))
                     .build();
 
-            InvestmentInstrumentDTO savedInstrument = toInstrumentDto(investmentInstrumentRepository.save(instrument));
+            Map<Long, CatalogOptionDTO> countries = loadCountryCatalogMap();
+            Map<Long, CatalogOptionDTO> regions = loadRegionCatalogMap();
+            Map<Long, CatalogOptionDTO> sectors = loadSectorCatalogMap();
+            Map<Long, CatalogOptionDTO> industries = loadIndustryCatalogMap();
+
+            InvestmentInstrumentDTO savedInstrument = toInstrumentDto(
+                    investmentInstrumentRepository.save(instrument),
+                    countries,
+                    regions,
+                    sectors,
+                    industries);
             LOG.info("Instrument created successfully. id={} code={} symbol={}",
                     savedInstrument.getId(),
                     savedInstrument.getCode(),
@@ -107,12 +300,22 @@ public class InvestmentCatalogService {
             instrument.setLastPriceSource(trimToNull(request.getLastPriceSource()));
             instrument.setLastPriceAt(request.getLastPriceAt());
             instrument.setScraperUrl(trimToNull(request.getScraperUrl()));
-            instrument.setCountryCode(normalizeCountryCode(request.getCountryCode()));
-            instrument.setRegion(trimToNull(request.getRegion()));
-            instrument.setSector(trimToNull(request.getSector()));
-            instrument.setIndustry(trimToNull(request.getIndustry()));
+            instrument.setCountryId(validateCatalogId(request.getCountryId(), investmentCountryCatalogRepository::existsById, "countryId"));
+            instrument.setRegionId(validateCatalogId(request.getRegionId(), investmentRegionCatalogRepository::existsById, "regionId"));
+            instrument.setSectorId(validateCatalogId(request.getSectorId(), investmentSectorCatalogRepository::existsById, "sectorId"));
+            instrument.setIndustryId(validateCatalogId(request.getIndustryId(), investmentIndustryCatalogRepository::existsById, "industryId"));
 
-            InvestmentInstrumentDTO updatedInstrument = toInstrumentDto(investmentInstrumentRepository.save(instrument));
+            Map<Long, CatalogOptionDTO> countries = loadCountryCatalogMap();
+            Map<Long, CatalogOptionDTO> regions = loadRegionCatalogMap();
+            Map<Long, CatalogOptionDTO> sectors = loadSectorCatalogMap();
+            Map<Long, CatalogOptionDTO> industries = loadIndustryCatalogMap();
+
+            InvestmentInstrumentDTO updatedInstrument = toInstrumentDto(
+                    investmentInstrumentRepository.save(instrument),
+                    countries,
+                    regions,
+                    sectors,
+                    industries);
             LOG.info("Instrument updated successfully. id={} code={} symbol={}",
                     updatedInstrument.getId(),
                     updatedInstrument.getCode(),
@@ -200,6 +403,38 @@ public class InvestmentCatalogService {
                 .orElseThrow(() -> new CatalogNotFoundException("Platform not found with id: " + id));
     }
 
+    private InvestmentCountryCatalog findCountry(Long id) {
+        if (id == null || id <= 0) {
+            throw new InvestmentValidationException("country id is required and must be > 0");
+        }
+        return investmentCountryCatalogRepository.findById(id)
+                .orElseThrow(() -> new CatalogNotFoundException("Country not found with id: " + id));
+    }
+
+    private InvestmentRegionCatalog findRegion(Long id) {
+        if (id == null || id <= 0) {
+            throw new InvestmentValidationException("region id is required and must be > 0");
+        }
+        return investmentRegionCatalogRepository.findById(id)
+                .orElseThrow(() -> new CatalogNotFoundException("Region not found with id: " + id));
+    }
+
+    private InvestmentSectorCatalog findSector(Long id) {
+        if (id == null || id <= 0) {
+            throw new InvestmentValidationException("sector id is required and must be > 0");
+        }
+        return investmentSectorCatalogRepository.findById(id)
+                .orElseThrow(() -> new CatalogNotFoundException("Sector not found with id: " + id));
+    }
+
+    private InvestmentIndustryCatalog findIndustry(Long id) {
+        if (id == null || id <= 0) {
+            throw new InvestmentValidationException("industry id is required and must be > 0");
+        }
+        return investmentIndustryCatalogRepository.findById(id)
+                .orElseThrow(() -> new CatalogNotFoundException("Industry not found with id: " + id));
+    }
+
     private void validateInstrumentRequest(InvestmentInstrumentDTO request) {
         if (request.getTypeId() == null || request.getTypeId() <= 0) {
             throw new InvestmentValidationException("typeId is required and must be > 0");
@@ -217,7 +452,16 @@ public class InvestmentCatalogService {
         trimRequired(request.getName(), "name");
     }
 
-    private InvestmentInstrumentDTO toInstrumentDto(InvestmentInstrument instrument) {
+    private InvestmentInstrumentDTO toInstrumentDto(InvestmentInstrument instrument,
+            Map<Long, CatalogOptionDTO> countries,
+            Map<Long, CatalogOptionDTO> regions,
+            Map<Long, CatalogOptionDTO> sectors,
+            Map<Long, CatalogOptionDTO> industries) {
+        CatalogOptionDTO country = countries.get(instrument.getCountryId());
+        CatalogOptionDTO region = regions.get(instrument.getRegionId());
+        CatalogOptionDTO sector = sectors.get(instrument.getSectorId());
+        CatalogOptionDTO industry = industries.get(instrument.getIndustryId());
+
         return InvestmentInstrumentDTO.builder()
                 .id(instrument.getId())
                 .typeId(instrument.getTypeId())
@@ -230,11 +474,73 @@ public class InvestmentCatalogService {
                 .lastPriceSource(instrument.getLastPriceSource())
                 .lastPriceAt(instrument.getLastPriceAt())
                 .scraperUrl(instrument.getScraperUrl())
-                .countryCode(instrument.getCountryCode())
-                .region(instrument.getRegion())
-                .sector(instrument.getSector())
-                .industry(instrument.getIndustry())
+                .countryId(instrument.getCountryId())
+                .countryCode(country == null ? null : country.getCode())
+                .countryName(country == null ? null : country.getName())
+                .regionId(instrument.getRegionId())
+                .regionCode(region == null ? null : region.getCode())
+                .regionName(region == null ? null : region.getName())
+                .sectorId(instrument.getSectorId())
+                .sectorCode(sector == null ? null : sector.getCode())
+                .sectorName(sector == null ? null : sector.getName())
+                .industryId(instrument.getIndustryId())
+                .industryCode(industry == null ? null : industry.getCode())
+                .industryName(industry == null ? null : industry.getName())
                 .build();
+    }
+
+    private CatalogOptionDTO toCatalogOption(InvestmentCountryCatalog country) {
+        return CatalogOptionDTO.builder()
+                .id(country.getId())
+                .code(country.getCode())
+                .name(country.getName())
+                .build();
+    }
+
+    private CatalogOptionDTO toCatalogOption(InvestmentRegionCatalog region) {
+        return CatalogOptionDTO.builder()
+                .id(region.getId())
+                .code(region.getCode())
+                .name(region.getName())
+                .build();
+    }
+
+    private CatalogOptionDTO toCatalogOption(InvestmentSectorCatalog sector) {
+        return CatalogOptionDTO.builder()
+                .id(sector.getId())
+                .code(sector.getCode())
+                .name(sector.getName())
+                .build();
+    }
+
+    private CatalogOptionDTO toCatalogOption(InvestmentIndustryCatalog industry) {
+        return CatalogOptionDTO.builder()
+                .id(industry.getId())
+                .code(industry.getCode())
+                .name(industry.getName())
+                .build();
+    }
+
+    private Map<Long, CatalogOptionDTO> loadCountryCatalogMap() {
+        return toCatalogMap(investmentCountryCatalogRepository.findAllByOrderByNameAsc(), this::toCatalogOption);
+    }
+
+    private Map<Long, CatalogOptionDTO> loadRegionCatalogMap() {
+        return toCatalogMap(investmentRegionCatalogRepository.findAllByOrderByNameAsc(), this::toCatalogOption);
+    }
+
+    private Map<Long, CatalogOptionDTO> loadSectorCatalogMap() {
+        return toCatalogMap(investmentSectorCatalogRepository.findAllByOrderByNameAsc(), this::toCatalogOption);
+    }
+
+    private Map<Long, CatalogOptionDTO> loadIndustryCatalogMap() {
+        return toCatalogMap(investmentIndustryCatalogRepository.findAllByOrderByNameAsc(), this::toCatalogOption);
+    }
+
+    private <T> Map<Long, CatalogOptionDTO> toCatalogMap(List<T> items, Function<T, CatalogOptionDTO> mapper) {
+        return items.stream()
+                .map(mapper)
+                .collect(Collectors.toMap(CatalogOptionDTO::getId, Function.identity()));
     }
 
     private InvestmentPlatformDTO toPlatformDto(InvestmentPlatform platform) {
@@ -265,16 +571,25 @@ public class InvestmentCatalogService {
         return normalized;
     }
 
-    private String normalizeCountryCode(String countryCode) {
-        String normalized = trimToNull(countryCode);
-        if (normalized == null) {
-            return null;
-        }
-        normalized = normalized.toUpperCase(Locale.ROOT);
-        if (normalized.length() != 2) {
-            throw new InvestmentValidationException("countryCode must be exactly 2 letters");
+    private String normalizeCodeWithLength(String value, String fieldName, int maxLength) {
+        String normalized = trimRequired(value, fieldName).toUpperCase(Locale.ROOT);
+        if (normalized.length() > maxLength) {
+            throw new InvestmentValidationException(fieldName + " max length is " + maxLength);
         }
         return normalized;
+    }
+
+    private Long validateCatalogId(Long id, Function<Long, Boolean> existsFn, String fieldName) {
+        if (id == null) {
+            return null;
+        }
+        if (id <= 0) {
+            throw new InvestmentValidationException(fieldName + " must be > 0");
+        }
+        if (!existsFn.apply(id)) {
+            throw new InvestmentValidationException("Unknown " + fieldName + ": " + id);
+        }
+        return id;
     }
 
     private String trimRequired(String value, String fieldName) {
@@ -297,7 +612,7 @@ public class InvestmentCatalogService {
             return "request=null";
         }
         return String.format(
-            "typeId=%s, code=%s, symbol=%s, name=%s, market=%s, currency=%s, lastPrice=%s, lastPriceSource=%s, lastPriceAt=%s, scraperUrl=%s, countryCode=%s, region=%s, sector=%s, industry=%s",
+                "typeId=%s, code=%s, symbol=%s, name=%s, market=%s, currency=%s, lastPrice=%s, lastPriceSource=%s, lastPriceAt=%s, scraperUrl=%s, countryId=%s, regionId=%s, sectorId=%s, industryId=%s",
                 request.getTypeId(),
                 request.getCode(),
                 request.getSymbol(),
@@ -307,10 +622,10 @@ public class InvestmentCatalogService {
                 request.getLastPrice(),
                 request.getLastPriceSource(),
                 request.getLastPriceAt(),
-            request.getScraperUrl(),
-            request.getCountryCode(),
-            request.getRegion(),
-            request.getSector(),
-            request.getIndustry());
+                request.getScraperUrl(),
+                request.getCountryId(),
+                request.getRegionId(),
+                request.getSectorId(),
+                request.getIndustryId());
     }
 }
