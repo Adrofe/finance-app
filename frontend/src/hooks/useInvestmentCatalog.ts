@@ -1,8 +1,24 @@
 import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import type { InvestmentInstrument, InvestmentPlatform, InvestmentType, PriceRefreshResult, PriceUpdateDraft } from '../types/investments';
+import type { CatalogOption, InvestmentInstrument, InvestmentPlatform, InvestmentType, PriceRefreshResult, PriceUpdateDraft } from '../types/investments';
 import {
   fetchInvestmentTypes,
+  fetchCountryCatalog,
+  fetchRegionCatalog,
+  fetchSectorCatalog,
+  fetchIndustryCatalog,
+  createCountryCatalogOption,
+  updateCountryCatalogOption,
+  deleteCountryCatalogOption,
+  createRegionCatalogOption,
+  updateRegionCatalogOption,
+  deleteRegionCatalogOption,
+  createSectorCatalogOption,
+  updateSectorCatalogOption,
+  deleteSectorCatalogOption,
+  createIndustryCatalogOption,
+  updateIndustryCatalogOption,
+  deleteIndustryCatalogOption,
   fetchInstruments, createInstrument, updateInstrument, deleteInstrument,
   fetchPlatforms, createPlatform, updatePlatform, deletePlatform,
   refreshInstrumentPrices,
@@ -11,6 +27,10 @@ import {
 
 export function useInvestmentCatalog(token: string, onUnauthorized?: (message: string) => void) {
   const [types, setTypes]               = useState<InvestmentType[]>([]);
+  const [countries, setCountries]       = useState<CatalogOption[]>([]);
+  const [regions, setRegions]           = useState<CatalogOption[]>([]);
+  const [sectors, setSectors]           = useState<CatalogOption[]>([]);
+  const [industries, setIndustries]     = useState<CatalogOption[]>([]);
   const [instruments, setInstruments]   = useState<InvestmentInstrument[]>([]);
   const [platforms, setPlatforms]       = useState<InvestmentPlatform[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -19,8 +39,24 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
   const load = useCallback(() => {
     if (!token) { setLoading(false); return; }
     setLoading(true);
-    Promise.all([fetchInvestmentTypes(token), fetchInstruments(token), fetchPlatforms(token)])
-      .then(([t, i, p]) => { setTypes(t); setInstruments(i); setPlatforms(p); })
+    Promise.all([
+      fetchInvestmentTypes(token),
+      fetchCountryCatalog(token),
+      fetchRegionCatalog(token),
+      fetchSectorCatalog(token),
+      fetchIndustryCatalog(token),
+      fetchInstruments(token),
+      fetchPlatforms(token),
+    ])
+      .then(([t, c, r, s, d, i, p]) => {
+        setTypes(t);
+        setCountries(c);
+        setRegions(r);
+        setSectors(s);
+        setIndustries(d);
+        setInstruments(i);
+        setPlatforms(p);
+      })
       .catch((err) => {
         if (axios.isAxiosError(err) && err.response?.status === 401) {
           onUnauthorized?.('Session expired or invalid token. Please login again.');
@@ -34,6 +70,19 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
   useEffect(() => { load(); }, [load]);
 
   const clearError = useCallback(() => setError(null), []);
+
+  const reloadClassificationCatalogs = useCallback(async () => {
+    const [c, r, s, d] = await Promise.all([
+      fetchCountryCatalog(token),
+      fetchRegionCatalog(token),
+      fetchSectorCatalog(token),
+      fetchIndustryCatalog(token),
+    ]);
+    setCountries(c);
+    setRegions(r);
+    setSectors(s);
+    setIndustries(d);
+  }, [token]);
 
   // ── Instruments ──────────────────────────────────────────────────────────────
 
@@ -103,12 +152,86 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     setPlatforms(prev => prev.filter(p => p.id !== id));
   }, [token]);
 
+  // ── Classification catalogs ───────────────────────────────────────────────
+
+  const addCountry = useCallback(async (payload: Omit<CatalogOption, 'id'>) => {
+    const created = await createCountryCatalogOption(token, payload);
+    await reloadClassificationCatalogs();
+    return created;
+  }, [token, reloadClassificationCatalogs]);
+
+  const editCountry = useCallback(async (id: number, payload: Omit<CatalogOption, 'id'>) => {
+    const updated = await updateCountryCatalogOption(token, id, payload);
+    await reloadClassificationCatalogs();
+    return updated;
+  }, [token, reloadClassificationCatalogs]);
+
+  const removeCountry = useCallback(async (id: number) => {
+    await deleteCountryCatalogOption(token, id);
+    await reloadClassificationCatalogs();
+  }, [token, reloadClassificationCatalogs]);
+
+  const addRegion = useCallback(async (payload: Omit<CatalogOption, 'id'>) => {
+    const created = await createRegionCatalogOption(token, payload);
+    await reloadClassificationCatalogs();
+    return created;
+  }, [token, reloadClassificationCatalogs]);
+
+  const editRegion = useCallback(async (id: number, payload: Omit<CatalogOption, 'id'>) => {
+    const updated = await updateRegionCatalogOption(token, id, payload);
+    await reloadClassificationCatalogs();
+    return updated;
+  }, [token, reloadClassificationCatalogs]);
+
+  const removeRegion = useCallback(async (id: number) => {
+    await deleteRegionCatalogOption(token, id);
+    await reloadClassificationCatalogs();
+  }, [token, reloadClassificationCatalogs]);
+
+  const addSector = useCallback(async (payload: Omit<CatalogOption, 'id'>) => {
+    const created = await createSectorCatalogOption(token, payload);
+    await reloadClassificationCatalogs();
+    return created;
+  }, [token, reloadClassificationCatalogs]);
+
+  const editSector = useCallback(async (id: number, payload: Omit<CatalogOption, 'id'>) => {
+    const updated = await updateSectorCatalogOption(token, id, payload);
+    await reloadClassificationCatalogs();
+    return updated;
+  }, [token, reloadClassificationCatalogs]);
+
+  const removeSector = useCallback(async (id: number) => {
+    await deleteSectorCatalogOption(token, id);
+    await reloadClassificationCatalogs();
+  }, [token, reloadClassificationCatalogs]);
+
+  const addIndustry = useCallback(async (payload: Omit<CatalogOption, 'id'>) => {
+    const created = await createIndustryCatalogOption(token, payload);
+    await reloadClassificationCatalogs();
+    return created;
+  }, [token, reloadClassificationCatalogs]);
+
+  const editIndustry = useCallback(async (id: number, payload: Omit<CatalogOption, 'id'>) => {
+    const updated = await updateIndustryCatalogOption(token, id, payload);
+    await reloadClassificationCatalogs();
+    return updated;
+  }, [token, reloadClassificationCatalogs]);
+
+  const removeIndustry = useCallback(async (id: number) => {
+    await deleteIndustryCatalogOption(token, id);
+    await reloadClassificationCatalogs();
+  }, [token, reloadClassificationCatalogs]);
+
   return {
-    types, instruments, platforms,
+    types, countries, regions, sectors, industries, instruments, platforms,
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
     refreshPrices,
     addManualPrice,
     addPlatform, editPlatform, removePlatform,
+    addCountry, editCountry, removeCountry,
+    addRegion, editRegion, removeRegion,
+    addSector, editSector, removeSector,
+    addIndustry, editIndustry, removeIndustry,
   };
 }

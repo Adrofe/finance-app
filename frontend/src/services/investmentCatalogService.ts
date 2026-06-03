@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { ApiResponse } from '../types/api';
 import type {
+  CatalogOption,
   InvestmentInstrument,
   InvestmentPlatform,
   InvestmentType,
@@ -18,6 +19,82 @@ const headers = (token: string) => ({ Authorization: `Bearer ${token}` });
 export async function fetchInvestmentTypes(token: string): Promise<InvestmentType[]> {
   const res = await axios.get<ApiResponse<InvestmentType[]>>(`${BASE}/types`, { headers: headers(token) });
   return res.data.data ?? [];
+}
+
+export async function fetchCountryCatalog(token: string): Promise<CatalogOption[]> {
+  const res = await axios.get<ApiResponse<CatalogOption[]>>(`${BASE}/countries`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function fetchRegionCatalog(token: string): Promise<CatalogOption[]> {
+  const res = await axios.get<ApiResponse<CatalogOption[]>>(`${BASE}/regions`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function fetchSectorCatalog(token: string): Promise<CatalogOption[]> {
+  const res = await axios.get<ApiResponse<CatalogOption[]>>(`${BASE}/sectors`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function fetchIndustryCatalog(token: string): Promise<CatalogOption[]> {
+  const res = await axios.get<ApiResponse<CatalogOption[]>>(`${BASE}/industries`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function createCountryCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/countries`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateCountryCatalogOption(token: string, id: number, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.put<ApiResponse<CatalogOption>>(`${BASE}/countries/${id}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteCountryCatalogOption(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/countries/${id}`, { headers: headers(token) });
+}
+
+export async function createRegionCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/regions`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateRegionCatalogOption(token: string, id: number, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.put<ApiResponse<CatalogOption>>(`${BASE}/regions/${id}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteRegionCatalogOption(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/regions/${id}`, { headers: headers(token) });
+}
+
+export async function createSectorCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/sectors`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateSectorCatalogOption(token: string, id: number, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.put<ApiResponse<CatalogOption>>(`${BASE}/sectors/${id}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteSectorCatalogOption(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/sectors/${id}`, { headers: headers(token) });
+}
+
+export async function createIndustryCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/industries`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateIndustryCatalogOption(token: string, id: number, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.put<ApiResponse<CatalogOption>>(`${BASE}/industries/${id}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteIndustryCatalogOption(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/industries/${id}`, { headers: headers(token) });
 }
 
 // ─── Instruments ──────────────────────────────────────────────────────────────

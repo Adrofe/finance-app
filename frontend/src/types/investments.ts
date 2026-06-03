@@ -8,6 +8,12 @@ export type InvestmentType = {
   name: string;
 };
 
+export type CatalogOption = {
+  id: number;
+  code: string;
+  name: string;
+};
+
 export type InvestmentInstrument = {
   id: number;
   typeId: number;
@@ -20,10 +26,18 @@ export type InvestmentInstrument = {
   lastPriceSource?: string;
   lastPriceAt?: string;
   scraperUrl?: string;
+  countryId?: number;
   countryCode?: string;
-  region?: string;
-  sector?: string;
-  industry?: string;
+  countryName?: string;
+  regionId?: number;
+  regionCode?: string;
+  regionName?: string;
+  sectorId?: number;
+  sectorCode?: string;
+  sectorName?: string;
+  industryId?: number;
+  industryCode?: string;
+  industryName?: string;
 };
 
 export type InvestmentPlatform = {
