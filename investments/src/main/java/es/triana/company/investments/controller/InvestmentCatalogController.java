@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import es.triana.company.investments.model.api.ApiResponse;
+import es.triana.company.investments.model.api.CatalogOptionDTO;
 import es.triana.company.investments.model.api.InvestmentInstrumentDTO;
 import es.triana.company.investments.model.api.InvestmentPlatformDTO;
 import es.triana.company.investments.model.db.InvestmentTypeCatalog;
@@ -34,6 +35,102 @@ public class InvestmentCatalogController {
     public ResponseEntity<ApiResponse<List<InvestmentTypeCatalog>>> getTypes() {
         List<InvestmentTypeCatalog> data = investmentCatalogService.getAllTypes();
         return ResponseEntity.ok(new ApiResponse<>(200, "Investment types retrieved successfully", data));
+    }
+
+    @GetMapping("/countries")
+    public ResponseEntity<ApiResponse<List<CatalogOptionDTO>>> getCountries() {
+        List<CatalogOptionDTO> data = investmentCatalogService.getAllCountries();
+        return ResponseEntity.ok(new ApiResponse<>(200, "Country catalog retrieved successfully", data));
+    }
+
+    @PostMapping("/countries")
+    public ResponseEntity<ApiResponse<CatalogOptionDTO>> createCountry(@RequestBody CatalogOptionDTO request) {
+        CatalogOptionDTO data = investmentCatalogService.createCountry(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(201, "Country created successfully", data));
+    }
+
+    @PutMapping("/countries/{id}")
+    public ResponseEntity<ApiResponse<CatalogOptionDTO>> updateCountry(@PathVariable("id") Long id, @RequestBody CatalogOptionDTO request) {
+        CatalogOptionDTO data = investmentCatalogService.updateCountry(id, request);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Country updated successfully", data));
+    }
+
+    @DeleteMapping("/countries/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteCountry(@PathVariable("id") Long id) {
+        investmentCatalogService.deleteCountry(id);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Country deleted successfully", null));
+    }
+
+    @GetMapping("/regions")
+    public ResponseEntity<ApiResponse<List<CatalogOptionDTO>>> getRegions() {
+        List<CatalogOptionDTO> data = investmentCatalogService.getAllRegions();
+        return ResponseEntity.ok(new ApiResponse<>(200, "Region catalog retrieved successfully", data));
+    }
+
+    @PostMapping("/regions")
+    public ResponseEntity<ApiResponse<CatalogOptionDTO>> createRegion(@RequestBody CatalogOptionDTO request) {
+        CatalogOptionDTO data = investmentCatalogService.createRegion(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(201, "Region created successfully", data));
+    }
+
+    @PutMapping("/regions/{id}")
+    public ResponseEntity<ApiResponse<CatalogOptionDTO>> updateRegion(@PathVariable("id") Long id, @RequestBody CatalogOptionDTO request) {
+        CatalogOptionDTO data = investmentCatalogService.updateRegion(id, request);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Region updated successfully", data));
+    }
+
+    @DeleteMapping("/regions/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteRegion(@PathVariable("id") Long id) {
+        investmentCatalogService.deleteRegion(id);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Region deleted successfully", null));
+    }
+
+    @GetMapping("/sectors")
+    public ResponseEntity<ApiResponse<List<CatalogOptionDTO>>> getSectors() {
+        List<CatalogOptionDTO> data = investmentCatalogService.getAllSectors();
+        return ResponseEntity.ok(new ApiResponse<>(200, "Sector catalog retrieved successfully", data));
+    }
+
+    @PostMapping("/sectors")
+    public ResponseEntity<ApiResponse<CatalogOptionDTO>> createSector(@RequestBody CatalogOptionDTO request) {
+        CatalogOptionDTO data = investmentCatalogService.createSector(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(201, "Sector created successfully", data));
+    }
+
+    @PutMapping("/sectors/{id}")
+    public ResponseEntity<ApiResponse<CatalogOptionDTO>> updateSector(@PathVariable("id") Long id, @RequestBody CatalogOptionDTO request) {
+        CatalogOptionDTO data = investmentCatalogService.updateSector(id, request);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Sector updated successfully", data));
+    }
+
+    @DeleteMapping("/sectors/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteSector(@PathVariable("id") Long id) {
+        investmentCatalogService.deleteSector(id);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Sector deleted successfully", null));
+    }
+
+    @GetMapping("/industries")
+    public ResponseEntity<ApiResponse<List<CatalogOptionDTO>>> getIndustries() {
+        List<CatalogOptionDTO> data = investmentCatalogService.getAllIndustries();
+        return ResponseEntity.ok(new ApiResponse<>(200, "Industry catalog retrieved successfully", data));
+    }
+
+    @PostMapping("/industries")
+    public ResponseEntity<ApiResponse<CatalogOptionDTO>> createIndustry(@RequestBody CatalogOptionDTO request) {
+        CatalogOptionDTO data = investmentCatalogService.createIndustry(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(201, "Industry created successfully", data));
+    }
+
+    @PutMapping("/industries/{id}")
+    public ResponseEntity<ApiResponse<CatalogOptionDTO>> updateIndustry(@PathVariable("id") Long id, @RequestBody CatalogOptionDTO request) {
+        CatalogOptionDTO data = investmentCatalogService.updateIndustry(id, request);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Industry updated successfully", data));
+    }
+
+    @DeleteMapping("/industries/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteIndustry(@PathVariable("id") Long id) {
+        investmentCatalogService.deleteIndustry(id);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Industry deleted successfully", null));
     }
 
     @GetMapping("/instruments")

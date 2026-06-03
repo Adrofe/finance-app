@@ -53,15 +53,35 @@ public class InvestmentInstrumentDTO {
     @Size(max = 500, message = "scraperUrl max length is 500")
     private String scraperUrl;
 
+    private Long countryId;
+
     @Size(min = 2, max = 2, message = "countryCode must be exactly 2 letters")
     private String countryCode;
 
+    @Size(max = 120, message = "countryName max length is 120")
+    private String countryName;
+
+    private Long regionId;
+
     @Size(max = 80, message = "region max length is 80")
-    private String region;
+    private String regionCode;
+
+    @Size(max = 120, message = "regionName max length is 120")
+    private String regionName;
+
+    private Long sectorId;
 
     @Size(max = 100, message = "sector max length is 100")
-    private String sector;
+    private String sectorCode;
+
+    @Size(max = 140, message = "sectorName max length is 140")
+    private String sectorName;
+
+    private Long industryId;
 
     @Size(max = 120, message = "industry max length is 120")
-    private String industry;
+    private String industryCode;
+
+    @Size(max = 180, message = "industryName max length is 180")
+    private String industryName;
 }
