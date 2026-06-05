@@ -21,6 +21,7 @@ import {
   deleteIndustryCatalogOption,
   fetchInstruments, createInstrument, updateInstrument, deleteInstrument,
   fetchPlatforms, createPlatform, updatePlatform, deletePlatform,
+  fetchInstrumentExposures, createInstrumentExposure, updateInstrumentExposure, deleteInstrumentExposure,
   refreshInstrumentPrices,
   addManualInstrumentPrice,
 } from '../services/investmentCatalogService';
@@ -33,6 +34,7 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
   const [industries, setIndustries]     = useState<CatalogOption[]>([]);
   const [instruments, setInstruments]   = useState<InvestmentInstrument[]>([]);
   const [platforms, setPlatforms]       = useState<InvestmentPlatform[]>([]);
+  const [exposuresByInstrument, setExposuresByInstrument] = useState<Record<number, InvestmentInstrumentExposure[]>>({});
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
 
@@ -133,6 +135,38 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     }
   }, [token, onUnauthorized]);
 
+  const loadInstrumentExposures = useCallback(async (instrumentId: number) => {
+    const exposures = await fetchInstrumentExposures(token, instrumentId);
+    setExposuresByInstrument(prev => ({ ...prev, [instrumentId]: exposures }));
+    return exposures;
+  }, [token]);
+
+  const addInstrumentExposure = useCallback(async (instrumentId: number, payload: Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>) => {
+    const created = await createInstrumentExposure(token, instrumentId, payload);
+    setExposuresByInstrument(prev => ({
+      ...prev,
+      [instrumentId]: [...(prev[instrumentId] ?? []), created].sort((a, b) => a.dimension.localeCompare(b.dimension)),
+    }));
+    return created;
+  }, [token]);
+
+  const editInstrumentExposure = useCallback(async (instrumentId: number, exposureId: number, payload: Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>) => {
+    const updated = await updateInstrumentExposure(token, instrumentId, exposureId, payload);
+    setExposuresByInstrument(prev => ({
+      ...prev,
+      [instrumentId]: (prev[instrumentId] ?? []).map(item => item.id === exposureId ? updated : item),
+    }));
+    return updated;
+  }, [token]);
+
+  const removeInstrumentExposure = useCallback(async (instrumentId: number, exposureId: number) => {
+    await deleteInstrumentExposure(token, instrumentId, exposureId);
+    setExposuresByInstrument(prev => ({
+      ...prev,
+      [instrumentId]: (prev[instrumentId] ?? []).filter(item => item.id !== exposureId),
+    }));
+  }, [token]);
+
   // ── Platforms ────────────────────────────────────────────────────────────────
 
   const addPlatform = useCallback(async (payload: Omit<InvestmentPlatform, 'id'>) => {
@@ -228,6 +262,11 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     addInstrument, editInstrument, removeInstrument,
     refreshPrices,
     addManualPrice,
+    exposuresByInstrument,
+    loadInstrumentExposures,
+    addInstrumentExposure,
+    editInstrumentExposure,
+    removeInstrumentExposure,
     addPlatform, editPlatform, removePlatform,
     addCountry, editCountry, removeCountry,
     addRegion, editRegion, removeRegion,
