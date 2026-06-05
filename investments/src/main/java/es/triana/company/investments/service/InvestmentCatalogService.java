@@ -230,6 +230,48 @@ public class InvestmentCatalogService {
         investmentIndustryCatalogRepository.deleteById(id);
     }
 
+    public List<InvestmentInstrumentExposureDTO> getExposuresByInstrument(Long instrumentId) {
+        findInstrument(instrumentId);
+        return investmentInstrumentExposureRepository.findAllByInstrumentIdOrderByDimensionAscIdAsc(instrumentId)
+                .stream()
+                .map(this::toExposureDto)
+                .toList();
+    }
+
+    public InvestmentInstrumentExposureDTO createExposure(Long instrumentId, InvestmentInstrumentExposureDTO request) {
+        InvestmentInstrument instrument = findInstrument(instrumentId);
+        validateExposureRequest(instrumentId, request);
+        InvestmentInstrumentExposure exposure = buildExposureEntity(instrument, request);
+        return toExposureDto(investmentInstrumentExposureRepository.save(exposure));
+    }
+
+    public InvestmentInstrumentExposureDTO updateExposure(Long instrumentId, Long exposureId, InvestmentInstrumentExposureDTO request) {
+        findInstrument(instrumentId);
+        validateExposureRequest(instrumentId, request);
+        InvestmentInstrumentExposure exposure = investmentInstrumentExposureRepository.findById(exposureId)
+                .orElseThrow(() -> new CatalogNotFoundException("Exposure not found with id: " + exposureId));
+        if (exposure.getInstrument() == null || !instrumentId.equals(exposure.getInstrument().getId())) {
+            throw new InvestmentValidationException("Exposure does not belong to instrument " + instrumentId);
+        }
+        exposure.setDimension(request.getDimension());
+        exposure.setCountry(request.getCountryId() == null ? null : findCountry(request.getCountryId()));
+        exposure.setRegion(request.getRegionId() == null ? null : findRegion(request.getRegionId()));
+        exposure.setSector(request.getSectorId() == null ? null : findSector(request.getSectorId()));
+        exposure.setIndustry(request.getIndustryId() == null ? null : findIndustry(request.getIndustryId()));
+        exposure.setWeightPct(request.getWeightPct());
+        return toExposureDto(investmentInstrumentExposureRepository.save(exposure));
+    }
+
+    public void deleteExposure(Long instrumentId, Long exposureId) {
+        findInstrument(instrumentId);
+        InvestmentInstrumentExposure exposure = investmentInstrumentExposureRepository.findById(exposureId)
+                .orElseThrow(() -> new CatalogNotFoundException("Exposure not found with id: " + exposureId));
+        if (exposure.getInstrument() == null || !instrumentId.equals(exposure.getInstrument().getId())) {
+            throw new InvestmentValidationException("Exposure does not belong to instrument " + instrumentId);
+        }
+        investmentInstrumentExposureRepository.delete(exposure);
+    }
+
     public InvestmentInstrumentDTO getInstrumentById(Long id) {
         Map<Long, CatalogOptionDTO> countries = loadCountryCatalogMap();
         Map<Long, CatalogOptionDTO> regions = loadRegionCatalogMap();
@@ -439,6 +481,83 @@ public class InvestmentCatalogService {
         }
         return investmentIndustryCatalogRepository.findById(id)
                 .orElseThrow(() -> new CatalogNotFoundException("Industry not found with id: " + id));
+    }
+
+    private void validateExposureRequest(Long instrumentId, InvestmentInstrumentExposureDTO request) {
+        if (request == null) {
+            throw new InvestmentValidationException("exposure request is required");
+        }
+        if (request.getInstrumentId() != null && !instrumentId.equals(request.getInstrumentId())) {
+            throw new InvestmentValidationException("instrumentId does not match path parameter");
+        }
+        if (request.getWeightPct() == null || request.getWeightPct().signum() < 0) {
+            throw new InvestmentValidationException("weightPct must be >= 0");
+        }
+        if (request.getWeightPct().compareTo(java.math.BigDecimal.valueOf(100)) > 0) {
+            throw new InvestmentValidationException("weightPct must be <= 100");
+        }
+        resolveExposureBucket(request);
+    }
+
+    private InvestmentInstrumentExposure buildExposureEntity(InvestmentInstrument instrument, InvestmentInstrumentExposureDTO request) {
+        InvestmentInstrumentExposure.Dimension dimension = request.getDimension();
+        InvestmentInstrumentExposure exposure = InvestmentInstrumentExposure.builder()
+                .instrument(instrument)
+                .dimension(dimension)
+                .weightPct(request.getWeightPct())
+                .build();
+        assignExposureBucket(exposure, request);
+        return exposure;
+    }
+
+    private void assignExposureBucket(InvestmentInstrumentExposure exposure, InvestmentInstrumentExposureDTO request) {
+        switch (request.getDimension()) {
+            case COUNTRY -> exposure.setCountry(findCountry(resolveExposureBucketId(request)));
+            case REGION -> exposure.setRegion(findRegion(resolveExposureBucketId(request)));
+            case SECTOR -> exposure.setSector(findSector(resolveExposureBucketId(request)));
+            case INDUSTRY -> exposure.setIndustry(findIndustry(resolveExposureBucketId(request)));
+        }
+    }
+
+    private CatalogOptionDTO resolveExposureBucket(InvestmentInstrumentExposureDTO request) {
+        Long bucketId = resolveExposureBucketId(request);
+        return switch (request.getDimension()) {
+            case COUNTRY -> toCatalogOption(findCountry(bucketId));
+            case REGION -> toCatalogOption(findRegion(bucketId));
+            case SECTOR -> toCatalogOption(findSector(bucketId));
+            case INDUSTRY -> toCatalogOption(findIndustry(bucketId));
+        };
+    }
+
+    private Long resolveExposureBucketId(InvestmentInstrumentExposureDTO request) {
+        return switch (request.getDimension()) {
+            case COUNTRY -> request.getCountryId();
+            case REGION -> request.getRegionId();
+            case SECTOR -> request.getSectorId();
+            case INDUSTRY -> request.getIndustryId();
+        };
+    }
+
+    private InvestmentInstrumentExposureDTO toExposureDto(InvestmentInstrumentExposure exposure) {
+        CatalogOptionDTO bucket = switch (exposure.getDimension()) {
+            case COUNTRY -> exposure.getCountry() == null ? null : toCatalogOption(exposure.getCountry());
+            case REGION -> exposure.getRegion() == null ? null : toCatalogOption(exposure.getRegion());
+            case SECTOR -> exposure.getSector() == null ? null : toCatalogOption(exposure.getSector());
+            case INDUSTRY -> exposure.getIndustry() == null ? null : toCatalogOption(exposure.getIndustry());
+        };
+
+        return InvestmentInstrumentExposureDTO.builder()
+                .id(exposure.getId())
+                .instrumentId(exposure.getInstrument() == null ? null : exposure.getInstrument().getId())
+                .dimension(exposure.getDimension())
+                .countryId(exposure.getCountry() == null ? null : exposure.getCountry().getId())
+                .regionId(exposure.getRegion() == null ? null : exposure.getRegion().getId())
+                .sectorId(exposure.getSector() == null ? null : exposure.getSector().getId())
+                .industryId(exposure.getIndustry() == null ? null : exposure.getIndustry().getId())
+                .bucketCode(bucket == null ? null : bucket.getCode())
+                .bucketName(bucket == null ? null : bucket.getName())
+                .weightPct(exposure.getWeightPct())
+                .build();
     }
 
     private void validateInstrumentRequest(InvestmentInstrumentDTO request) {
