@@ -21,6 +21,7 @@ const fmtDate = (s?: string) =>
 
 type Section = 'instruments' | 'platforms' | 'classifications';
 type ClassificationKind = 'countries' | 'regions' | 'sectors' | 'industries';
+type ExposureMode = 'UNIQUE' | 'COMPOUND';
 
 // ─── Instrument form state ────────────────────────────────────────────────────
 
@@ -45,6 +46,14 @@ const EMPTY_INSTRUMENT = {
 
 const EMPTY_PLATFORM = { code: '', name: '' };
 const EMPTY_CLASSIFICATION = { code: '', name: '' };
+const EMPTY_EXPOSURE = {
+  dimension: 'SECTOR' as InvestmentInstrumentExposure['dimension'],
+  countryId: '',
+  regionId: '',
+  sectorId: '',
+  industryId: '',
+  weightPct: '',
+};
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -81,6 +90,11 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     addRegion, editRegion, removeRegion,
     addSector, editSector, removeSector,
     addIndustry, editIndustry, removeIndustry,
+    exposuresByInstrument,
+    loadInstrumentExposures,
+    addInstrumentExposure,
+    editInstrumentExposure,
+    removeInstrumentExposure,
   } = useInvestmentCatalog(token, onUnauthorized);
 
   const [section, setSection] = useState<Section>('instruments');
@@ -88,6 +102,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
 
   // ── shared modal state ────────────────────────────────────────────────────
   const [showForm, setShowForm]           = useState(false);
+  const [showExposureModal, setShowExposureModal] = useState(false);
   const [editingId, setEditingId]         = useState<number | null>(null);
   const [submitting, setSubmitting]       = useState(false);
   const [formError, setFormError]         = useState<string | null>(null);
@@ -121,6 +136,14 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [classForm, setClassForm] = useState({ ...EMPTY_CLASSIFICATION });
   const onClassChange = (k: keyof typeof EMPTY_CLASSIFICATION, v: string) =>
     setClassForm(s => ({ ...s, [k]: v }));
+
+  const [exposureForm, setExposureForm] = useState({ ...EMPTY_EXPOSURE });
+  const [exposureEditingId, setExposureEditingId] = useState<number | null>(null);
+  const [exposureSubmitting, setExposureSubmitting] = useState(false);
+  const [exposureError, setExposureError] = useState<string | null>(null);
+  const [exposureMode, setExposureMode] = useState<ExposureMode>('UNIQUE');
+  const onExposureChange = (k: keyof typeof EMPTY_EXPOSURE, v: string) =>
+    setExposureForm(s => ({ ...s, [k]: v }));
 
   const classificationItems = useMemo<CatalogOption[]>(() => {
     switch (classificationKind) {
@@ -207,17 +230,21 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   // ── open/close form ───────────────────────────────────────────────────────
   const openCreate = () => {
     setShowManualPrice(false);
+    setShowExposureModal(false);
     setManualError(null);
     setEditingId(null);
     setFormError(null);
+    setExposureMode('UNIQUE');
+    resetExposureForm();
     if (section === 'instruments') setInstrForm({ ...EMPTY_INSTRUMENT });
     else if (section === 'platforms') setPlatForm({ ...EMPTY_PLATFORM });
     else setClassForm({ ...EMPTY_CLASSIFICATION });
     setShowForm(true);
   };
 
-  const openEdit = (item: InvestmentInstrument | InvestmentPlatform | CatalogOption) => {
+  const openEdit = async (item: InvestmentInstrument | InvestmentPlatform | CatalogOption) => {
     setShowManualPrice(false);
+    setShowExposureModal(false);
     setManualError(null);
     setEditingId(item.id);
     setFormError(null);
@@ -239,6 +266,17 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         sectorId: i.sectorId != null ? String(i.sectorId) : '',
         industryId: i.industryId != null ? String(i.industryId) : '',
       });
+      setExposureEditingId(null);
+      setExposureError(null);
+      setExposureForm({ ...EMPTY_EXPOSURE });
+      try {
+        const loadedExposures = await loadInstrumentExposures(i.id);
+        setExposureMode(loadedExposures.length > 0 ? 'COMPOUND' : 'UNIQUE');
+      } catch (err: unknown) {
+        const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+        setExposureError(eRes?.response?.data?.message || eRes?.message || 'Error loading exposures');
+        setExposureMode('UNIQUE');
+      }
     } else {
       if (section === 'platforms') {
         const p = item as InvestmentPlatform;
@@ -251,7 +289,12 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     setShowForm(true);
   };
 
-  const closeForm = () => { setShowForm(false); setEditingId(null); setFormError(null); };
+  const closeForm = () => {
+    setShowForm(false);
+    setShowExposureModal(false);
+    setEditingId(null);
+    setFormError(null);
+  };
 
   const openManualPrice = () => {
     setShowForm(false);
@@ -291,10 +334,18 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPriceSource: instrForm.lastPriceSource.trim() || undefined,
         lastPriceAt: instrForm.lastPriceAt || undefined,
         scraperUrl: instrForm.scraperUrl.trim() || undefined,
-        countryId: instrForm.countryId ? Number(instrForm.countryId) : undefined,
-        regionId: instrForm.regionId ? Number(instrForm.regionId) : undefined,
-        sectorId: instrForm.sectorId ? Number(instrForm.sectorId) : undefined,
-        industryId: instrForm.industryId ? Number(instrForm.industryId) : undefined,
+        countryId: supportsExposureEditing && exposureMode === 'COMPOUND'
+          ? undefined
+          : (instrForm.countryId ? Number(instrForm.countryId) : undefined),
+        regionId: supportsExposureEditing && exposureMode === 'COMPOUND'
+          ? undefined
+          : (instrForm.regionId ? Number(instrForm.regionId) : undefined),
+        sectorId: supportsExposureEditing && exposureMode === 'COMPOUND'
+          ? undefined
+          : (instrForm.sectorId ? Number(instrForm.sectorId) : undefined),
+        industryId: supportsExposureEditing && exposureMode === 'COMPOUND'
+          ? undefined
+          : (instrForm.industryId ? Number(instrForm.industryId) : undefined),
       };
       if (editingId) await editInstrument(editingId, payload);
       else await addInstrument(payload);
@@ -358,6 +409,90 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const resetExposureForm = () => {
+    setExposureEditingId(null);
+    setExposureError(null);
+    setExposureForm({ ...EMPTY_EXPOSURE });
+  };
+
+  const instrumentExposures = editingId ? exposuresByInstrument[editingId] ?? [] : [];
+  const supportsExposureEditing = Boolean(selectedType && ['ETF', 'FUND'].includes(selectedType.code));
+
+  const selectedExposureOptions = useMemo(() => {
+    switch (exposureForm.dimension) {
+      case 'COUNTRY': return countries;
+      case 'REGION': return regions;
+      case 'SECTOR': return sectors;
+      case 'INDUSTRY': return industries;
+    }
+  }, [countries, exposureForm.dimension, industries, regions, sectors]);
+
+  const exposureTotalWeight = useMemo(
+    () => instrumentExposures.reduce((sum, item) => sum + Number(item.weightPct || 0), 0),
+    [instrumentExposures],
+  );
+
+  const submitExposure = async () => {
+    if (!editingId) return;
+    setExposureError(null);
+    setExposureSubmitting(true);
+    try {
+      const payload = {
+        dimension: exposureForm.dimension,
+        countryId: exposureForm.dimension === 'COUNTRY' && exposureForm.countryId ? Number(exposureForm.countryId) : undefined,
+        regionId: exposureForm.dimension === 'REGION' && exposureForm.regionId ? Number(exposureForm.regionId) : undefined,
+        sectorId: exposureForm.dimension === 'SECTOR' && exposureForm.sectorId ? Number(exposureForm.sectorId) : undefined,
+        industryId: exposureForm.dimension === 'INDUSTRY' && exposureForm.industryId ? Number(exposureForm.industryId) : undefined,
+        weightPct: Number(exposureForm.weightPct),
+      } satisfies Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>;
+      if (exposureEditingId) await editInstrumentExposure(editingId, exposureEditingId, payload);
+      else await addInstrumentExposure(editingId, payload);
+      resetExposureForm();
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setExposureError(eRes?.response?.data?.message || eRes?.message || 'Error saving exposure');
+    } finally {
+      setExposureSubmitting(false);
+    }
+  };
+
+  const editExposure = (item: InvestmentInstrumentExposure) => {
+    setExposureEditingId(item.id);
+    setExposureError(null);
+    setExposureForm({
+      dimension: item.dimension,
+      countryId: item.countryId != null ? String(item.countryId) : '',
+      regionId: item.regionId != null ? String(item.regionId) : '',
+      sectorId: item.sectorId != null ? String(item.sectorId) : '',
+      industryId: item.industryId != null ? String(item.industryId) : '',
+      weightPct: String(item.weightPct),
+    });
+  };
+
+  const deleteExposure = async (item: InvestmentInstrumentExposure) => {
+    if (!editingId) return;
+    setExposureError(null);
+    try {
+      await removeInstrumentExposure(editingId, item.id);
+      if (exposureEditingId === item.id) resetExposureForm();
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setExposureError(eRes?.response?.data?.message || eRes?.message || 'Error deleting exposure');
+    }
+  };
+
+  const openExposureManager = async () => {
+    if (!editingId) return;
+    setExposureError(null);
+    try {
+      await loadInstrumentExposures(editingId);
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setExposureError(eRes?.response?.data?.message || eRes?.message || 'Error loading exposures');
+    }
+    setShowExposureModal(true);
   };
 
   // ── delete handler ────────────────────────────────────────────────────────
