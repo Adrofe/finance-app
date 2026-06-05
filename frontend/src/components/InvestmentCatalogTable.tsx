@@ -6,7 +6,7 @@ import {
   INVESTMENT_MARKET_OPTIONS,
   INVESTMENT_PRICE_SOURCE_OPTIONS,
 } from '../constants/visualConfig';
-import type { CatalogOption, InvestmentInstrument, InvestmentPlatform, InvestmentType } from '../types/investments';
+import type { CatalogOption, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType } from '../types/investments';
 import './investment-catalog.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

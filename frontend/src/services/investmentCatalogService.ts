@@ -5,6 +5,7 @@ import type {
   InvestmentInstrument,
   InvestmentPlatform,
   InvestmentType,
+  InvestmentInstrumentExposure,
   PriceRefreshResult,
   PriceUpdateDraft,
 } from '../types/investments';
@@ -95,6 +96,25 @@ export async function updateIndustryCatalogOption(token: string, id: number, pay
 
 export async function deleteIndustryCatalogOption(token: string, id: number): Promise<void> {
   await axios.delete(`${BASE}/industries/${id}`, { headers: headers(token) });
+}
+
+export async function fetchInstrumentExposures(token: string, instrumentId: number): Promise<InvestmentInstrumentExposure[]> {
+  const res = await axios.get<ApiResponse<InvestmentInstrumentExposure[]>>(`${BASE}/instruments/${instrumentId}/exposures`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function createInstrumentExposure(token: string, instrumentId: number, payload: Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>): Promise<InvestmentInstrumentExposure> {
+  const res = await axios.post<ApiResponse<InvestmentInstrumentExposure>>(`${BASE}/instruments/${instrumentId}/exposures`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateInstrumentExposure(token: string, instrumentId: number, exposureId: number, payload: Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>): Promise<InvestmentInstrumentExposure> {
+  const res = await axios.put<ApiResponse<InvestmentInstrumentExposure>>(`${BASE}/instruments/${instrumentId}/exposures/${exposureId}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteInstrumentExposure(token: string, instrumentId: number, exposureId: number): Promise<void> {
+  await axios.delete(`${BASE}/instruments/${instrumentId}/exposures/${exposureId}`, { headers: headers(token) });
 }
 
 // ─── Instruments ──────────────────────────────────────────────────────────────

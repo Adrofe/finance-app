@@ -40,6 +40,19 @@ export type InvestmentInstrument = {
   industryName?: string;
 };
 
+export type InvestmentInstrumentExposure = {
+  id: number;
+  instrumentId: number;
+  dimension: 'COUNTRY' | 'REGION' | 'SECTOR' | 'INDUSTRY';
+  countryId?: number;
+  regionId?: number;
+  sectorId?: number;
+  industryId?: number;
+  bucketCode?: string;
+  bucketName?: string;
+  weightPct: number;
+};
+
 export type InvestmentPlatform = {
   id: number;
   code: string;
