@@ -974,64 +974,202 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                   onChange={e => onInstrChange('scraperUrl', e.target.value)}
                 />
               </div>
-              <div className="modal-row">
-                <label>Country</label>
-                <select
-                  className="modal-select"
-                  value={instrForm.countryId}
-                  onChange={e => onInstrChange('countryId', e.target.value)}
-                >
-                  <option value="">-- Select country --</option>
-                  {countries.map(option => (
-                    <option key={option.id} value={option.id}>{option.name} ({option.code})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="modal-row">
-                <label>Region</label>
-                <select
-                  className="modal-select"
-                  value={instrForm.regionId}
-                  onChange={e => onInstrChange('regionId', e.target.value)}
-                >
-                  <option value="">-- Select region --</option>
-                  {regions.map(option => (
-                    <option key={option.id} value={option.id}>{option.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="modal-row">
-                <label>Sector</label>
-                <select
-                  className="modal-select"
-                  value={instrForm.sectorId}
-                  onChange={e => onInstrChange('sectorId', e.target.value)}
-                >
-                  <option value="">-- Select sector --</option>
-                  {sectors.map(option => (
-                    <option key={option.id} value={option.id}>{option.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="modal-row">
-                <label>Industry</label>
-                <select
-                  className="modal-select"
-                  value={instrForm.industryId}
-                  onChange={e => onInstrChange('industryId', e.target.value)}
-                >
-                  <option value="">-- Select industry --</option>
-                  {industries.map(option => (
-                    <option key={option.id} value={option.id}>{option.name}</option>
-                  ))}
-                </select>
-              </div>
+              {supportsExposureEditing && (
+                <div className="ict-exposure-mode-switch">
+                  <span className="ict-exposure-mode-switch__label">Exposure mode</span>
+                  <div className="ict-exposure-mode-switch__controls">
+                    <button
+                      type="button"
+                      className={`ict-toggle-chip${exposureMode === 'UNIQUE' ? ' active' : ''}`}
+                      onClick={() => setExposureMode('UNIQUE')}
+                    >
+                      Unique
+                    </button>
+                    <button
+                      type="button"
+                      className={`ict-toggle-chip${exposureMode === 'COMPOUND' ? ' active' : ''}`}
+                      onClick={() => setExposureMode('COMPOUND')}
+                    >
+                      Compound
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(!supportsExposureEditing || exposureMode === 'UNIQUE') && (
+                <>
+                  <div className="modal-row">
+                    <label>Country</label>
+                    <select
+                      className="modal-select"
+                      value={instrForm.countryId}
+                      onChange={e => onInstrChange('countryId', e.target.value)}
+                    >
+                      <option value="">-- Select country --</option>
+                      {countries.map(option => (
+                        <option key={option.id} value={option.id}>{option.name} ({option.code})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="modal-row">
+                    <label>Region</label>
+                    <select
+                      className="modal-select"
+                      value={instrForm.regionId}
+                      onChange={e => onInstrChange('regionId', e.target.value)}
+                    >
+                      <option value="">-- Select region --</option>
+                      {regions.map(option => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="modal-row">
+                    <label>Sector</label>
+                    <select
+                      className="modal-select"
+                      value={instrForm.sectorId}
+                      onChange={e => onInstrChange('sectorId', e.target.value)}
+                    >
+                      <option value="">-- Select sector --</option>
+                      {sectors.map(option => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="modal-row">
+                    <label>Industry</label>
+                    <select
+                      className="modal-select"
+                      value={instrForm.industryId}
+                      onChange={e => onInstrChange('industryId', e.target.value)}
+                    >
+                      <option value="">-- Select industry --</option>
+                      {industries.map(option => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {supportsExposureEditing && exposureMode === 'COMPOUND' && (
+                <div className="ict-exposure-summary-row">
+                  <div className="ict-exposure-summary-row__text">
+                    <strong>Compound exposure enabled</strong>
+                    {editingId
+                      ? <span>{instrumentExposures.length} entries • total {exposureTotalWeight.toFixed(2)}%</span>
+                      : <span>Save the instrument first to configure compound exposure.</span>}
+                  </div>
+                  <button
+                    type="button"
+                    className="ict-btn-manage-exposure"
+                    onClick={openExposureManager}
+                    disabled={!editingId}
+                  >
+                    Manage exposure
+                  </button>
+                </div>
+              )}
               {formError && <div className="modal-error">{formError}</div>}
               <div className="modal-actions">
                 <button className="at-btn-primary" type="submit" disabled={submitting}>
                   {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Create'}
                 </button>
                 <button className="at-btn-secondary" type="button" onClick={closeForm}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showExposureModal && showForm && section === 'instruments' && supportsExposureEditing && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal ict-exposure-modal">
+            <div className="modal-header">
+              <h4>Compound exposure editor</h4>
+              <button className="modal-close" type="button" onClick={() => setShowExposureModal(false)}>✕</button>
+            </div>
+            <form
+              className="modal-body"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void submitExposure();
+              }}
+            >
+              <div className="ict-exposure-form-grid">
+                <div className="modal-row">
+                  <label>Dimension</label>
+                  <select
+                    className="modal-select"
+                    value={exposureForm.dimension}
+                    onChange={e => onExposureChange('dimension', e.target.value)}
+                  >
+                    <option value="SECTOR">Sector</option>
+                    <option value="REGION">Region</option>
+                    <option value="COUNTRY">Country</option>
+                    <option value="INDUSTRY">Industry</option>
+                  </select>
+                </div>
+                <div className="modal-row">
+                  <label>{exposureForm.dimension === 'COUNTRY' ? 'Country' : exposureForm.dimension === 'REGION' ? 'Region' : exposureForm.dimension === 'SECTOR' ? 'Sector' : 'Industry'}</label>
+                  <select
+                    className="modal-select"
+                    value={exposureForm.dimension === 'COUNTRY' ? exposureForm.countryId : exposureForm.dimension === 'REGION' ? exposureForm.regionId : exposureForm.dimension === 'SECTOR' ? exposureForm.sectorId : exposureForm.industryId}
+                    onChange={e => {
+                      const next = e.target.value;
+                      setExposureForm(current => ({
+                        ...current,
+                        countryId: exposureForm.dimension === 'COUNTRY' ? next : '',
+                        regionId: exposureForm.dimension === 'REGION' ? next : '',
+                        sectorId: exposureForm.dimension === 'SECTOR' ? next : '',
+                        industryId: exposureForm.dimension === 'INDUSTRY' ? next : '',
+                      }));
+                    }}
+                  >
+                    <option value="">-- Select bucket --</option>
+                    {selectedExposureOptions.map(option => (
+                      <option key={option.id} value={option.id}>{option.name} ({option.code})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="modal-row">
+                  <label>Weight %</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={exposureForm.weightPct}
+                    onChange={e => onExposureChange('weightPct', e.target.value)}
+                    placeholder="e.g. 12.5"
+                  />
+                </div>
+              </div>
+
+              <div className="modal-actions modal-actions--compact">
+                <button className="at-btn-primary" type="submit" disabled={exposureSubmitting}>
+                  {exposureSubmitting ? 'Saving…' : exposureEditingId ? 'Update exposure' : 'Add exposure'}
+                </button>
+                <button className="at-btn-secondary" type="button" onClick={resetExposureForm}>Clear</button>
+              </div>
+
+              {exposureError && <div className="modal-error">{exposureError}</div>}
+
+              <div className="ict-exposure-list">
+                {instrumentExposures.length === 0 ? (
+                  <div className="ict-empty ict-empty--compact">No exposures added yet.</div>
+                ) : instrumentExposures.map(item => (
+                  <div key={item.id} className="ict-exposure-item">
+                    <span className="ict-exposure-item__label">{item.dimension}</span>
+                    <span className="ict-exposure-item__bucket">{item.bucketName ?? item.bucketCode ?? '—'}</span>
+                    <span className="ict-exposure-item__weight">{Number(item.weightPct).toFixed(2)}%</span>
+                    <div className="ict-actions">
+                      <button type="button" className="ict-btn-icon" onClick={() => editExposure(item)}>✏️</button>
+                      <button type="button" className="ict-btn-icon ict-btn-icon--danger" onClick={() => deleteExposure(item)}>🗑</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </form>
           </div>
