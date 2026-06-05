@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import es.triana.company.investments.model.api.ApiResponse;
 import es.triana.company.investments.model.api.CatalogOptionDTO;
 import es.triana.company.investments.model.api.InvestmentInstrumentDTO;
+import es.triana.company.investments.model.api.InvestmentInstrumentExposureDTO;
 import es.triana.company.investments.model.api.InvestmentPlatformDTO;
 import es.triana.company.investments.model.db.InvestmentTypeCatalog;
 import es.triana.company.investments.service.InvestmentCatalogService;
@@ -131,6 +132,37 @@ public class InvestmentCatalogController {
     public ResponseEntity<ApiResponse<Void>> deleteIndustry(@PathVariable("id") Long id) {
         investmentCatalogService.deleteIndustry(id);
         return ResponseEntity.ok(new ApiResponse<>(200, "Industry deleted successfully", null));
+    }
+
+    @GetMapping("/instruments/{id}/exposures")
+    public ResponseEntity<ApiResponse<List<InvestmentInstrumentExposureDTO>>> getInstrumentExposures(@PathVariable("id") Long id) {
+        List<InvestmentInstrumentExposureDTO> data = investmentCatalogService.getExposuresByInstrument(id);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Instrument exposures retrieved successfully", data));
+    }
+
+    @PostMapping("/instruments/{id}/exposures")
+    public ResponseEntity<ApiResponse<InvestmentInstrumentExposureDTO>> createInstrumentExposure(
+            @PathVariable("id") Long id,
+            @Valid @RequestBody InvestmentInstrumentExposureDTO request) {
+        InvestmentInstrumentExposureDTO data = investmentCatalogService.createExposure(id, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(201, "Instrument exposure created successfully", data));
+    }
+
+    @PutMapping("/instruments/{id}/exposures/{exposureId}")
+    public ResponseEntity<ApiResponse<InvestmentInstrumentExposureDTO>> updateInstrumentExposure(
+            @PathVariable("id") Long id,
+            @PathVariable("exposureId") Long exposureId,
+            @Valid @RequestBody InvestmentInstrumentExposureDTO request) {
+        InvestmentInstrumentExposureDTO data = investmentCatalogService.updateExposure(id, exposureId, request);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Instrument exposure updated successfully", data));
+    }
+
+    @DeleteMapping("/instruments/{id}/exposures/{exposureId}")
+    public ResponseEntity<ApiResponse<Void>> deleteInstrumentExposure(
+            @PathVariable("id") Long id,
+            @PathVariable("exposureId") Long exposureId) {
+        investmentCatalogService.deleteExposure(id, exposureId);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Instrument exposure deleted successfully", null));
     }
 
     @GetMapping("/instruments")
