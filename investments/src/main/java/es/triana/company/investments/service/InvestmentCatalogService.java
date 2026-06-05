@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import es.triana.company.investments.model.api.CatalogOptionDTO;
 import es.triana.company.investments.model.api.InvestmentInstrumentDTO;
+import es.triana.company.investments.model.api.InvestmentInstrumentExposureDTO;
 import es.triana.company.investments.model.api.InvestmentPlatformDTO;
 import es.triana.company.investments.model.db.InvestmentCountryCatalog;
 import es.triana.company.investments.model.db.InvestmentIndustryCatalog;
@@ -20,9 +21,11 @@ import es.triana.company.investments.model.db.InvestmentInstrument;
 import es.triana.company.investments.model.db.InvestmentPlatform;
 import es.triana.company.investments.model.db.InvestmentRegionCatalog;
 import es.triana.company.investments.model.db.InvestmentSectorCatalog;
+import es.triana.company.investments.model.db.InvestmentInstrumentExposure;
 import es.triana.company.investments.model.db.InvestmentTypeCatalog;
 import es.triana.company.investments.repository.InvestmentCountryCatalogRepository;
 import es.triana.company.investments.repository.InvestmentIndustryCatalogRepository;
+import es.triana.company.investments.repository.InvestmentInstrumentExposureRepository;
 import es.triana.company.investments.repository.InvestmentInstrumentRepository;
 import es.triana.company.investments.repository.InvestmentPlatformRepository;
 import es.triana.company.investments.repository.InvestmentRegionCatalogRepository;
@@ -43,6 +46,7 @@ public class InvestmentCatalogService {
     private final InvestmentRegionCatalogRepository investmentRegionCatalogRepository;
     private final InvestmentSectorCatalogRepository investmentSectorCatalogRepository;
     private final InvestmentIndustryCatalogRepository investmentIndustryCatalogRepository;
+    private final InvestmentInstrumentExposureRepository investmentInstrumentExposureRepository;
 
     public InvestmentCatalogService(InvestmentInstrumentRepository investmentInstrumentRepository,
             InvestmentPlatformRepository investmentPlatformRepository,
@@ -50,7 +54,8 @@ public class InvestmentCatalogService {
             InvestmentCountryCatalogRepository investmentCountryCatalogRepository,
             InvestmentRegionCatalogRepository investmentRegionCatalogRepository,
             InvestmentSectorCatalogRepository investmentSectorCatalogRepository,
-            InvestmentIndustryCatalogRepository investmentIndustryCatalogRepository) {
+            InvestmentIndustryCatalogRepository investmentIndustryCatalogRepository,
+            InvestmentInstrumentExposureRepository investmentInstrumentExposureRepository) {
         this.investmentInstrumentRepository = investmentInstrumentRepository;
         this.investmentPlatformRepository = investmentPlatformRepository;
         this.investmentTypeCatalogRepository = investmentTypeCatalogRepository;
@@ -58,6 +63,7 @@ public class InvestmentCatalogService {
         this.investmentRegionCatalogRepository = investmentRegionCatalogRepository;
         this.investmentSectorCatalogRepository = investmentSectorCatalogRepository;
         this.investmentIndustryCatalogRepository = investmentIndustryCatalogRepository;
+        this.investmentInstrumentExposureRepository = investmentInstrumentExposureRepository;
     }
 
     public List<InvestmentInstrumentDTO> getAllInstruments() {
