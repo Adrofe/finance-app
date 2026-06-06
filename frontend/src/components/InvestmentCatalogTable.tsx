@@ -20,7 +20,7 @@ const fmtDate = (s?: string) =>
   s ? new Date(s).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 type Section = 'instruments' | 'platforms' | 'classifications';
-type ClassificationKind = 'countries' | 'regions' | 'sectors' | 'industries';
+type ClassificationKind = 'countries' | 'regions' | 'sectors' | 'industries' | 'marketRegimes';
 type ExposureMode = 'UNIQUE' | 'COMPOUND';
 
 // ─── Instrument form state ────────────────────────────────────────────────────
@@ -52,6 +52,7 @@ const EMPTY_EXPOSURE = {
   regionId: '',
   sectorId: '',
   industryId: '',
+  marketRegimeId: '',
   weightPct: '',
 };
 

@@ -42,6 +42,11 @@ export async function fetchIndustryCatalog(token: string): Promise<CatalogOption
   return res.data.data ?? [];
 }
 
+export async function fetchMarketRegimeCatalog(token: string): Promise<CatalogOption[]> {
+  const res = await axios.get<ApiResponse<CatalogOption[]>>(`${BASE}/market-regimes`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
 export async function createCountryCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
   const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/countries`, payload, { headers: headers(token) });
   return res.data.data;
@@ -96,6 +101,20 @@ export async function updateIndustryCatalogOption(token: string, id: number, pay
 
 export async function deleteIndustryCatalogOption(token: string, id: number): Promise<void> {
   await axios.delete(`${BASE}/industries/${id}`, { headers: headers(token) });
+}
+
+export async function createMarketRegimeCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/market-regimes`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateMarketRegimeCatalogOption(token: string, id: number, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.put<ApiResponse<CatalogOption>>(`${BASE}/market-regimes/${id}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteMarketRegimeCatalogOption(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/market-regimes/${id}`, { headers: headers(token) });
 }
 
 export async function fetchInstrumentExposures(token: string, instrumentId: number): Promise<InvestmentInstrumentExposure[]> {

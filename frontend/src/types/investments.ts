@@ -43,11 +43,12 @@ export type InvestmentInstrument = {
 export type InvestmentInstrumentExposure = {
   id: number;
   instrumentId: number;
-  dimension: 'COUNTRY' | 'REGION' | 'SECTOR' | 'INDUSTRY';
+  dimension: 'COUNTRY' | 'REGION' | 'SECTOR' | 'INDUSTRY' | 'MARKET_REGIME';
   countryId?: number;
   regionId?: number;
   sectorId?: number;
   industryId?: number;
+  marketRegimeId?: number;
   bucketCode?: string;
   bucketName?: string;
   weightPct: number;

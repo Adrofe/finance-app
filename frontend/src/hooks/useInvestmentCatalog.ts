@@ -1,28 +1,35 @@
 import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import type { CatalogOption, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType, PriceRefreshResult, PriceUpdateDraft } from '../types/investments';
+import type { CatalogOption, ExposureRefreshResult, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType, PriceRefreshResult, PriceUpdateDraft } from '../types/investments';
 import {
   fetchInvestmentTypes,
   fetchCountryCatalog,
   fetchRegionCatalog,
   fetchSectorCatalog,
   fetchIndustryCatalog,
+  fetchMarketRegimeCatalog,
   createCountryCatalogOption,
   updateCountryCatalogOption,
   deleteCountryCatalogOption,
   createRegionCatalogOption,
   updateRegionCatalogOption,
   deleteRegionCatalogOption,
+  upsertCountryExposureAlias,
+  upsertRegionExposureAlias,
   createSectorCatalogOption,
   updateSectorCatalogOption,
   deleteSectorCatalogOption,
   createIndustryCatalogOption,
   updateIndustryCatalogOption,
   deleteIndustryCatalogOption,
+  createMarketRegimeCatalogOption,
+  updateMarketRegimeCatalogOption,
+  deleteMarketRegimeCatalogOption,
   fetchInstruments, createInstrument, updateInstrument, deleteInstrument,
   fetchPlatforms, createPlatform, updatePlatform, deletePlatform,
   fetchInstrumentExposures, createInstrumentExposure, updateInstrumentExposure, deleteInstrumentExposure,
   refreshInstrumentPrices,
+  refreshCompoundExposures,
   addManualInstrumentPrice,
 } from '../services/investmentCatalogService';
 
@@ -32,6 +39,7 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
   const [regions, setRegions]           = useState<CatalogOption[]>([]);
   const [sectors, setSectors]           = useState<CatalogOption[]>([]);
   const [industries, setIndustries]     = useState<CatalogOption[]>([]);
+  const [marketRegimes, setMarketRegimes] = useState<CatalogOption[]>([]);
   const [instruments, setInstruments]   = useState<InvestmentInstrument[]>([]);
   const [platforms, setPlatforms]       = useState<InvestmentPlatform[]>([]);
   const [exposuresByInstrument, setExposuresByInstrument] = useState<Record<number, InvestmentInstrumentExposure[]>>({});
@@ -47,15 +55,17 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
       fetchRegionCatalog(token),
       fetchSectorCatalog(token),
       fetchIndustryCatalog(token),
+      fetchMarketRegimeCatalog(token),
       fetchInstruments(token),
       fetchPlatforms(token),
     ])
-      .then(([t, c, r, s, d, i, p]) => {
+      .then(([t, c, r, s, d, m, i, p]) => {
         setTypes(t);
         setCountries(c);
         setRegions(r);
         setSectors(s);
         setIndustries(d);
+        setMarketRegimes(m);
         setInstruments(i);
         setPlatforms(p);
       })
@@ -74,16 +84,18 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
   const clearError = useCallback(() => setError(null), []);
 
   const reloadClassificationCatalogs = useCallback(async () => {
-    const [c, r, s, d] = await Promise.all([
+    const [c, r, s, d, m] = await Promise.all([
       fetchCountryCatalog(token),
       fetchRegionCatalog(token),
       fetchSectorCatalog(token),
       fetchIndustryCatalog(token),
+      fetchMarketRegimeCatalog(token),
     ]);
     setCountries(c);
     setRegions(r);
     setSectors(s);
     setIndustries(d);
+    setMarketRegimes(m);
   }, [token]);
 
   // ── Instruments ──────────────────────────────────────────────────────────────
@@ -256,11 +268,53 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     await reloadClassificationCatalogs();
   }, [token, reloadClassificationCatalogs]);
 
+  const addMarketRegime = useCallback(async (payload: Omit<CatalogOption, 'id'>) => {
+    const created = await createMarketRegimeCatalogOption(token, payload);
+    await reloadClassificationCatalogs();
+    return created;
+  }, [token, reloadClassificationCatalogs]);
+
+  const editMarketRegime = useCallback(async (id: number, payload: Omit<CatalogOption, 'id'>) => {
+    const updated = await updateMarketRegimeCatalogOption(token, id, payload);
+    await reloadClassificationCatalogs();
+    return updated;
+  }, [token, reloadClassificationCatalogs]);
+
+  const removeMarketRegime = useCallback(async (id: number) => {
+    await deleteMarketRegimeCatalogOption(token, id);
+    await reloadClassificationCatalogs();
+  }, [token, reloadClassificationCatalogs]);
+
+  const mapCountryExposureAlias = useCallback(async (sourceName: string, countryId: number) => {
+    try {
+      setError(null);
+      await upsertCountryExposureAlias(token, sourceName, countryId);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        onUnauthorized?.('Session expired or invalid token. Please login again.');
+      }
+      throw err;
+    }
+  }, [token, onUnauthorized]);
+
+  const mapRegionExposureAlias = useCallback(async (sourceName: string, regionId: number) => {
+    try {
+      setError(null);
+      await upsertRegionExposureAlias(token, sourceName, regionId);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        onUnauthorized?.('Session expired or invalid token. Please login again.');
+      }
+      throw err;
+    }
+  }, [token, onUnauthorized]);
+
   return {
-    types, countries, regions, sectors, industries, instruments, platforms,
+    types, countries, regions, sectors, industries, marketRegimes, instruments, platforms,
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
     refreshPrices,
+    refreshExposures,
     addManualPrice,
     exposuresByInstrument,
     loadInstrumentExposures,
@@ -272,5 +326,8 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     addRegion, editRegion, removeRegion,
     addSector, editSector, removeSector,
     addIndustry, editIndustry, removeIndustry,
+    addMarketRegime, editMarketRegime, removeMarketRegime,
+    mapCountryExposureAlias,
+    mapRegionExposureAlias,
   };
 }
