@@ -53,6 +53,9 @@ public class InvestmentInstrumentDTO {
     @Size(max = 500, message = "scraperUrl max length is 500")
     private String scraperUrl;
 
+    @Size(max = 500, message = "finectUrl max length is 500")
+    private String finectUrl;
+
     private Long countryId;
 
     @Size(min = 2, max = 2, message = "countryCode must be exactly 2 letters")

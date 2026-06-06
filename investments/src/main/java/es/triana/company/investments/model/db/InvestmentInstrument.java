@@ -56,6 +56,9 @@ public class InvestmentInstrument {
     @Column(name = "scraper_url", length = 500)
     private String scraperUrl;
 
+    @Column(name = "finect_url", length = 500)
+    private String finectUrl;
+
     @Column(name = "country_id")
     private Long countryId;
 
