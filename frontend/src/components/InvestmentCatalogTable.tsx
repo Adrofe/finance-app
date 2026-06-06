@@ -36,6 +36,7 @@ const EMPTY_INSTRUMENT = {
   lastPriceSource: '',
   lastPriceAt: '',
   scraperUrl: '',
+  finectUrl: '',
   countryId: '',
   regionId: '',
   sectorId: '',
@@ -262,6 +263,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPriceSource: i.lastPriceSource ?? '',
         lastPriceAt: i.lastPriceAt ? i.lastPriceAt.slice(0, 16) : '',
         scraperUrl: i.scraperUrl ?? '',
+        finectUrl: i.finectUrl ?? '',
         countryId: i.countryId != null ? String(i.countryId) : '',
         regionId: i.regionId != null ? String(i.regionId) : '',
         sectorId: i.sectorId != null ? String(i.sectorId) : '',
@@ -335,6 +337,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPriceSource: instrForm.lastPriceSource.trim() || undefined,
         lastPriceAt: instrForm.lastPriceAt || undefined,
         scraperUrl: instrForm.scraperUrl.trim() || undefined,
+        finectUrl: instrForm.finectUrl.trim() || undefined,
         countryId: supportsExposureEditing && exposureMode === 'COMPOUND'
           ? undefined
           : (instrForm.countryId ? Number(instrForm.countryId) : undefined),
@@ -966,13 +969,23 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 />
               </div>
               <div className="modal-row">
-                <label>Scraper URL</label>
+                <label>Price scraper URL</label>
                 <input
                   type="url"
                   maxLength={500}
                   placeholder="https://..."
                   value={instrForm.scraperUrl}
                   onChange={e => onInstrChange('scraperUrl', e.target.value)}
+                />
+              </div>
+              <div className="modal-row">
+                <label>Finect URL</label>
+                <input
+                  type="url"
+                  maxLength={500}
+                  placeholder="https://..."
+                  value={instrForm.finectUrl}
+                  onChange={e => onInstrChange('finectUrl', e.target.value)}
                 />
               </div>
               {supportsExposureEditing && (
@@ -1321,13 +1334,14 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 <th className="ict-th ict-th--right">Last price</th>
                 <th className="ict-th">Source</th>
                 <th className="ict-th">Price date</th>
-                <th className="ict-th">Scraper</th>
+                <th className="ict-th">Price URL</th>
+                <th className="ict-th">Finect URL</th>
                 <th className="ict-th ict-th--actions" aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
               {filteredInstruments.length === 0 && (
-                <tr><td colSpan={15} className="ict-empty">
+                <tr><td colSpan={16} className="ict-empty">
                   {instruments.length === 0
                     ? 'No hay activos. Añade uno para empezar.'
                     : 'Ningún activo coincide con la búsqueda.'}
@@ -1367,6 +1381,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                     <td className="ict-td">
                       {instr.scraperUrl ? (
                         <a className="ict-scraper-link" href={instr.scraperUrl} target="_blank" rel="noreferrer">🔗 URL</a>
+                      ) : (
+                        <span className="ict-muted">—</span>
+                      )}
+                    </td>
+                    <td className="ict-td">
+                      {instr.finectUrl ? (
+                        <a className="ict-scraper-link" href={instr.finectUrl} target="_blank" rel="noreferrer">🔗 Finect</a>
                       ) : (
                         <span className="ict-muted">—</span>
                       )}

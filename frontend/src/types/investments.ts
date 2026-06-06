@@ -26,6 +26,7 @@ export type InvestmentInstrument = {
   lastPriceSource?: string;
   lastPriceAt?: string;
   scraperUrl?: string;
+  finectUrl?: string;
   countryId?: number;
   countryCode?: string;
   countryName?: string;
