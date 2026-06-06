@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import es.triana.company.investments.model.api.ApiResponse;
 import es.triana.company.investments.model.api.CatalogOptionDTO;
+import es.triana.company.investments.model.api.ExposureAliasRequestDTO;
 import es.triana.company.investments.model.api.InvestmentInstrumentDTO;
 import es.triana.company.investments.model.api.InvestmentInstrumentExposureDTO;
 import es.triana.company.investments.model.api.InvestmentPlatformDTO;
@@ -86,6 +87,18 @@ public class InvestmentCatalogController {
         return ResponseEntity.ok(new ApiResponse<>(200, "Region deleted successfully", null));
     }
 
+    @PostMapping("/countries/aliases")
+    public ResponseEntity<ApiResponse<Void>> upsertCountryAlias(@Valid @RequestBody ExposureAliasRequestDTO request) {
+        investmentCatalogService.upsertCountryAlias(request);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Country alias saved successfully", null));
+    }
+
+    @PostMapping("/regions/aliases")
+    public ResponseEntity<ApiResponse<Void>> upsertRegionAlias(@Valid @RequestBody ExposureAliasRequestDTO request) {
+        investmentCatalogService.upsertRegionAlias(request);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Region alias saved successfully", null));
+    }
+
     @GetMapping("/sectors")
     public ResponseEntity<ApiResponse<List<CatalogOptionDTO>>> getSectors() {
         List<CatalogOptionDTO> data = investmentCatalogService.getAllSectors();
@@ -132,6 +145,30 @@ public class InvestmentCatalogController {
     public ResponseEntity<ApiResponse<Void>> deleteIndustry(@PathVariable("id") Long id) {
         investmentCatalogService.deleteIndustry(id);
         return ResponseEntity.ok(new ApiResponse<>(200, "Industry deleted successfully", null));
+    }
+
+    @GetMapping("/market-regimes")
+    public ResponseEntity<ApiResponse<List<CatalogOptionDTO>>> getMarketRegimes() {
+        List<CatalogOptionDTO> data = investmentCatalogService.getAllMarketRegimes();
+        return ResponseEntity.ok(new ApiResponse<>(200, "Market regime catalog retrieved successfully", data));
+    }
+
+    @PostMapping("/market-regimes")
+    public ResponseEntity<ApiResponse<CatalogOptionDTO>> createMarketRegime(@RequestBody CatalogOptionDTO request) {
+        CatalogOptionDTO data = investmentCatalogService.createMarketRegime(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(201, "Market regime created successfully", data));
+    }
+
+    @PutMapping("/market-regimes/{id}")
+    public ResponseEntity<ApiResponse<CatalogOptionDTO>> updateMarketRegime(@PathVariable("id") Long id, @RequestBody CatalogOptionDTO request) {
+        CatalogOptionDTO data = investmentCatalogService.updateMarketRegime(id, request);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Market regime updated successfully", data));
+    }
+
+    @DeleteMapping("/market-regimes/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteMarketRegime(@PathVariable("id") Long id) {
+        investmentCatalogService.deleteMarketRegime(id);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Market regime deleted successfully", null));
     }
 
     @GetMapping("/instruments/{id}/exposures")
