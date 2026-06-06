@@ -82,16 +82,20 @@ const SortIcon = ({ col, active, dir }: { col: SortColKey; active: SortColKey; d
 
 export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized }) => {
   const {
-    types, countries, regions, sectors, industries, instruments, platforms,
+    types, countries, regions, sectors, industries, marketRegimes, instruments, platforms,
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
     refreshPrices,
+    refreshExposures,
     addManualPrice,
     addPlatform, editPlatform, removePlatform,
     addCountry, editCountry, removeCountry,
     addRegion, editRegion, removeRegion,
     addSector, editSector, removeSector,
     addIndustry, editIndustry, removeIndustry,
+    addMarketRegime, editMarketRegime, removeMarketRegime,
+    mapCountryExposureAlias,
+    mapRegionExposureAlias,
     exposuresByInstrument,
     loadInstrumentExposures,
     addInstrumentExposure,
@@ -153,8 +157,9 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       case 'regions': return regions;
       case 'sectors': return sectors;
       case 'industries': return industries;
+      case 'marketRegimes': return marketRegimes;
     }
-  }, [classificationKind, countries, regions, sectors, industries]);
+  }, [classificationKind, countries, regions, sectors, industries, marketRegimes]);
 
   const classificationLabel = useMemo(() => {
     switch (classificationKind) {
@@ -162,6 +167,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       case 'regions': return 'Region';
       case 'sectors': return 'Sector';
       case 'industries': return 'Industry';
+      case 'marketRegimes': return 'Market regime';
     }
   }, [classificationKind]);
 
@@ -242,6 +248,33 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     else if (section === 'platforms') setPlatForm({ ...EMPTY_PLATFORM });
     else setClassForm({ ...EMPTY_CLASSIFICATION });
     setShowForm(true);
+  };
+
+  const openClassificationCreate = (kind: 'regions' | 'countries' | 'marketRegimes', presetName?: string) => {
+    setSection('classifications');
+    setClassificationKind(kind);
+    setShowManualPrice(false);
+    setShowExposureModal(false);
+    setManualError(null);
+    setEditingId(null);
+    setFormError(null);
+    setClassForm({
+      code: presetName ? presetName.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') : '',
+      name: presetName ?? '',
+    });
+    setShowForm(true);
+  };
+
+  const openRegionCreate = (presetName?: string) => {
+    openClassificationCreate('regions', presetName);
+  };
+
+  const openCountryCreate = (presetName?: string) => {
+    openClassificationCreate('countries', presetName);
+  };
+
+  const openMarketRegimeCreate = (presetName?: string) => {
+    openClassificationCreate('marketRegimes', presetName);
   };
 
   const openEdit = async (item: InvestmentInstrument | InvestmentPlatform | CatalogOption) => {
@@ -401,6 +434,9 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       } else if (classificationKind === 'sectors') {
         if (editingId) await editSector(editingId, payload);
         else await addSector(payload);
+      } else if (classificationKind === 'marketRegimes') {
+        if (editingId) await editMarketRegime(editingId, payload);
+        else await addMarketRegime(payload);
       } else {
         if (editingId) await editIndustry(editingId, payload);
         else await addIndustry(payload);
@@ -430,8 +466,9 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       case 'REGION': return regions;
       case 'SECTOR': return sectors;
       case 'INDUSTRY': return industries;
+      case 'MARKET_REGIME': return marketRegimes;
     }
-  }, [countries, exposureForm.dimension, industries, regions, sectors]);
+  }, [countries, exposureForm.dimension, industries, marketRegimes, regions, sectors]);
 
   const exposureTotalWeight = useMemo(
     () => instrumentExposures.reduce((sum, item) => sum + Number(item.weightPct || 0), 0),
@@ -449,6 +486,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         regionId: exposureForm.dimension === 'REGION' && exposureForm.regionId ? Number(exposureForm.regionId) : undefined,
         sectorId: exposureForm.dimension === 'SECTOR' && exposureForm.sectorId ? Number(exposureForm.sectorId) : undefined,
         industryId: exposureForm.dimension === 'INDUSTRY' && exposureForm.industryId ? Number(exposureForm.industryId) : undefined,
+        marketRegimeId: exposureForm.dimension === 'MARKET_REGIME' && exposureForm.marketRegimeId ? Number(exposureForm.marketRegimeId) : undefined,
         weightPct: Number(exposureForm.weightPct),
       } satisfies Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>;
       if (exposureEditingId) await editInstrumentExposure(editingId, exposureEditingId, payload);
@@ -471,6 +509,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       regionId: item.regionId != null ? String(item.regionId) : '',
       sectorId: item.sectorId != null ? String(item.sectorId) : '',
       industryId: item.industryId != null ? String(item.industryId) : '',
+      marketRegimeId: item.marketRegimeId != null ? String(item.marketRegimeId) : '',
       weightPct: String(item.weightPct),
     });
   };
@@ -509,6 +548,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       else if (classificationKind === 'countries') await removeCountry(confirmDelete.id);
       else if (classificationKind === 'regions') await removeRegion(confirmDelete.id);
       else if (classificationKind === 'sectors') await removeSector(confirmDelete.id);
+      else if (classificationKind === 'marketRegimes') await removeMarketRegime(confirmDelete.id);
       else await removeIndustry(confirmDelete.id);
       setConfirmDelete(null);
     } catch (err: unknown) {
@@ -1123,13 +1163,14 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                     <option value="REGION">Region</option>
                     <option value="COUNTRY">Country</option>
                     <option value="INDUSTRY">Industry</option>
+                    <option value="MARKET_REGIME">Market regime</option>
                   </select>
                 </div>
                 <div className="modal-row">
-                  <label>{exposureForm.dimension === 'COUNTRY' ? 'Country' : exposureForm.dimension === 'REGION' ? 'Region' : exposureForm.dimension === 'SECTOR' ? 'Sector' : 'Industry'}</label>
+                  <label>{exposureForm.dimension === 'COUNTRY' ? 'Country' : exposureForm.dimension === 'REGION' ? 'Region' : exposureForm.dimension === 'SECTOR' ? 'Sector' : exposureForm.dimension === 'INDUSTRY' ? 'Industry' : 'Market regime'}</label>
                   <select
                     className="modal-select"
-                    value={exposureForm.dimension === 'COUNTRY' ? exposureForm.countryId : exposureForm.dimension === 'REGION' ? exposureForm.regionId : exposureForm.dimension === 'SECTOR' ? exposureForm.sectorId : exposureForm.industryId}
+                    value={exposureForm.dimension === 'COUNTRY' ? exposureForm.countryId : exposureForm.dimension === 'REGION' ? exposureForm.regionId : exposureForm.dimension === 'SECTOR' ? exposureForm.sectorId : exposureForm.dimension === 'INDUSTRY' ? exposureForm.industryId : exposureForm.marketRegimeId}
                     onChange={e => {
                       const next = e.target.value;
                       setExposureForm(current => ({
@@ -1138,6 +1179,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                         regionId: exposureForm.dimension === 'REGION' ? next : '',
                         sectorId: exposureForm.dimension === 'SECTOR' ? next : '',
                         industryId: exposureForm.dimension === 'INDUSTRY' ? next : '',
+                        marketRegimeId: exposureForm.dimension === 'MARKET_REGIME' ? next : '',
                       }));
                     }}
                   >
@@ -1244,7 +1286,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 <label>Code *</label>
                 <input
                   required
-                  maxLength={classificationKind === 'countries' ? 2 : classificationKind === 'regions' ? 40 : classificationKind === 'sectors' ? 60 : 80}
+                  maxLength={classificationKind === 'countries' ? 2 : classificationKind === 'regions' ? 40 : classificationKind === 'sectors' ? 60 : classificationKind === 'industries' ? 80 : 80}
                   placeholder={`e.g. ${classificationKind === 'countries' ? 'US' : 'TECH'}`}
                   value={classForm.code}
                   onChange={e => onClassChange('code', e.target.value.toUpperCase())}
@@ -1254,7 +1296,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 <label>Name *</label>
                 <input
                   required
-                  maxLength={classificationKind === 'countries' ? 120 : classificationKind === 'regions' ? 120 : classificationKind === 'sectors' ? 140 : 180}
+                  maxLength={classificationKind === 'countries' ? 120 : classificationKind === 'regions' ? 120 : classificationKind === 'sectors' ? 140 : classificationKind === 'industries' ? 180 : 160}
                   placeholder={`Display name for ${classificationLabel.toLowerCase()}`}
                   value={classForm.name}
                   onChange={e => onClassChange('name', e.target.value)}
@@ -1470,6 +1512,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
             <button type="button" className={`ict-toggle-btn${classificationKind === 'regions' ? ' active' : ''}`} onClick={() => setClassificationKind('regions')}>Regions</button>
             <button type="button" className={`ict-toggle-btn${classificationKind === 'sectors' ? ' active' : ''}`} onClick={() => setClassificationKind('sectors')}>Sectors</button>
             <button type="button" className={`ict-toggle-btn${classificationKind === 'industries' ? ' active' : ''}`} onClick={() => setClassificationKind('industries')}>Industries</button>
+            <button type="button" className={`ict-toggle-btn${classificationKind === 'marketRegimes' ? ' active' : ''}`} onClick={() => setClassificationKind('marketRegimes')}>Market Regimes</button>
           </div>
           <div className="ict-container">
             <table className="ict-table">
