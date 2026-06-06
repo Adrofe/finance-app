@@ -30,7 +30,8 @@ public class InvestmentInstrumentExposure {
         COUNTRY,
         REGION,
         SECTOR,
-        INDUSTRY
+        INDUSTRY,
+        MARKET_REGIME
     }
 
     @Id
@@ -60,6 +61,10 @@ public class InvestmentInstrumentExposure {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "industry_id")
     private InvestmentIndustryCatalog industry;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "market_regime_id")
+    private InvestmentMarketRegimeCatalog marketRegime;
 
     @Column(name = "weight_pct", nullable = false, precision = 7, scale = 4)
     private BigDecimal weightPct;

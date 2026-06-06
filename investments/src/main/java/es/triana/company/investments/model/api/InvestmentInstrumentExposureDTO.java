@@ -28,6 +28,7 @@ public class InvestmentInstrumentExposureDTO {
     private Long regionId;
     private Long sectorId;
     private Long industryId;
+    private Long marketRegimeId;
 
     private String bucketCode;
     private String bucketName;
