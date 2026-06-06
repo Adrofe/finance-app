@@ -3,6 +3,8 @@ package es.triana.company.investments.service;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.text.Normalizer;
+import java.time.LocalDateTime;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -12,22 +14,29 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import es.triana.company.investments.model.api.CatalogOptionDTO;
+import es.triana.company.investments.model.api.ExposureAliasRequestDTO;
 import es.triana.company.investments.model.api.InvestmentInstrumentDTO;
 import es.triana.company.investments.model.api.InvestmentInstrumentExposureDTO;
 import es.triana.company.investments.model.api.InvestmentPlatformDTO;
+import es.triana.company.investments.model.db.InvestmentCountryAlias;
 import es.triana.company.investments.model.db.InvestmentCountryCatalog;
 import es.triana.company.investments.model.db.InvestmentIndustryCatalog;
 import es.triana.company.investments.model.db.InvestmentInstrument;
 import es.triana.company.investments.model.db.InvestmentPlatform;
+import es.triana.company.investments.model.db.InvestmentMarketRegimeCatalog;
+import es.triana.company.investments.model.db.InvestmentRegionAlias;
 import es.triana.company.investments.model.db.InvestmentRegionCatalog;
 import es.triana.company.investments.model.db.InvestmentSectorCatalog;
 import es.triana.company.investments.model.db.InvestmentInstrumentExposure;
 import es.triana.company.investments.model.db.InvestmentTypeCatalog;
+import es.triana.company.investments.repository.InvestmentCountryAliasRepository;
 import es.triana.company.investments.repository.InvestmentCountryCatalogRepository;
 import es.triana.company.investments.repository.InvestmentIndustryCatalogRepository;
 import es.triana.company.investments.repository.InvestmentInstrumentExposureRepository;
 import es.triana.company.investments.repository.InvestmentInstrumentRepository;
+import es.triana.company.investments.repository.InvestmentMarketRegimeCatalogRepository;
 import es.triana.company.investments.repository.InvestmentPlatformRepository;
+import es.triana.company.investments.repository.InvestmentRegionAliasRepository;
 import es.triana.company.investments.repository.InvestmentRegionCatalogRepository;
 import es.triana.company.investments.repository.InvestmentSectorCatalogRepository;
 import es.triana.company.investments.repository.InvestmentTypeCatalogRepository;
@@ -42,27 +51,36 @@ public class InvestmentCatalogService {
     private final InvestmentInstrumentRepository investmentInstrumentRepository;
     private final InvestmentPlatformRepository investmentPlatformRepository;
     private final InvestmentTypeCatalogRepository investmentTypeCatalogRepository;
+    private final InvestmentCountryAliasRepository investmentCountryAliasRepository;
+    private final InvestmentRegionAliasRepository investmentRegionAliasRepository;
     private final InvestmentCountryCatalogRepository investmentCountryCatalogRepository;
     private final InvestmentRegionCatalogRepository investmentRegionCatalogRepository;
     private final InvestmentSectorCatalogRepository investmentSectorCatalogRepository;
     private final InvestmentIndustryCatalogRepository investmentIndustryCatalogRepository;
+    private final InvestmentMarketRegimeCatalogRepository investmentMarketRegimeCatalogRepository;
     private final InvestmentInstrumentExposureRepository investmentInstrumentExposureRepository;
 
     public InvestmentCatalogService(InvestmentInstrumentRepository investmentInstrumentRepository,
             InvestmentPlatformRepository investmentPlatformRepository,
             InvestmentTypeCatalogRepository investmentTypeCatalogRepository,
+            InvestmentCountryAliasRepository investmentCountryAliasRepository,
+            InvestmentRegionAliasRepository investmentRegionAliasRepository,
             InvestmentCountryCatalogRepository investmentCountryCatalogRepository,
             InvestmentRegionCatalogRepository investmentRegionCatalogRepository,
             InvestmentSectorCatalogRepository investmentSectorCatalogRepository,
             InvestmentIndustryCatalogRepository investmentIndustryCatalogRepository,
+            InvestmentMarketRegimeCatalogRepository investmentMarketRegimeCatalogRepository,
             InvestmentInstrumentExposureRepository investmentInstrumentExposureRepository) {
         this.investmentInstrumentRepository = investmentInstrumentRepository;
         this.investmentPlatformRepository = investmentPlatformRepository;
         this.investmentTypeCatalogRepository = investmentTypeCatalogRepository;
+        this.investmentCountryAliasRepository = investmentCountryAliasRepository;
+        this.investmentRegionAliasRepository = investmentRegionAliasRepository;
         this.investmentCountryCatalogRepository = investmentCountryCatalogRepository;
         this.investmentRegionCatalogRepository = investmentRegionCatalogRepository;
         this.investmentSectorCatalogRepository = investmentSectorCatalogRepository;
         this.investmentIndustryCatalogRepository = investmentIndustryCatalogRepository;
+        this.investmentMarketRegimeCatalogRepository = investmentMarketRegimeCatalogRepository;
         this.investmentInstrumentExposureRepository = investmentInstrumentExposureRepository;
     }
 
@@ -102,6 +120,12 @@ public class InvestmentCatalogService {
 
     public List<CatalogOptionDTO> getAllIndustries() {
         return investmentIndustryCatalogRepository.findAllByOrderByNameAsc().stream()
+                .map(this::toCatalogOption)
+                .toList();
+    }
+
+    public List<CatalogOptionDTO> getAllMarketRegimes() {
+        return investmentMarketRegimeCatalogRepository.findAllByOrderByNameAsc().stream()
                 .map(this::toCatalogOption)
                 .toList();
     }
@@ -168,6 +192,40 @@ public class InvestmentCatalogService {
         investmentRegionCatalogRepository.deleteById(id);
     }
 
+    public void upsertCountryAlias(ExposureAliasRequestDTO request) {
+        String sourceName = trimRequired(request.getSourceName(), "sourceName");
+        Long countryId = validateCatalogId(request.getTargetId(), investmentCountryCatalogRepository::existsById, "targetId");
+        String normalizedSource = normalizeAlias(sourceName);
+        LocalDateTime now = LocalDateTime.now();
+
+        InvestmentCountryAlias alias = investmentCountryAliasRepository.findByNormalizedSourceName(normalizedSource)
+                .orElseGet(() -> InvestmentCountryAlias.builder()
+                        .normalizedSourceName(normalizedSource)
+                        .createdAt(now)
+                        .build());
+        alias.setSourceName(sourceName);
+        alias.setCountry(findCountry(countryId));
+        alias.setUpdatedAt(now);
+        investmentCountryAliasRepository.save(alias);
+    }
+
+    public void upsertRegionAlias(ExposureAliasRequestDTO request) {
+        String sourceName = trimRequired(request.getSourceName(), "sourceName");
+        Long regionId = validateCatalogId(request.getTargetId(), investmentRegionCatalogRepository::existsById, "targetId");
+        String normalizedSource = normalizeAlias(sourceName);
+        LocalDateTime now = LocalDateTime.now();
+
+        InvestmentRegionAlias alias = investmentRegionAliasRepository.findByNormalizedSourceName(normalizedSource)
+                .orElseGet(() -> InvestmentRegionAlias.builder()
+                        .normalizedSourceName(normalizedSource)
+                        .createdAt(now)
+                        .build());
+        alias.setSourceName(sourceName);
+        alias.setRegion(findRegion(regionId));
+        alias.setUpdatedAt(now);
+        investmentRegionAliasRepository.save(alias);
+    }
+
     public CatalogOptionDTO createSector(CatalogOptionDTO request) {
         String code = normalizeCodeWithLength(request.getCode(), "sector code", 60);
         String name = trimRequired(request.getName(), "sector name");
@@ -230,9 +288,40 @@ public class InvestmentCatalogService {
         investmentIndustryCatalogRepository.deleteById(id);
     }
 
+    public CatalogOptionDTO createMarketRegime(CatalogOptionDTO request) {
+        String code = normalizeCodeWithLength(request.getCode(), "market regime code", 80);
+        String name = trimRequired(request.getName(), "market regime name");
+        if (investmentMarketRegimeCatalogRepository.existsByCodeIgnoreCase(code)) {
+            throw new InvestmentValidationException("Market regime code already exists: " + code);
+        }
+        InvestmentMarketRegimeCatalog saved = investmentMarketRegimeCatalogRepository.save(
+                InvestmentMarketRegimeCatalog.builder().code(code).name(name).build());
+        return toCatalogOption(saved);
+    }
+
+    public CatalogOptionDTO updateMarketRegime(Long id, CatalogOptionDTO request) {
+        InvestmentMarketRegimeCatalog entity = findMarketRegime(id);
+        String code = normalizeCodeWithLength(request.getCode(), "market regime code", 80);
+        String name = trimRequired(request.getName(), "market regime name");
+        if (investmentMarketRegimeCatalogRepository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
+            throw new InvestmentValidationException("Market regime code already exists: " + code);
+        }
+        entity.setCode(code);
+        entity.setName(name);
+        return toCatalogOption(investmentMarketRegimeCatalogRepository.save(entity));
+    }
+
+    public void deleteMarketRegime(Long id) {
+        findMarketRegime(id);
+        if (investmentInstrumentExposureRepository.existsByMarketRegimeId(id)) {
+            throw new InvestmentValidationException("Market regime " + id + " cannot be deleted because it is referenced by exposures.");
+        }
+        investmentMarketRegimeCatalogRepository.deleteById(id);
+    }
+
     public List<InvestmentInstrumentExposureDTO> getExposuresByInstrument(Long instrumentId) {
         findInstrument(instrumentId);
-        return investmentInstrumentExposureRepository.findAllByInstrumentIdOrderByDimensionAscIdAsc(instrumentId)
+        return investmentInstrumentExposureRepository.findAllWithBucketsByInstrumentId(instrumentId)
                 .stream()
                 .map(this::toExposureDto)
                 .toList();
@@ -485,6 +574,14 @@ public class InvestmentCatalogService {
                 .orElseThrow(() -> new CatalogNotFoundException("Industry not found with id: " + id));
     }
 
+    private InvestmentMarketRegimeCatalog findMarketRegime(Long id) {
+        if (id == null || id <= 0) {
+            throw new InvestmentValidationException("market regime id is required and must be > 0");
+        }
+        return investmentMarketRegimeCatalogRepository.findById(id)
+                .orElseThrow(() -> new CatalogNotFoundException("Market regime not found with id: " + id));
+    }
+
     private void validateExposureRequest(Long instrumentId, InvestmentInstrumentExposureDTO request) {
         if (request == null) {
             throw new InvestmentValidationException("exposure request is required");
@@ -518,6 +615,7 @@ public class InvestmentCatalogService {
             case REGION -> exposure.setRegion(findRegion(resolveExposureBucketId(request)));
             case SECTOR -> exposure.setSector(findSector(resolveExposureBucketId(request)));
             case INDUSTRY -> exposure.setIndustry(findIndustry(resolveExposureBucketId(request)));
+            case MARKET_REGIME -> exposure.setMarketRegime(findMarketRegime(resolveExposureBucketId(request)));
         }
     }
 
@@ -528,6 +626,7 @@ public class InvestmentCatalogService {
             case REGION -> toCatalogOption(findRegion(bucketId));
             case SECTOR -> toCatalogOption(findSector(bucketId));
             case INDUSTRY -> toCatalogOption(findIndustry(bucketId));
+            case MARKET_REGIME -> toCatalogOption(findMarketRegime(bucketId));
         };
     }
 
@@ -537,6 +636,7 @@ public class InvestmentCatalogService {
             case REGION -> request.getRegionId();
             case SECTOR -> request.getSectorId();
             case INDUSTRY -> request.getIndustryId();
+            case MARKET_REGIME -> request.getMarketRegimeId();
         };
     }
 
@@ -546,6 +646,7 @@ public class InvestmentCatalogService {
             case REGION -> exposure.getRegion() == null ? null : toCatalogOption(exposure.getRegion());
             case SECTOR -> exposure.getSector() == null ? null : toCatalogOption(exposure.getSector());
             case INDUSTRY -> exposure.getIndustry() == null ? null : toCatalogOption(exposure.getIndustry());
+            case MARKET_REGIME -> exposure.getMarketRegime() == null ? null : toCatalogOption(exposure.getMarketRegime());
         };
 
         return InvestmentInstrumentExposureDTO.builder()
@@ -556,6 +657,7 @@ public class InvestmentCatalogService {
                 .regionId(exposure.getRegion() == null ? null : exposure.getRegion().getId())
                 .sectorId(exposure.getSector() == null ? null : exposure.getSector().getId())
                 .industryId(exposure.getIndustry() == null ? null : exposure.getIndustry().getId())
+                .marketRegimeId(exposure.getMarketRegime() == null ? null : exposure.getMarketRegime().getId())
                 .bucketCode(bucket == null ? null : bucket.getCode())
                 .bucketName(bucket == null ? null : bucket.getName())
                 .weightPct(exposure.getWeightPct())
@@ -649,6 +751,14 @@ public class InvestmentCatalogService {
                 .build();
     }
 
+    private CatalogOptionDTO toCatalogOption(InvestmentMarketRegimeCatalog marketRegime) {
+        return CatalogOptionDTO.builder()
+                .id(marketRegime.getId())
+                .code(marketRegime.getCode())
+                .name(marketRegime.getName())
+                .build();
+    }
+
     private Map<Long, CatalogOptionDTO> loadCountryCatalogMap() {
         return toCatalogMap(investmentCountryCatalogRepository.findAllByOrderByNameAsc(), this::toCatalogOption);
     }
@@ -681,6 +791,15 @@ public class InvestmentCatalogService {
 
     private String normalizeCode(String code) {
         return trimRequired(code, "code").toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeAlias(String value) {
+        return Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private String normalizeSymbol(String symbol) {
