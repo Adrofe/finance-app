@@ -7,6 +7,7 @@ import type {
   InvestmentType,
   InvestmentInstrumentExposure,
   PriceRefreshResult,
+  ExposureRefreshResult,
   PriceUpdateDraft,
 } from '../types/investments';
 
@@ -73,6 +74,14 @@ export async function updateRegionCatalogOption(token: string, id: number, paylo
 
 export async function deleteRegionCatalogOption(token: string, id: number): Promise<void> {
   await axios.delete(`${BASE}/regions/${id}`, { headers: headers(token) });
+}
+
+export async function upsertCountryExposureAlias(token: string, sourceName: string, targetId: number): Promise<void> {
+  await axios.post(`${BASE}/countries/aliases`, { sourceName, targetId }, { headers: headers(token) });
+}
+
+export async function upsertRegionExposureAlias(token: string, sourceName: string, targetId: number): Promise<void> {
+  await axios.post(`${BASE}/regions/aliases`, { sourceName, targetId }, { headers: headers(token) });
 }
 
 export async function createSectorCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
@@ -180,6 +189,11 @@ export async function deletePlatform(token: string, id: number): Promise<void> {
 
 export async function refreshInstrumentPrices(token: string): Promise<PriceRefreshResult> {
   const res = await axios.post<ApiResponse<PriceRefreshResult>>(`${INVESTMENTS_BASE}/prices/refresh/auto`, undefined, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function refreshCompoundExposures(token: string): Promise<ExposureRefreshResult> {
+  const res = await axios.post<ApiResponse<ExposureRefreshResult>>(`${INVESTMENTS_BASE}/exposures/refresh`, undefined, { headers: headers(token) });
   return res.data.data;
 }
 

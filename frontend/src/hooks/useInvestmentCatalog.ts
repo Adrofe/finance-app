@@ -147,6 +147,18 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     }
   }, [token, onUnauthorized]);
 
+  const refreshExposures = useCallback(async (): Promise<ExposureRefreshResult> => {
+    try {
+      setError(null);
+      return await refreshCompoundExposures(token);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        onUnauthorized?.('Session expired or invalid token. Please login again.');
+      }
+      throw err;
+    }
+  }, [token, onUnauthorized]);
+
   const loadInstrumentExposures = useCallback(async (instrumentId: number) => {
     const exposures = await fetchInstrumentExposures(token, instrumentId);
     setExposuresByInstrument(prev => ({ ...prev, [instrumentId]: exposures }));

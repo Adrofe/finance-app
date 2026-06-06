@@ -6,7 +6,7 @@ import {
   INVESTMENT_MARKET_OPTIONS,
   INVESTMENT_PRICE_SOURCE_OPTIONS,
 } from '../constants/visualConfig';
-import type { CatalogOption, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType } from '../types/investments';
+import type { CatalogOption, ExposureSuggestion, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType } from '../types/investments';
 import './investment-catalog.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -122,6 +122,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [searchQuery, setSearchQuery]           = useState('');
   const [sortKey, setSortKey]                   = useState<SortColKey>('name');
   const [sortDir, setSortDir]                   = useState<'asc' | 'desc'>('asc');
+  const [regionSuggestions, setRegionSuggestions] = useState<ExposureSuggestion[]>([]);
+  const [countrySuggestions, setCountrySuggestions] = useState<ExposureSuggestion[]>([]);
+  const [marketRegimeSuggestions, setMarketRegimeSuggestions] = useState<ExposureSuggestion[]>([]);
+  const [regionSuggestionTargets, setRegionSuggestionTargets] = useState<Record<string, string>>({});
+  const [countrySuggestionTargets, setCountrySuggestionTargets] = useState<Record<string, string>>({});
+  const [suggestionCreateKind, setSuggestionCreateKind] = useState<Record<string, 'regions' | 'countries' | 'marketRegimes'>>({});
+  const [mappingSuggestionKey, setMappingSuggestionKey] = useState<string | null>(null);
 
   // ── instrument form ───────────────────────────────────────────────────────
   const [instrForm, setInstrForm] = useState({ ...EMPTY_INSTRUMENT });
@@ -590,6 +597,88 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     }
   };
 
+  const handleRefreshExposures = async () => {
+    setRefreshMessage(null);
+    setRefreshingPrices(true);
+    try {
+      const result = await refreshExposures();
+      setRegionSuggestions(result.suggestedRegions ?? []);
+      setCountrySuggestions(result.suggestedCountries ?? []);
+      setMarketRegimeSuggestions(result.suggestedMarketRegimes ?? []);
+      setRegionSuggestionTargets({});
+      setCountrySuggestionTargets({});
+      const createKinds: Record<string, 'regions' | 'countries' | 'marketRegimes'> = {};
+      (result.suggestedRegions ?? []).forEach(item => {
+        createKinds[item.name] = 'regions';
+      });
+      (result.suggestedCountries ?? []).forEach(item => {
+        createKinds[item.name] = createKinds[item.name] ?? 'countries';
+      });
+      (result.suggestedMarketRegimes ?? []).forEach(item => {
+        createKinds[item.name] = 'marketRegimes';
+      });
+      setSuggestionCreateKind(createKinds);
+      setRefreshMessage(
+        result.updatedInstruments > 0
+          ? `Compound exposures refreshed for ${result.updatedInstruments} instruments and ${result.updatedExposures} rows.`
+          : 'Refresh finished. No compound exposures were updated.'
+      );
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setRefreshMessage(e?.response?.data?.message || e?.message || 'Error refreshing compound exposures');
+    } finally {
+      setRefreshingPrices(false);
+    }
+  };
+
+  const applyRegionSuggestionMapping = async (sourceName: string) => {
+    const selectedTarget = regionSuggestionTargets[sourceName];
+    if (!selectedTarget) {
+      setRefreshMessage(`Selecciona una región destino para "${sourceName}".`);
+      return;
+    }
+    setMappingSuggestionKey(`REGION:${sourceName}`);
+    try {
+      await mapRegionExposureAlias(sourceName, Number(selectedTarget));
+      setRegionSuggestions(prev => prev.filter(item => item.name !== sourceName));
+      setRegionSuggestionTargets(prev => {
+        const next = { ...prev };
+        delete next[sourceName];
+        return next;
+      });
+      setRefreshMessage(`Alias guardado: "${sourceName}" se asociará automáticamente en próximos refresh.`);
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setRefreshMessage(eRes?.response?.data?.message || eRes?.message || `No se pudo guardar el alias para "${sourceName}".`);
+    } finally {
+      setMappingSuggestionKey(null);
+    }
+  };
+
+  const applyCountrySuggestionMapping = async (sourceName: string) => {
+    const selectedTarget = countrySuggestionTargets[sourceName];
+    if (!selectedTarget) {
+      setRefreshMessage(`Selecciona un país destino para "${sourceName}".`);
+      return;
+    }
+    setMappingSuggestionKey(`COUNTRY:${sourceName}`);
+    try {
+      await mapCountryExposureAlias(sourceName, Number(selectedTarget));
+      setCountrySuggestions(prev => prev.filter(item => item.name !== sourceName));
+      setCountrySuggestionTargets(prev => {
+        const next = { ...prev };
+        delete next[sourceName];
+        return next;
+      });
+      setRefreshMessage(`Alias guardado: "${sourceName}" se asociará automáticamente en próximos refresh.`);
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setRefreshMessage(eRes?.response?.data?.message || eRes?.message || `No se pudo guardar el alias para "${sourceName}".`);
+    } finally {
+      setMappingSuggestionKey(null);
+    }
+  };
+
   const submitManualPrice = async (e: React.FormEvent) => {
     e.preventDefault();
     setManualError(null);
@@ -750,6 +839,16 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
               {refreshingPrices ? '⏳ Actualizando…' : '↻ Refresh prices'}
             </button>
           )}
+          {section === 'instruments' && (
+            <button
+              type="button"
+              className="ict-btn-refresh"
+              onClick={handleRefreshExposures}
+              disabled={refreshingPrices}
+            >
+              {refreshingPrices ? '⏳ Actualizando…' : '↻ Refresh exposures'}
+            </button>
+          )}
           <button
             type="button"
             className={`ict-btn-add${showForm ? ' ict-btn-add--cancel' : ''}`}
@@ -778,6 +877,146 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         <div className="ict-toast-info" role="status">
           <span>{refreshMessage}</span>
           <button type="button" onClick={() => setRefreshMessage(null)}>Cerrar</button>
+        </div>
+      )}
+
+      {regionSuggestions.length > 0 && (
+        <div className="ict-toast-warning" role="status">
+          <div className="ict-toast-warning__content">
+            <strong>Regiones detectadas sin catálogo</strong>
+            <p>Puedes asociarlas a una región existente para guardar el alias en BBDD, o crear una nueva.</p>
+            <ul className="ict-suggestion-list">
+              {regionSuggestions.map(item => (
+                <li key={item.name} className="ict-suggestion-row">
+                  <span>{item.name}{item.occurrences > 1 ? ` (${item.occurrences})` : ''}</span>
+                  <select
+                    className="ict-select"
+                    value={regionSuggestionTargets[item.name] ?? ''}
+                    onChange={(e) => setRegionSuggestionTargets(prev => ({ ...prev, [item.name]: e.target.value }))}
+                  >
+                    <option value="">Asociar a región...</option>
+                    {regions.map(region => (
+                      <option key={region.id} value={region.id}>{region.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="ict-btn-mini"
+                    onClick={() => applyRegionSuggestionMapping(item.name)}
+                    disabled={mappingSuggestionKey === `REGION:${item.name}`}
+                  >
+                    {mappingSuggestionKey === `REGION:${item.name}` ? 'Guardando…' : 'Asociar'}
+                  </button>
+                  <select
+                    className="ict-select"
+                    value={suggestionCreateKind[item.name] ?? 'regions'}
+                    onChange={(e) => setSuggestionCreateKind(prev => ({
+                      ...prev,
+                      [item.name]: e.target.value as 'regions' | 'countries' | 'marketRegimes',
+                    }))}
+                  >
+                    <option value="regions">Crear como región</option>
+                    <option value="countries">Crear como país</option>
+                    <option value="marketRegimes">Crear como market regime</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="ict-btn-mini"
+                    onClick={() => (suggestionCreateKind[item.name] === 'countries'
+                      ? openCountryCreate(item.name)
+                      : suggestionCreateKind[item.name] === 'marketRegimes'
+                        ? openMarketRegimeCreate(item.name)
+                        : openRegionCreate(item.name))}
+                  >
+                    Crear
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" onClick={() => setRegionSuggestions([])}>Cerrar</button>
+        </div>
+      )}
+
+      {countrySuggestions.length > 0 && (
+        <div className="ict-toast-warning" role="status">
+          <div className="ict-toast-warning__content">
+            <strong>Países detectados sin catálogo</strong>
+            <p>Asócialos a un país existente para guardar el alias y evitar nuevas incidencias.</p>
+            <ul className="ict-suggestion-list">
+              {countrySuggestions.map(item => (
+                <li key={item.name} className="ict-suggestion-row">
+                  <span>{item.name}{item.occurrences > 1 ? ` (${item.occurrences})` : ''}</span>
+                  <select
+                    className="ict-select"
+                    value={countrySuggestionTargets[item.name] ?? ''}
+                    onChange={(e) => setCountrySuggestionTargets(prev => ({ ...prev, [item.name]: e.target.value }))}
+                  >
+                    <option value="">Asociar a país...</option>
+                    {countries.map(country => (
+                      <option key={country.id} value={country.id}>{country.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="ict-btn-mini"
+                    onClick={() => applyCountrySuggestionMapping(item.name)}
+                    disabled={mappingSuggestionKey === `COUNTRY:${item.name}`}
+                  >
+                    {mappingSuggestionKey === `COUNTRY:${item.name}` ? 'Guardando…' : 'Asociar'}
+                  </button>
+                  <select
+                    className="ict-select"
+                    value={suggestionCreateKind[item.name] ?? 'countries'}
+                    onChange={(e) => setSuggestionCreateKind(prev => ({
+                      ...prev,
+                      [item.name]: e.target.value as 'regions' | 'countries' | 'marketRegimes',
+                    }))}
+                  >
+                    <option value="countries">Crear como país</option>
+                    <option value="regions">Crear como región</option>
+                    <option value="marketRegimes">Crear como market regime</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="ict-btn-mini"
+                    onClick={() => (suggestionCreateKind[item.name] === 'regions'
+                      ? openRegionCreate(item.name)
+                      : suggestionCreateKind[item.name] === 'marketRegimes'
+                        ? openMarketRegimeCreate(item.name)
+                        : openCountryCreate(item.name))}
+                  >
+                    Crear
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" onClick={() => setCountrySuggestions([])}>Cerrar</button>
+        </div>
+      )}
+
+      {marketRegimeSuggestions.length > 0 && (
+        <div className="ict-toast-warning" role="status">
+          <div className="ict-toast-warning__content">
+            <strong>Market regimes detectados sin catálogo</strong>
+            <p>Puedes crearlos directamente para que queden disponibles en la dimensión MARKET_REGIME.</p>
+            <ul className="ict-suggestion-list">
+              {marketRegimeSuggestions.map(item => (
+                <li key={item.name} className="ict-suggestion-row">
+                  <span>{item.name}{item.occurrences > 1 ? ` (${item.occurrences})` : ''}</span>
+                  <button
+                    type="button"
+                    className="ict-btn-mini"
+                    onClick={() => openMarketRegimeCreate(item.name)}
+                  >
+                    Crear
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" onClick={() => setMarketRegimeSuggestions([])}>Cerrar</button>
         </div>
       )}
 

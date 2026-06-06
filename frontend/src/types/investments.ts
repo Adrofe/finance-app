@@ -193,6 +193,22 @@ export type PriceRefreshResult = {
   mode: string;
 };
 
+export type ExposureRefreshResult = {
+  updatedInstruments: number;
+  updatedExposures: number;
+  skippedNoData: number;
+  instrumentIds: number[];
+  mode: string;
+  suggestedRegions?: ExposureSuggestion[];
+  suggestedCountries?: ExposureSuggestion[];
+  suggestedMarketRegimes?: ExposureSuggestion[];
+};
+
+export type ExposureSuggestion = {
+  name: string;
+  occurrences: number;
+};
+
 export type PriceUpdateDraft = {
   instrumentId: number;
   price: number;
