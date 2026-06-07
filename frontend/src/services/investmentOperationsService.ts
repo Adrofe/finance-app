@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { ApiResponse } from '../types/api';
 import type {
+  ExposureOverview,
   InvestmentOperation,
   InvestmentOperationDraft,
   InvestmentPosition,
@@ -53,4 +54,12 @@ export async function deleteOperation(token: string, id: number): Promise<void> 
 export async function recalculateAllPositions(token: string): Promise<number> {
   const res = await axios.post<ApiResponse<number>>(`${OPERATIONS_BASE}/recalculate-all`, null, { headers: headers(token) });
   return res.data.data ?? 0;
+}
+
+export async function fetchExposureOverview(token: string, typeCodes?: string[]): Promise<ExposureOverview> {
+  const res = await axios.get<ApiResponse<ExposureOverview>>(`${INVESTMENTS_BASE}/exposures/overview`, {
+    headers: headers(token),
+    params: typeCodes && typeCodes.length > 0 ? { typeCodes } : undefined,
+  });
+  return res.data.data;
 }
