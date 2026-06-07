@@ -14,6 +14,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useInvestmentsDashboard } from '../hooks/useInvestmentsDashboard';
+import type { ExposureOverviewBucket } from '../types/investments';
 import './investments-dashboard.css';
 
 type Props = {
@@ -22,6 +23,7 @@ type Props = {
 };
 
 const TYPE_COLORS = ['#0f6bb4', '#16a34a', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#64748b'];
+const EXPOSURE_COLORS = ['#0f6bb4', '#0ea5e9', '#16a34a', '#84cc16', '#f59e0b', '#f97316', '#8b5cf6', '#ec4899'];
 
 const safeNumber = (value: number | null | undefined) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
@@ -35,10 +37,69 @@ const fmtPct = (value: number | null | undefined) => {
 
 const pnlClass = (value: number | null | undefined) => (safeNumber(value) >= 0 ? 'idb-positive' : 'idb-negative');
 
+const exposureSections: Array<{ key: 'countries' | 'regions' | 'sectors' | 'industries' | 'marketRegimes'; label: string }> = [
+  { key: 'countries', label: 'Países' },
+  { key: 'regions', label: 'Regiones' },
+  { key: 'sectors', label: 'Sectores' },
+  { key: 'industries', label: 'Industrias' },
+  { key: 'marketRegimes', label: 'Regímenes mercado' },
+];
+
+const ExposureDonut: React.FC<{ items: ExposureOverviewBucket[] }> = ({ items }) => {
+  if (items.length === 0) {
+    return <p className="idb-empty">Sin datos para este filtro.</p>;
+  }
+
+  const top = items.slice(0, 6).map((item) => ({
+    name: item.name,
+    value: safeNumber(item.currentValue),
+    sharePct: safeNumber(item.sharePct),
+  }));
+  const rest = items.slice(6);
+  const restValue = rest.reduce((sum, item) => sum + safeNumber(item.currentValue), 0);
+  const restShare = rest.reduce((sum, item) => sum + safeNumber(item.sharePct), 0);
+  const chartData = restValue > 0 ? [...top, { name: 'Otros', value: restValue, sharePct: restShare }] : top;
+
+  return (
+    <div className="idb-exposure-donut-layout">
+      <ResponsiveContainer width="100%" height={220}>
+        <PieChart>
+          <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={54} outerRadius={88} paddingAngle={2}>
+            {chartData.map((_, index) => (
+              <Cell key={index} fill={EXPOSURE_COLORS[index % EXPOSURE_COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip
+            formatter={((value: unknown, _name: unknown, ctx: unknown) => {
+              const payload = (ctx as { payload?: { sharePct?: number } })?.payload;
+              return [`${fmtMoney(Number(value))} · ${fmtPct(payload?.sharePct)}`, 'Exposición'];
+            }) as never}
+            contentStyle={{ borderRadius: 10, border: '1px solid #d6e0eb', fontSize: '0.86rem' }}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+
+      <ul className="idb-exposure-legend">
+        {chartData.map((item, index) => (
+          <li key={item.name}>
+            <span className="idb-dot" style={{ background: EXPOSURE_COLORS[index % EXPOSURE_COLORS.length] }} />
+            <span className="idb-legend-name">{item.name}</span>
+            <strong>{item.sharePct.toFixed(1)}%</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
 export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized }) => {
   const {
     summary,
     taxSummary,
+    exposureOverview,
+    selectedTypeCodes,
+    setSelectedTypeCodes,
+    typeFilters,
     selectedYear,
     setSelectedYear,
     availableYears,
@@ -260,6 +321,54 @@ export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized })
           </div>
         </article>
       </div>
+
+      <article className="idb-card">
+        <div className="idb-tax-header">
+          <div className="sheet-header">
+            <h3>Exposición de Cartera</h3>
+            <span>Filtrable por tipo de activo (ETF, fondos, acciones, etc.)</span>
+          </div>
+          <span className="idb-exposure-total">Base: {fmtMoney(exposureOverview?.totalCurrentValue ?? 0)}</span>
+        </div>
+
+        <div className="idb-filter-chips">
+          <button
+            type="button"
+            className={`idb-chip ${selectedTypeCodes.length === 0 ? 'active' : ''}`}
+            onClick={() => setSelectedTypeCodes([])}
+          >
+            Todos
+          </button>
+          {typeFilters.map((item) => {
+            const active = selectedTypeCodes.includes(item.code);
+            return (
+              <button
+                key={item.code}
+                type="button"
+                className={`idb-chip ${active ? 'active' : ''}`}
+                onClick={() => setSelectedTypeCodes((current) =>
+                  active ? current.filter((code) => code !== item.code) : [...current, item.code])}
+              >
+                {item.name}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="idb-exposure-grid">
+          {exposureSections.map((section) => {
+            const items = exposureOverview?.[section.key] ?? [];
+            return (
+              <section key={section.key} className="idb-exposure-card">
+                <header>
+                  <h4>{section.label}</h4>
+                </header>
+                <ExposureDonut items={items} />
+              </section>
+            );
+          })}
+        </div>
+      </article>
     </div>
   );
 };
