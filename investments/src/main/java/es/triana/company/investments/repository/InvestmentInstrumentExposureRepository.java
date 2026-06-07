@@ -25,6 +25,19 @@ public interface InvestmentInstrumentExposureRepository extends JpaRepository<In
             """)
     List<InvestmentInstrumentExposure> findAllWithBucketsByInstrumentId(@Param("instrumentId") Long instrumentId);
 
+        @Query("""
+            SELECT e
+            FROM InvestmentInstrumentExposure e
+            LEFT JOIN FETCH e.country
+            LEFT JOIN FETCH e.region
+            LEFT JOIN FETCH e.sector
+            LEFT JOIN FETCH e.industry
+            LEFT JOIN FETCH e.marketRegime
+            WHERE e.instrument.id IN :instrumentIds
+            ORDER BY e.instrument.id ASC, e.dimension ASC, e.id ASC
+            """)
+        List<InvestmentInstrumentExposure> findAllWithBucketsByInstrumentIdIn(@Param("instrumentIds") List<Long> instrumentIds);
+
             boolean existsByMarketRegimeId(Long marketRegimeId);
 
     void deleteByInstrumentId(Long instrumentId);
