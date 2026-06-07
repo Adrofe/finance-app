@@ -209,6 +209,23 @@ export type ExposureSuggestion = {
   occurrences: number;
 };
 
+export type ExposureOverviewBucket = {
+  code?: string;
+  name: string;
+  currentValue: number;
+  sharePct: number;
+};
+
+export type ExposureOverview = {
+  totalCurrentValue: number;
+  appliedTypeCodes: string[];
+  countries: ExposureOverviewBucket[];
+  regions: ExposureOverviewBucket[];
+  sectors: ExposureOverviewBucket[];
+  industries: ExposureOverviewBucket[];
+  marketRegimes: ExposureOverviewBucket[];
+};
+
 export type PriceUpdateDraft = {
   instrumentId: number;
   price: number;
