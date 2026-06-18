@@ -584,6 +584,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     setRefreshingPrices(true);
     try {
       const result = await refreshPrices();
+      if (result.mode === 'background-started') {
+        setRefreshMessage('Price refresh started in background. Reload in a few seconds to see updated values.');
+        return;
+      }
       setRefreshMessage(
         result.updatedInstruments > 0
           ? `Prices refreshed for ${result.updatedInstruments} instruments.`

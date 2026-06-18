@@ -189,7 +189,12 @@ export async function deletePlatform(token: string, id: number): Promise<void> {
 
 export async function refreshInstrumentPrices(token: string): Promise<PriceRefreshResult> {
   const res = await axios.post<ApiResponse<PriceRefreshResult>>(`${INVESTMENTS_BASE}/prices/refresh/auto`, undefined, { headers: headers(token) });
-  return res.data.data;
+  return res.data.data ?? {
+    updatedInstruments: 0,
+    recalculatedPositions: 0,
+    instrumentIds: [],
+    mode: 'background-started',
+  };
 }
 
 export async function refreshCompoundExposures(token: string): Promise<ExposureRefreshResult> {
