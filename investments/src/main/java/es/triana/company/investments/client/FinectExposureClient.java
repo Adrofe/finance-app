@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -146,27 +147,27 @@ public class FinectExposureClient {
 
             List<InvestmentInstrumentExposureDTO> exposures = new ArrayList<>();
             for (JsonNode block : breakdown) {
-                Dimension dimension = inferDimensionFromBreakdownType(block.path("type").asText());
+                Dimension dimension = inferDimensionFromBreakdownBlock(block);
                 if (dimension == null) {
                     continue;
                 }
 
-                JsonNode items = block.path("items");
+                JsonNode items = extractItemsArray(block);
                 if (!items.isArray()) {
                     continue;
                 }
 
                 for (JsonNode item : items) {
-                    String bucket = item.path("drawer").asText("").trim();
-                    JsonNode longValue = item.path("values").path("long");
-                    if (bucket.isBlank() || !longValue.isNumber()) {
+                    String bucket = extractBucketName(item);
+                    BigDecimal weight = extractWeightValue(item);
+                    if (bucket.isBlank() || weight == null) {
                         continue;
                     }
 
                     exposures.add(InvestmentInstrumentExposureDTO.builder()
                             .dimension(dimension)
                             .bucketName(bucket)
-                            .weightPct(longValue.decimalValue())
+                            .weightPct(weight)
                             .build());
                 }
             }
@@ -220,6 +221,12 @@ public class FinectExposureClient {
         }
 
         String normalized = type.toLowerCase(Locale.ROOT);
+        if (normalized.contains("industry")) {
+            return Dimension.INDUSTRY;
+        }
+        if (normalized.contains("sector")) {
+            return Dimension.SECTOR;
+        }
         if (normalized.contains("country") || normalized.contains("geograph")) {
             return Dimension.COUNTRY;
         }
@@ -229,11 +236,104 @@ public class FinectExposureClient {
         if (normalized.contains("develop") || normalized.contains("emerg") || normalized.contains("regime")) {
             return Dimension.MARKET_REGIME;
         }
-        if (normalized.contains("sector")) {
-            return Dimension.SECTOR;
+        return null;
+    }
+
+    private Dimension inferDimensionFromBreakdownBlock(JsonNode block) {
+        List<String> hints = Arrays.asList(
+                block.path("type").asText(""),
+                block.path("title").asText(""),
+                block.path("name").asText(""),
+                block.path("label").asText(""),
+                block.path("id").asText(""));
+
+        for (String hint : hints) {
+            Dimension dimension = inferDimensionFromBreakdownType(hint);
+            if (dimension != null) {
+                return dimension;
+            }
         }
-        if (normalized.contains("industry")) {
-            return Dimension.INDUSTRY;
+        return null;
+    }
+
+    private JsonNode extractItemsArray(JsonNode block) {
+        JsonNode items = block.path("items");
+        if (items.isArray()) {
+            return items;
+        }
+        items = block.path("rows");
+        if (items.isArray()) {
+            return items;
+        }
+        items = block.path("data");
+        if (items.isArray()) {
+            return items;
+        }
+        items = block.path("breakdown");
+        if (items.isArray()) {
+            return items;
+        }
+        return items;
+    }
+
+    private String extractBucketName(JsonNode item) {
+        String bucket = item.path("drawer").asText("").trim();
+        if (!bucket.isBlank()) {
+            return bucket;
+        }
+        bucket = item.path("label").asText("").trim();
+        if (!bucket.isBlank()) {
+            return bucket;
+        }
+        bucket = item.path("name").asText("").trim();
+        if (!bucket.isBlank()) {
+            return bucket;
+        }
+        return item.path("title").asText("").trim();
+    }
+
+    private BigDecimal extractWeightValue(JsonNode item) {
+        JsonNode values = item.path("values");
+        BigDecimal value = readDecimal(values.path("long"));
+        if (value != null) {
+            return value;
+        }
+        value = readDecimal(values.path("net"));
+        if (value != null) {
+            return value;
+        }
+        value = readDecimal(values.path("value"));
+        if (value != null) {
+            return value;
+        }
+        value = readDecimal(item.path("value"));
+        if (value != null) {
+            return value;
+        }
+        value = readDecimal(item.path("long"));
+        if (value != null) {
+            return value;
+        }
+        value = readDecimal(item.path("weight"));
+        if (value != null) {
+            return value;
+        }
+        value = readDecimal(item.path("percentage"));
+        if (value != null) {
+            return value;
+        }
+        return readDecimal(item.path("pct"));
+    }
+
+    private BigDecimal readDecimal(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        if (node.isNumber()) {
+            return node.decimalValue();
+        }
+        if (node.isTextual()) {
+            return parsePercent(node.asText());
         }
         return null;
     }

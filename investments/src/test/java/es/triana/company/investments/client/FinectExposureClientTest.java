@@ -79,4 +79,51 @@ class FinectExposureClientTest {
                     assertThat(exposure.getWeightPct()).isEqualByComparingTo(new BigDecimal("8.25"));
                 });
     }
+
+    @Test
+    void parseExposures_readsSectorFromAlternateBreakdownFields() throws Exception {
+        FinectExposureClient client = new FinectExposureClient();
+        String initialStateJson = """
+                {
+                  "fund": {
+                    "fund": {
+                      "model": {
+                        "breakdown": [
+                          {
+                            "type": "style",
+                            "title": "Exposición por sectores",
+                            "rows": [
+                              { "label": "Technology", "value": "25,50" },
+                              { "name": "Financials", "percentage": "14.3" }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+                """;
+        String html = "<html><body><script>window.INITIAL_STATE=\""
+                + URLEncoder.encode(initialStateJson, StandardCharsets.UTF_8)
+                + "\";</script></body></html>";
+
+        Method parseExposures = FinectExposureClient.class.getDeclaredMethod("parseExposures", String.class);
+        parseExposures.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<InvestmentInstrumentExposureDTO> exposures =
+                (List<InvestmentInstrumentExposureDTO>) parseExposures.invoke(client, html);
+
+        assertThat(exposures).hasSize(2);
+        assertThat(exposures)
+                .allSatisfy(exposure -> assertThat(exposure.getDimension()).isEqualTo(Dimension.SECTOR))
+                .anySatisfy(exposure -> {
+                    assertThat(exposure.getBucketName()).isEqualTo("Technology");
+                    assertThat(exposure.getWeightPct()).isEqualByComparingTo(new BigDecimal("25.50"));
+                })
+                .anySatisfy(exposure -> {
+                    assertThat(exposure.getBucketName()).isEqualTo("Financials");
+                    assertThat(exposure.getWeightPct()).isEqualByComparingTo(new BigDecimal("14.3"));
+                });
+    }
 }
