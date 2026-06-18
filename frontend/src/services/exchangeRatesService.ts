@@ -31,3 +31,7 @@ export async function refreshExchangeRatesForDay(token: string, asOf: string): P
   });
   return res.data.data ?? 0;
 }
+
+export async function deleteExchangeRate(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/rates/${id}`, { headers: headers(token) });
+}

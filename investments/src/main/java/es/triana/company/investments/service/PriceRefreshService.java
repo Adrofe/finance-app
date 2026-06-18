@@ -7,9 +7,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +26,7 @@ import es.triana.company.investments.model.db.InvestmentPrice;
 import es.triana.company.investments.repository.InvestmentInstrumentRepository;
 import es.triana.company.investments.repository.InvestmentPriceRepository;
 import es.triana.company.investments.repository.InvestmentRepository;
+import es.triana.company.investments.repository.InvestmentTypeCatalogRepository;
 import es.triana.company.investments.service.exception.InvestmentValidationException;
 
 @Service
@@ -33,12 +37,17 @@ public class PriceRefreshService {
     private final InvestmentInstrumentRepository investmentInstrumentRepository;
     private final InvestmentPriceRepository investmentPriceRepository;
     private final InvestmentRepository investmentRepository;
+    private final InvestmentTypeCatalogRepository investmentTypeCatalogRepository;
     private final MarketPriceClient marketPriceClient;
 
-    public PriceRefreshService(InvestmentInstrumentRepository investmentInstrumentRepository, InvestmentPriceRepository investmentPriceRepository,InvestmentRepository investmentRepository, MarketPriceClient marketPriceClient) {
+    @Value("${investments.prices.auto-refresh-excluded-type-codes:FUND,ETF}")
+    private String autoRefreshExcludedTypeCodes;
+
+    public PriceRefreshService(InvestmentInstrumentRepository investmentInstrumentRepository, InvestmentPriceRepository investmentPriceRepository,InvestmentRepository investmentRepository, InvestmentTypeCatalogRepository investmentTypeCatalogRepository, MarketPriceClient marketPriceClient) {
         this.investmentInstrumentRepository = investmentInstrumentRepository;
         this.investmentPriceRepository = investmentPriceRepository;
         this.investmentRepository = investmentRepository;
+        this.investmentTypeCatalogRepository = investmentTypeCatalogRepository;
         this.marketPriceClient = marketPriceClient;
     }
 
@@ -94,13 +103,29 @@ public class PriceRefreshService {
     @Transactional
     public PriceRefreshResultDTO refreshPricesAutomaticallyNow() {
         List<Long> activeInstrumentIds = investmentRepository.findDistinctActiveInstrumentIds();
-        List<InvestmentInstrument> instruments = activeInstrumentIds.isEmpty()
+        List<InvestmentInstrument> allActiveInstruments = activeInstrumentIds.isEmpty()
             ? List.of()
             : investmentInstrumentRepository.findAllById(activeInstrumentIds);
+        Set<String> excludedTypeCodes = parseExcludedTypeCodes();
+        Map<Long, String> typeCodeById = investmentTypeCatalogRepository.findAll().stream()
+                .collect(Collectors.toMap(type -> type.getId(), type -> type.getCode(), (a, b) -> a));
+        List<InvestmentInstrument> instruments = allActiveInstruments.stream()
+                .filter(instrument -> {
+                    String typeCode = typeCodeById.get(instrument.getTypeId());
+                    if (typeCode == null) {
+                        return true;
+                    }
+                    return !excludedTypeCodes.contains(typeCode.trim().toUpperCase(Locale.ROOT));
+                })
+                .toList();
+        int skippedByType = allActiveInstruments.size() - instruments.size();
+
         LOG.info(
-            "Starting automatic price refresh for {} active instruments ({} total configured)",
+            "Starting automatic price refresh for {} active instruments ({} total configured, skippedByType={}, excludedTypes={})",
             instruments.size(),
-            investmentInstrumentRepository.count());
+            investmentInstrumentRepository.count(),
+            skippedByType,
+            excludedTypeCodes);
 
         int recalculatedPositions = 0;
         List<Long> updatedInstrumentIds = new ArrayList<>();
@@ -150,10 +175,11 @@ public class PriceRefreshService {
         }
 
         LOG.info(
-                "Automatic price refresh finished. updatedInstruments={} recalculatedPositions={} skippedNoQuote={}",
+            "Automatic price refresh finished. updatedInstruments={} recalculatedPositions={} skippedNoQuote={} skippedByType={}",
                 updatedInstrumentIds.size(),
                 recalculatedPositions,
-                skippedNoQuote);
+            skippedNoQuote,
+            skippedByType);
 
         return PriceRefreshResultDTO.builder()
                 .updatedInstruments(updatedInstrumentIds.size())
@@ -270,5 +296,16 @@ public class PriceRefreshService {
             return fallback;
         }
         return trimmed;
+    }
+
+    private Set<String> parseExcludedTypeCodes() {
+        if (autoRefreshExcludedTypeCodes == null || autoRefreshExcludedTypeCodes.isBlank()) {
+            return Set.of();
+        }
+        return List.of(autoRefreshExcludedTypeCodes.split(",")).stream()
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(s -> s.toUpperCase(Locale.ROOT))
+                .collect(Collectors.toSet());
     }
 }

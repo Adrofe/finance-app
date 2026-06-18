@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useInvestmentsOverview } from '../hooks/useInvestmentsOverview';
 import { recalculateAllPositions } from '../services/investmentOperationsService';
+import { fetchExchangeRates } from '../services/exchangeRatesService';
+import { getInvestmentTypeVisual } from '../constants/visualConfig';
 import './investments-overview.css';
+
+type SortKey = 'symbol' | 'investedAmount' | 'currentValue' | 'pnl' | 'pnlPct' | 'quantity';
+type SortDir = 'asc' | 'desc';
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <span className="io-sort-icon io-sort-inactive">⇅</span>;
+  return <span className="io-sort-icon">{dir === 'asc' ? '↑' : '↓'}</span>;
+}
 
 type Props = {
   token: string;
@@ -19,13 +29,98 @@ const fmtPct = (value: number | null | undefined) => {
 };
 
 const fmtQty = (value: number | null | undefined) =>
-  safeNumber(value).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+  safeNumber(value).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 6 });
 
-const pnlClass = (value: number | null | undefined) => safeNumber(value) >= 0 ? 'io-positive' : 'io-negative';
+const pnlClass = (value: number | null | undefined) => safeNumber(value) >= 0 ? 'io-pos' : 'io-neg';
 
 export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorized }) => {
   const { summary, positions, byInstrument, loading, error, clearError, reload } = useInvestmentsOverview(token, onUnauthorized);
   const [recalculating, setRecalculating] = useState(false);
+  const [search, setSearch] = useState('');
+  const [countryFilter, setCountryFilter] = useState('');
+  const [regionFilter, setRegionFilter] = useState('');
+  const [sectorFilter, setSectorFilter] = useState('');
+  const [industryFilter, setIndustryFilter] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('currentValue');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [normalizeToEur, setNormalizeToEur] = useState(false);
+  const [eurRates, setEurRates] = useState<Map<string, number>>(new Map());
+  const [loadingRates, setLoadingRates] = useState(false);
+
+  const countryOptions = useMemo(
+    () => [...new Set(byInstrument.map((g) => g.countryCode).filter(Boolean))].sort(),
+    [byInstrument],
+  );
+  const regionOptions = useMemo(
+    () => [...new Set(byInstrument.map((g) => g.region).filter(Boolean))].sort(),
+    [byInstrument],
+  );
+  const sectorOptions = useMemo(
+    () => [...new Set(byInstrument.map((g) => g.sector).filter(Boolean))].sort(),
+    [byInstrument],
+  );
+  const industryOptions = useMemo(
+    () => [...new Set(byInstrument.map((g) => g.industry).filter(Boolean))].sort(),
+    [byInstrument],
+  );
+
+  const foreignCurrenciesStr = useMemo(
+    () => [...new Set(byInstrument.map((g) => g.currency).filter((c) => c && c !== 'EUR'))].sort().join(','),
+    [byInstrument],
+  );
+
+  useEffect(() => {
+    if (!foreignCurrenciesStr) return;
+    const currencies = foreignCurrenciesStr.split(',');
+    setLoadingRates(true);
+    Promise.all(
+      currencies.map((curr) =>
+        fetchExchangeRates(token, { fromCurrency: 'EUR', toCurrency: curr })
+          .then((rates) => ({ currency: curr, rate: rates.length > 0 ? rates[0].rate : null }))
+          .catch(() => ({ currency: curr, rate: null as number | null })),
+      ),
+    )
+      .then((results) => {
+        const map = new Map<string, number>();
+        for (const { currency, rate } of results) {
+          if (rate !== null) map.set(currency, rate);
+        }
+        setEurRates(map);
+      })
+      .finally(() => setLoadingRates(false));
+  }, [token, foreignCurrenciesStr]);
+
+  const toEur = useCallback(
+    (value: number, currency: string): number => {
+      if (currency === 'EUR') return value;
+      const rate = eurRates.get(currency);
+      if (!rate) return value;
+      return value / rate;
+    },
+    [eurRates],
+  );
+
+  const eurSummary = useMemo(() => {
+    if (!normalizeToEur) return null;
+    let invested = 0;
+    let current = 0;
+    for (const g of byInstrument) {
+      invested += toEur(g.investedAmount, g.currency);
+      current += toEur(g.currentValue, g.currency);
+    }
+    const pnl = current - invested;
+    const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+    return { totalInvested: invested, totalCurrentValue: current, totalPnl: pnl, totalPnlPct: pnlPct };
+  }, [normalizeToEur, byInstrument, toEur]);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
 
   const handleRecalculate = () => {
     setRecalculating(true);
@@ -35,13 +130,47 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
       .finally(() => setRecalculating(false));
   };
 
+  const displayRows = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    const filtered = q
+      ? byInstrument.filter(
+          (g) =>
+            g.instrumentSymbol.toLowerCase().includes(q) ||
+            g.instrumentName.toLowerCase().includes(q) ||
+            g.typeCode.toLowerCase().includes(q) ||
+            g.platforms.some((p) => p.toLowerCase().includes(q)),
+        )
+      : byInstrument;
+
+    const classificationFiltered = filtered.filter((g) => {
+      if (countryFilter && g.countryCode !== countryFilter) return false;
+      if (regionFilter && g.region !== regionFilter) return false;
+      if (sectorFilter && g.sector !== sectorFilter) return false;
+      if (industryFilter && g.industry !== industryFilter) return false;
+      return true;
+    });
+
+    return [...classificationFiltered].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'symbol':         cmp = a.instrumentSymbol.localeCompare(b.instrumentSymbol); break;
+        case 'investedAmount': cmp = (normalizeToEur ? toEur(a.investedAmount, a.currency) : a.investedAmount) - (normalizeToEur ? toEur(b.investedAmount, b.currency) : b.investedAmount); break;
+        case 'currentValue':   cmp = (normalizeToEur ? toEur(a.currentValue, a.currency) : a.currentValue) - (normalizeToEur ? toEur(b.currentValue, b.currency) : b.currentValue); break;
+        case 'pnl':            cmp = (normalizeToEur ? toEur(a.pnl, a.currency) : a.pnl) - (normalizeToEur ? toEur(b.pnl, b.currency) : b.pnl); break;
+        case 'pnlPct':         cmp = a.pnlPct - b.pnlPct; break;
+        case 'quantity':       cmp = a.quantity - b.quantity; break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [byInstrument, search, sortKey, sortDir, normalizeToEur, toEur, countryFilter, regionFilter, sectorFilter, industryFilter]);
+
   if (loading) {
-    return <p className="state">Cargando resumen de inversiones...</p>;
+    return <p className="state">Cargando resumen de inversiones…</p>;
   }
 
   if (error) {
     return (
-      <div className="io-state">
+      <div className="io-state-row">
         <p className="state error">{error}</p>
         <button className="btn secondary" type="button" onClick={clearError}>Cerrar</button>
       </div>
@@ -52,91 +181,214 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
     return <p className="state">No hay resumen disponible todavía.</p>;
   }
 
+  const displaySummary = eurSummary ?? summary;
+  const pnlPositive = safeNumber(displaySummary.totalPnl) >= 0;
+
   return (
     <div className="io-wrapper">
-      <div className="io-metrics-grid">
-        <article className="metric-card">
-          <h3>Total Invertido</h3>
-          <strong>{fmtMoney(summary.totalInvested)}</strong>
-          <span>Capital desplegado en cartera</span>
+
+      {/* ── KPI cards ───────────────────────────────────────────────────── */}
+      <div className="io-kpi-grid">
+        <article className="io-kpi io-kpi--invested">
+          <span className="io-kpi-icon">💰</span>
+          <span className="io-kpi-label">Total invertido</span>
+          <strong className="io-kpi-value">{fmtMoney(displaySummary.totalInvested)}</strong>
+          <span className="io-kpi-sub">{normalizeToEur ? 'Normalizado a EUR' : 'Capital desplegado'}</span>
         </article>
 
-        <article className="metric-card">
-          <h3>Valor Actual</h3>
-          <strong>{fmtMoney(summary.totalCurrentValue)}</strong>
-          <span>Manual o calculado por precio</span>
+        <article className="io-kpi io-kpi--current">
+          <span className="io-kpi-icon">📈</span>
+          <span className="io-kpi-label">Valor actual</span>
+          <strong className="io-kpi-value">{fmtMoney(displaySummary.totalCurrentValue)}</strong>
+          <span className="io-kpi-sub">{normalizeToEur ? 'Normalizado a EUR' : 'Manual o por precio'}</span>
         </article>
 
-        <article className="metric-card">
-          <h3>P&amp;L Total</h3>
-          <strong className={pnlClass(summary.totalPnl)}>{fmtMoney(summary.totalPnl)}</strong>
-          <span className={pnlClass(summary.totalPnlPct)}>{fmtPct(summary.totalPnlPct)}</span>
+        <article className={`io-kpi ${pnlPositive ? 'io-kpi--gain' : 'io-kpi--loss'}`}>
+          <span className="io-kpi-icon">{pnlPositive ? '🟢' : '🔴'}</span>
+          <span className="io-kpi-label">P&amp;L total</span>
+          <strong className={`io-kpi-value ${pnlClass(displaySummary.totalPnl)}`}>
+            {fmtMoney(displaySummary.totalPnl)}
+          </strong>
+          <span className={`io-kpi-sub ${pnlClass(displaySummary.totalPnlPct)}`}>
+            {fmtPct(displaySummary.totalPnlPct)}
+          </span>
         </article>
 
-        <article className="metric-card">
-          <h3>Posiciones</h3>
-          <strong>{summary.positions}</strong>
-          <span>Distribuidas en {byInstrument.length} instrumentos</span>
+        <article className="io-kpi io-kpi--positions">
+          <span className="io-kpi-icon">🏦</span>
+          <span className="io-kpi-label">Posiciones</span>
+          <strong className="io-kpi-value">{summary.positions}</strong>
+          <span className="io-kpi-sub">{byInstrument.length} instrumentos</span>
         </article>
       </div>
 
-      <div className="io-panel">
-        <div className="sheet-header">
-          <h3>Resumen por Instrumento</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span>{byInstrument.length} instrumentos · {positions.length} posiciones</span>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={handleRecalculate}
-              disabled={recalculating}
-            >
-              {recalculating ? 'Recalculando...' : 'Recalcular posiciones'}
-            </button>
-          </div>
+      {/* ── Toolbar ──────────────────────────────────────────────────────── */}
+      <div className="io-toolbar">
+        <div className="io-search-wrap">
+          <span className="io-search-icon">🔍</span>
+          <input
+            type="text"
+            className="io-search"
+            placeholder="Filtrar por símbolo, nombre, tipo o plataforma…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button type="button" className="io-search-clear" onClick={() => setSearch('')}>✕</button>
+          )}
         </div>
-        <div className="io-table-wrap">
-          <table className="io-table">
-            <thead>
-              <tr>
-                <th>Instrumento</th>
-                <th>Plataformas</th>
-                <th>Posiciones</th>
-                <th className="io-right">Cantidad</th>
-                <th className="io-right">Invertido</th>
-                <th className="io-right">Valor actual</th>
-                <th className="io-right">P&amp;L</th>
-                <th className="io-right">Rentabilidad</th>
-              </tr>
-            </thead>
-            <tbody>
-              {byInstrument.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="io-empty">Todavía no hay inversiones para mostrar.</td>
-                </tr>
-              )}
+        <div className="io-toolbar-right">
+          <span className="io-count">
+            {displayRows.length} / {byInstrument.length} instrumentos · {positions.length} posiciones
+          </span>
+          <button
+            type="button"
+            className={`io-btn-eur-toggle${normalizeToEur ? ' io-btn-eur-toggle--active' : ''}`}
+            onClick={() => setNormalizeToEur((v) => !v)}
+            disabled={loadingRates}
+            title={normalizeToEur ? 'Mostrando valores en EUR' : 'Normalizar todo a EUR'}
+          >
+            {loadingRates ? '⏳' : '€'} {normalizeToEur ? 'EUR' : 'Moneda'}
+          </button>
+          <button
+            type="button"
+            className="io-btn-recalc"
+            onClick={handleRecalculate}
+            disabled={recalculating}
+          >
+            {recalculating ? '⏳ Recalculando…' : '↻ Recalcular'}
+          </button>
+        </div>
+      </div>
 
-              {byInstrument.map((group) => (
-                <tr key={group.instrumentId}>
+      <div className="io-filters-row">
+        <select className="io-filter-select" value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)}>
+          <option value="">País (todos)</option>
+          {countryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <select className="io-filter-select" value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)}>
+          <option value="">Región (todas)</option>
+          {regionOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <select className="io-filter-select" value={sectorFilter} onChange={(e) => setSectorFilter(e.target.value)}>
+          <option value="">Sector (todos)</option>
+          {sectorOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <select className="io-filter-select" value={industryFilter} onChange={(e) => setIndustryFilter(e.target.value)}>
+          <option value="">Industria (todas)</option>
+          {industryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <button
+          type="button"
+          className="io-btn-clear-filters"
+          onClick={() => {
+            setCountryFilter('');
+            setRegionFilter('');
+            setSectorFilter('');
+            setIndustryFilter('');
+          }}
+          disabled={!countryFilter && !regionFilter && !sectorFilter && !industryFilter}
+        >
+          Limpiar filtros
+        </button>
+      </div>
+
+      {/* ── Table ────────────────────────────────────────────────────────── */}
+      <div className="io-table-wrap">
+        <table className="io-table">
+          <thead>
+            <tr>
+              <th className="io-th-sortable" onClick={() => handleSort('symbol')}>
+                Instrumento <SortIcon active={sortKey === 'symbol'} dir={sortDir} />
+              </th>
+              <th>Plataformas</th>
+              <th>Clasificación</th>
+              <th className="io-right">Pos.</th>
+              <th className="io-right io-th-sortable" onClick={() => handleSort('quantity')}>
+                Cantidad <SortIcon active={sortKey === 'quantity'} dir={sortDir} />
+              </th>
+              <th className="io-right io-th-sortable" onClick={() => handleSort('investedAmount')}>
+                Invertido <SortIcon active={sortKey === 'investedAmount'} dir={sortDir} />
+              </th>
+              <th className="io-right io-th-sortable" onClick={() => handleSort('currentValue')}>
+                Valor actual <SortIcon active={sortKey === 'currentValue'} dir={sortDir} />
+              </th>
+              <th className="io-right io-th-sortable" onClick={() => handleSort('pnl')}>
+                P&amp;L <SortIcon active={sortKey === 'pnl'} dir={sortDir} />
+              </th>
+              <th className="io-right io-th-sortable" onClick={() => handleSort('pnlPct')}>
+                Rentab. <SortIcon active={sortKey === 'pnlPct'} dir={sortDir} />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {displayRows.length === 0 && (
+              <tr>
+                <td colSpan={9} className="io-empty">
+                  {search ? 'No hay instrumentos que coincidan con el filtro.' : 'Todavía no hay inversiones para mostrar.'}
+                </td>
+              </tr>
+            )}
+
+            {displayRows.map((group) => {
+              const visual = getInvestmentTypeVisual(group.typeCode, group.typeName);
+              const pnlPos = group.pnl >= 0;
+              return (
+                <tr key={group.instrumentId} className="io-row">
                   <td>
-                    <div className="io-instrument">
-                      <strong>{group.instrumentSymbol}</strong>
-                      <span>{group.instrumentName}</span>
+                    <div className="io-instrument-cell">
+                      <span
+                        className="io-type-badge"
+                        style={{ background: visual.background, color: visual.color }}
+                        title={group.typeName || group.typeCode}
+                      >
+                        {visual.emoji}
+                      </span>
+                      <div className="io-instrument-info">
+                        <strong className="io-symbol">{group.instrumentSymbol}</strong>
+                        <span className="io-name">{group.instrumentName}</span>
+                      </div>
                     </div>
                   </td>
-                  <td>{group.platforms.join(', ')}</td>
-                  <td>{group.positions}</td>
-                  <td className="io-right">{fmtQty(group.quantity)}</td>
-                  <td className="io-right">{fmtMoney(group.investedAmount, group.currency)}</td>
-                  <td className="io-right">{fmtMoney(group.currentValue, group.currency)}</td>
-                  <td className={`io-right ${pnlClass(group.pnl)}`}>{fmtMoney(group.pnl, group.currency)}</td>
-                  <td className={`io-right ${pnlClass(group.pnlPct)}`}>{fmtPct(group.pnlPct)}</td>
+                  <td>
+                    <div className="io-platforms">
+                      {group.platforms.map((p) => (
+                        <span key={p} className="io-platform-chip">{p}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="io-classification">
+                      {group.countryCode && <span className="io-class-chip">🌍 {group.countryCode}</span>}
+                      {group.region && <span className="io-class-chip">{group.region}</span>}
+                      {group.sector && <span className="io-class-chip">{group.sector}</span>}
+                      {group.industry && <span className="io-class-chip">{group.industry}</span>}
+                      {!group.countryCode && !group.region && !group.sector && !group.industry && (
+                        <span className="io-dim">—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="io-right io-dim">{group.positions}</td>
+                  <td className="io-right io-mono">{fmtQty(group.quantity)}</td>
+                  <td className="io-right io-mono">{fmtMoney(normalizeToEur ? toEur(group.investedAmount, group.currency) : group.investedAmount, normalizeToEur ? 'EUR' : group.currency)}</td>
+                  <td className="io-right io-mono">{fmtMoney(normalizeToEur ? toEur(group.currentValue, group.currency) : group.currentValue, normalizeToEur ? 'EUR' : group.currency)}</td>
+                  <td className="io-right">
+                    <span className={`io-pnl-badge ${pnlPos ? 'io-pnl-pos' : 'io-pnl-neg'}`}>
+                      {pnlPos ? '▲' : '▼'} {fmtMoney(Math.abs(normalizeToEur ? toEur(group.pnl, group.currency) : group.pnl), normalizeToEur ? 'EUR' : group.currency)}
+                    </span>
+                  </td>
+                  <td className="io-right">
+                    <span className={`io-pct-badge ${pnlPos ? 'io-pct-pos' : 'io-pct-neg'}`}>
+                      {fmtPct(group.pnlPct)}
+                    </span>
+                  </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
+
     </div>
   );
 };

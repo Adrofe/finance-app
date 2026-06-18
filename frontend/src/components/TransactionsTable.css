@@ -6,6 +6,35 @@
   gap: 16px;
 }
 
+/* ─── Highlight banner ───────────────────────────────────────────────────── */
+
+.tt-highlight-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #1e40af;
+}
+
+.tt-highlight-clear {
+  background: none;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  color: #1e40af;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.tt-highlight-clear:hover {
+  background: #dbeafe;
+}
+
 .tt-summary-bar {
   display: flex;
   align-items: center;

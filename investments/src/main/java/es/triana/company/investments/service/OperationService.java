@@ -20,6 +20,7 @@ import es.triana.company.investments.model.api.FifoRebuildResultDTO;
 import es.triana.company.investments.model.api.OperationDTO;
 import es.triana.company.investments.model.api.TaxSummaryDTO;
 import es.triana.company.investments.model.db.Investment;
+import es.triana.company.investments.model.db.InvestmentInstrument;
 import es.triana.company.investments.model.db.InvestmentOperation;
 import es.triana.company.investments.model.db.OperationType;
 import es.triana.company.investments.model.db.OperationFifoLot;
@@ -635,6 +636,23 @@ public class OperationService {
 
         investment.setQuantity(quantity);
         investment.setInvestedAmount(investedAmount.setScale(2, RoundingMode.HALF_UP));
+
+        // Also recompute currentValueCalculated so P&L reflects the updated quantity.
+        // Without this, a position that had sells would still show the old calculated
+        // value (oldQuantity * lastPrice) making rentabilidad/P&L incorrect.
+        if (investment.getCurrentValueCalculated() != null) {
+            InvestmentInstrument instrument = investmentInstrumentRepository
+                    .findById(investment.getInstrumentId()).orElse(null);
+            if (instrument != null && instrument.getLastPrice() != null) {
+                BigDecimal recalculated = quantity
+                        .multiply(instrument.getLastPrice())
+                        .setScale(2, RoundingMode.HALF_UP);
+                investment.setCurrentValueCalculated(recalculated);
+            } else if (quantity.compareTo(BigDecimal.ZERO) == 0) {
+                investment.setCurrentValueCalculated(BigDecimal.ZERO);
+            }
+        }
+
         investment.setUpdatedAt(LocalDateTime.now());
         investmentRepository.save(investment);
     }
@@ -751,7 +769,7 @@ public class OperationService {
             return instrumentAnchor;
         }
 
-        es.triana.company.investments.model.db.InvestmentInstrument instrument = investmentInstrumentRepository.findById(instrumentId)
+        InvestmentInstrument instrument = investmentInstrumentRepository.findById(instrumentId)
                 .orElseThrow(() -> new InvestmentValidationException("Unknown instrumentId: " + instrumentId));
 
         if (platformId != null) {

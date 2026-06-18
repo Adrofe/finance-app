@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
+import { FINANCE_EVENTS, addFinanceEventListener } from './events/financeEvents';
 import { BankingSubTabs } from './components/BankingSubTabs';
 import { BudgetPanel } from './components/BudgetPanel';
 import { BankImportPanel } from './components/BankImportPanel';
@@ -34,6 +35,16 @@ function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('banking');
   const [bankingSubTab, setBankingSubTab] = useState<BankingSubTab>('dashboard');
   const [investmentsSubTab, setInvestmentsSubTab] = useState<InvestmentsSubTab>('dashboard');
+  const [highlightTransactionId, setHighlightTransactionId] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    return addFinanceEventListener(FINANCE_EVENTS.NAVIGATE_TO_TRANSACTION, (e) => {
+      const id = (e as CustomEvent<{ transactionId: number }>).detail.transactionId;
+      setActiveTab('banking');
+      setBankingSubTab('transactions');
+      setHighlightTransactionId(id);
+    });
+  }, []);
 
   if (!accessToken) {
     return <LoginForm loading={authLoading} error={authError} realm={KEYCLOAK_REALM} onSubmit={login} />;
@@ -91,7 +102,7 @@ function App() {
               </div>
               {loading && items.length === 0 && <p className="state">Loading transactions...</p>}
               {error && <p className="state error">{error}</p>}
-              {(items.length > 0 || (!loading && !error)) && <TransactionsTable items={items} accessToken={accessToken} onRefresh={refresh} />}
+              {(items.length > 0 || (!loading && !error)) && <TransactionsTable items={items} accessToken={accessToken} onRefresh={refresh} highlightTransactionId={highlightTransactionId} onClearHighlight={() => setHighlightTransactionId(undefined)} />}
             </article>
           )}
 

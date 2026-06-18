@@ -52,4 +52,22 @@ public class InvestmentInstrument {
 
     @Column(name = "last_price_at")
     private LocalDateTime lastPriceAt;
+
+    @Column(name = "scraper_url", length = 500)
+    private String scraperUrl;
+
+    @Column(name = "finect_url", length = 500)
+    private String finectUrl;
+
+    @Column(name = "country_id")
+    private Long countryId;
+
+    @Column(name = "region_id")
+    private Long regionId;
+
+    @Column(name = "sector_id")
+    private Long sectorId;
+
+    @Column(name = "industry_id")
+    private Long industryId;
 }

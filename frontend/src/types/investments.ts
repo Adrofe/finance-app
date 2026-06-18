@@ -8,6 +8,12 @@ export type InvestmentType = {
   name: string;
 };
 
+export type CatalogOption = {
+  id: number;
+  code: string;
+  name: string;
+};
+
 export type InvestmentInstrument = {
   id: number;
   typeId: number;
@@ -19,6 +25,34 @@ export type InvestmentInstrument = {
   lastPrice?: number;
   lastPriceSource?: string;
   lastPriceAt?: string;
+  scraperUrl?: string;
+  finectUrl?: string;
+  countryId?: number;
+  countryCode?: string;
+  countryName?: string;
+  regionId?: number;
+  regionCode?: string;
+  regionName?: string;
+  sectorId?: number;
+  sectorCode?: string;
+  sectorName?: string;
+  industryId?: number;
+  industryCode?: string;
+  industryName?: string;
+};
+
+export type InvestmentInstrumentExposure = {
+  id: number;
+  instrumentId: number;
+  dimension: 'COUNTRY' | 'REGION' | 'SECTOR' | 'INDUSTRY' | 'MARKET_REGIME';
+  countryId?: number;
+  regionId?: number;
+  sectorId?: number;
+  industryId?: number;
+  marketRegimeId?: number;
+  bucketCode?: string;
+  bucketName?: string;
+  weightPct: number;
 };
 
 export type InvestmentPlatform = {
@@ -157,4 +191,45 @@ export type PriceRefreshResult = {
   recalculatedPositions: number;
   instrumentIds: number[];
   mode: string;
+};
+
+export type ExposureRefreshResult = {
+  updatedInstruments: number;
+  updatedExposures: number;
+  skippedNoData: number;
+  instrumentIds: number[];
+  mode: string;
+  suggestedRegions?: ExposureSuggestion[];
+  suggestedCountries?: ExposureSuggestion[];
+  suggestedMarketRegimes?: ExposureSuggestion[];
+};
+
+export type ExposureSuggestion = {
+  name: string;
+  occurrences: number;
+};
+
+export type ExposureOverviewBucket = {
+  code?: string;
+  name: string;
+  currentValue: number;
+  sharePct: number;
+};
+
+export type ExposureOverview = {
+  totalCurrentValue: number;
+  appliedTypeCodes: string[];
+  countries: ExposureOverviewBucket[];
+  regions: ExposureOverviewBucket[];
+  sectors: ExposureOverviewBucket[];
+  industries: ExposureOverviewBucket[];
+  marketRegimes: ExposureOverviewBucket[];
+};
+
+export type PriceUpdateDraft = {
+  instrumentId: number;
+  price: number;
+  asOf?: string;
+  source?: string;
+  currency?: string;
 };
