@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FINANCE_EVENTS } from '../events/financeEvents';
 import axios from 'axios';
-import type { InvestmentPosition, InvestmentSummary } from '../types/investments';
+import type { InvestmentInstrument, InvestmentPosition, InvestmentSummary } from '../types/investments';
+import { fetchInstruments } from '../services/investmentCatalogService';
 import { fetchInvestmentPositions, fetchInvestmentSummary } from '../services/investmentOperationsService';
 
 type InstrumentGroup = {
@@ -18,6 +19,10 @@ type InstrumentGroup = {
   pnl: number;
   pnlPct: number;
   platforms: string[];
+  countryCode: string;
+  region: string;
+  sector: string;
+  industry: string;
 };
 
 const getPositionCurrentValue = (position: InvestmentPosition) =>
@@ -29,6 +34,7 @@ const sortPositions = (items: InvestmentPosition[]) =>
 export function useInvestmentsOverview(token: string, onUnauthorized?: (message: string) => void) {
   const [summary, setSummary] = useState<InvestmentSummary | null>(null);
   const [positions, setPositions] = useState<InvestmentPosition[]>([]);
+  const [instruments, setInstruments] = useState<InvestmentInstrument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,10 +49,11 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
     setLoading(true);
     setError(null);
 
-    Promise.all([fetchInvestmentSummary(token), fetchInvestmentPositions(token)])
-      .then(([loadedSummary, loadedPositions]) => {
+    Promise.all([fetchInvestmentSummary(token), fetchInvestmentPositions(token), fetchInstruments(token)])
+      .then(([loadedSummary, loadedPositions, loadedInstruments]) => {
         setSummary(loadedSummary);
         setPositions(sortPositions(loadedPositions.filter((p) => (p.quantity ?? 0) > 0)));
+        setInstruments(loadedInstruments);
       })
       .catch((err) => {
         if (axios.isAxiosError(err) && err.response?.status === 401) {
@@ -77,6 +84,7 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
 
   const byInstrument = useMemo<InstrumentGroup[]>(() => {
     const grouped = new Map<number, InstrumentGroup>();
+    const instrumentsById = new Map(instruments.map((instrument) => [instrument.id, instrument]));
 
     for (const position of positions) {
       const current = getPositionCurrentValue(position);
@@ -85,6 +93,7 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
       const instrumentSymbol = position.instrumentSymbol || `#${instrumentId}`;
       const instrumentName = position.instrumentName || position.name;
       const platformName = position.platformName || position.platformCode || 'Sin plataforma';
+      const instrumentMeta = instrumentsById.get(instrumentId);
 
       const currentGroup = grouped.get(instrumentId);
       if (!currentGroup) {
@@ -102,6 +111,10 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
           pnl: current - position.investedAmount,
           pnlPct: position.investedAmount > 0 ? ((current - position.investedAmount) / position.investedAmount) * 100 : 0,
           platforms: [platformName],
+          countryCode: instrumentMeta?.countryCode ?? instrumentMeta?.countryName ?? '',
+          region: instrumentMeta?.regionName ?? instrumentMeta?.regionCode ?? '',
+          sector: instrumentMeta?.sectorName ?? instrumentMeta?.sectorCode ?? '',
+          industry: instrumentMeta?.industryName ?? instrumentMeta?.industryCode ?? '',
         });
         continue;
       }
@@ -119,7 +132,7 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
     }
 
     return [...grouped.values()].sort((left, right) => right.currentValue - left.currentValue);
-  }, [positions]);
+  }, [positions, instruments]);
 
   return {
     summary,

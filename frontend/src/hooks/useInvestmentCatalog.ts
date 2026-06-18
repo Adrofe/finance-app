@@ -1,26 +1,74 @@
 import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import type { InvestmentInstrument, InvestmentPlatform, InvestmentType, PriceRefreshResult, PriceUpdateDraft } from '../types/investments';
+import type { CatalogOption, ExposureRefreshResult, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType, PriceRefreshResult, PriceUpdateDraft } from '../types/investments';
 import {
   fetchInvestmentTypes,
+  fetchCountryCatalog,
+  fetchRegionCatalog,
+  fetchSectorCatalog,
+  fetchIndustryCatalog,
+  fetchMarketRegimeCatalog,
+  createCountryCatalogOption,
+  updateCountryCatalogOption,
+  deleteCountryCatalogOption,
+  createRegionCatalogOption,
+  updateRegionCatalogOption,
+  deleteRegionCatalogOption,
+  upsertCountryExposureAlias,
+  upsertRegionExposureAlias,
+  createSectorCatalogOption,
+  updateSectorCatalogOption,
+  deleteSectorCatalogOption,
+  createIndustryCatalogOption,
+  updateIndustryCatalogOption,
+  deleteIndustryCatalogOption,
+  createMarketRegimeCatalogOption,
+  updateMarketRegimeCatalogOption,
+  deleteMarketRegimeCatalogOption,
   fetchInstruments, createInstrument, updateInstrument, deleteInstrument,
   fetchPlatforms, createPlatform, updatePlatform, deletePlatform,
+  fetchInstrumentExposures, createInstrumentExposure, updateInstrumentExposure, deleteInstrumentExposure,
   refreshInstrumentPrices,
+  refreshCompoundExposures,
   addManualInstrumentPrice,
 } from '../services/investmentCatalogService';
 
 export function useInvestmentCatalog(token: string, onUnauthorized?: (message: string) => void) {
   const [types, setTypes]               = useState<InvestmentType[]>([]);
+  const [countries, setCountries]       = useState<CatalogOption[]>([]);
+  const [regions, setRegions]           = useState<CatalogOption[]>([]);
+  const [sectors, setSectors]           = useState<CatalogOption[]>([]);
+  const [industries, setIndustries]     = useState<CatalogOption[]>([]);
+  const [marketRegimes, setMarketRegimes] = useState<CatalogOption[]>([]);
   const [instruments, setInstruments]   = useState<InvestmentInstrument[]>([]);
   const [platforms, setPlatforms]       = useState<InvestmentPlatform[]>([]);
+  const [exposuresByInstrument, setExposuresByInstrument] = useState<Record<number, InvestmentInstrumentExposure[]>>({});
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!token) { setLoading(false); return; }
     setLoading(true);
-    Promise.all([fetchInvestmentTypes(token), fetchInstruments(token), fetchPlatforms(token)])
-      .then(([t, i, p]) => { setTypes(t); setInstruments(i); setPlatforms(p); })
+    Promise.all([
+      fetchInvestmentTypes(token),
+      fetchCountryCatalog(token),
+      fetchRegionCatalog(token),
+      fetchSectorCatalog(token),
+      fetchIndustryCatalog(token),
+      fetchMarketRegimeCatalog(token),
+      fetchInstruments(token),
+      fetchPlatforms(token),
+    ])
+      .then(([t, c, r, s, d, m, i, p]) => {
+        setTypes(t);
+        setCountries(c);
+        setRegions(r);
+        setSectors(s);
+        setIndustries(d);
+        setMarketRegimes(m);
+        setInstruments(i);
+        setPlatforms(p);
+      })
       .catch((err) => {
         if (axios.isAxiosError(err) && err.response?.status === 401) {
           onUnauthorized?.('Session expired or invalid token. Please login again.');
@@ -34,6 +82,21 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
   useEffect(() => { load(); }, [load]);
 
   const clearError = useCallback(() => setError(null), []);
+
+  const reloadClassificationCatalogs = useCallback(async () => {
+    const [c, r, s, d, m] = await Promise.all([
+      fetchCountryCatalog(token),
+      fetchRegionCatalog(token),
+      fetchSectorCatalog(token),
+      fetchIndustryCatalog(token),
+      fetchMarketRegimeCatalog(token),
+    ]);
+    setCountries(c);
+    setRegions(r);
+    setSectors(s);
+    setIndustries(d);
+    setMarketRegimes(m);
+  }, [token]);
 
   // ── Instruments ──────────────────────────────────────────────────────────────
 
@@ -84,6 +147,50 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     }
   }, [token, onUnauthorized]);
 
+  const refreshExposures = useCallback(async (): Promise<ExposureRefreshResult> => {
+    try {
+      setError(null);
+      return await refreshCompoundExposures(token);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        onUnauthorized?.('Session expired or invalid token. Please login again.');
+      }
+      throw err;
+    }
+  }, [token, onUnauthorized]);
+
+  const loadInstrumentExposures = useCallback(async (instrumentId: number) => {
+    const exposures = await fetchInstrumentExposures(token, instrumentId);
+    setExposuresByInstrument(prev => ({ ...prev, [instrumentId]: exposures }));
+    return exposures;
+  }, [token]);
+
+  const addInstrumentExposure = useCallback(async (instrumentId: number, payload: Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>) => {
+    const created = await createInstrumentExposure(token, instrumentId, payload);
+    setExposuresByInstrument(prev => ({
+      ...prev,
+      [instrumentId]: [...(prev[instrumentId] ?? []), created].sort((a, b) => a.dimension.localeCompare(b.dimension)),
+    }));
+    return created;
+  }, [token]);
+
+  const editInstrumentExposure = useCallback(async (instrumentId: number, exposureId: number, payload: Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>) => {
+    const updated = await updateInstrumentExposure(token, instrumentId, exposureId, payload);
+    setExposuresByInstrument(prev => ({
+      ...prev,
+      [instrumentId]: (prev[instrumentId] ?? []).map(item => item.id === exposureId ? updated : item),
+    }));
+    return updated;
+  }, [token]);
+
+  const removeInstrumentExposure = useCallback(async (instrumentId: number, exposureId: number) => {
+    await deleteInstrumentExposure(token, instrumentId, exposureId);
+    setExposuresByInstrument(prev => ({
+      ...prev,
+      [instrumentId]: (prev[instrumentId] ?? []).filter(item => item.id !== exposureId),
+    }));
+  }, [token]);
+
   // ── Platforms ────────────────────────────────────────────────────────────────
 
   const addPlatform = useCallback(async (payload: Omit<InvestmentPlatform, 'id'>) => {
@@ -103,12 +210,136 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     setPlatforms(prev => prev.filter(p => p.id !== id));
   }, [token]);
 
+  // ── Classification catalogs ───────────────────────────────────────────────
+
+  const addCountry = useCallback(async (payload: Omit<CatalogOption, 'id'>) => {
+    const created = await createCountryCatalogOption(token, payload);
+    await reloadClassificationCatalogs();
+    return created;
+  }, [token, reloadClassificationCatalogs]);
+
+  const editCountry = useCallback(async (id: number, payload: Omit<CatalogOption, 'id'>) => {
+    const updated = await updateCountryCatalogOption(token, id, payload);
+    await reloadClassificationCatalogs();
+    return updated;
+  }, [token, reloadClassificationCatalogs]);
+
+  const removeCountry = useCallback(async (id: number) => {
+    await deleteCountryCatalogOption(token, id);
+    await reloadClassificationCatalogs();
+  }, [token, reloadClassificationCatalogs]);
+
+  const addRegion = useCallback(async (payload: Omit<CatalogOption, 'id'>) => {
+    const created = await createRegionCatalogOption(token, payload);
+    await reloadClassificationCatalogs();
+    return created;
+  }, [token, reloadClassificationCatalogs]);
+
+  const editRegion = useCallback(async (id: number, payload: Omit<CatalogOption, 'id'>) => {
+    const updated = await updateRegionCatalogOption(token, id, payload);
+    await reloadClassificationCatalogs();
+    return updated;
+  }, [token, reloadClassificationCatalogs]);
+
+  const removeRegion = useCallback(async (id: number) => {
+    await deleteRegionCatalogOption(token, id);
+    await reloadClassificationCatalogs();
+  }, [token, reloadClassificationCatalogs]);
+
+  const addSector = useCallback(async (payload: Omit<CatalogOption, 'id'>) => {
+    const created = await createSectorCatalogOption(token, payload);
+    await reloadClassificationCatalogs();
+    return created;
+  }, [token, reloadClassificationCatalogs]);
+
+  const editSector = useCallback(async (id: number, payload: Omit<CatalogOption, 'id'>) => {
+    const updated = await updateSectorCatalogOption(token, id, payload);
+    await reloadClassificationCatalogs();
+    return updated;
+  }, [token, reloadClassificationCatalogs]);
+
+  const removeSector = useCallback(async (id: number) => {
+    await deleteSectorCatalogOption(token, id);
+    await reloadClassificationCatalogs();
+  }, [token, reloadClassificationCatalogs]);
+
+  const addIndustry = useCallback(async (payload: Omit<CatalogOption, 'id'>) => {
+    const created = await createIndustryCatalogOption(token, payload);
+    await reloadClassificationCatalogs();
+    return created;
+  }, [token, reloadClassificationCatalogs]);
+
+  const editIndustry = useCallback(async (id: number, payload: Omit<CatalogOption, 'id'>) => {
+    const updated = await updateIndustryCatalogOption(token, id, payload);
+    await reloadClassificationCatalogs();
+    return updated;
+  }, [token, reloadClassificationCatalogs]);
+
+  const removeIndustry = useCallback(async (id: number) => {
+    await deleteIndustryCatalogOption(token, id);
+    await reloadClassificationCatalogs();
+  }, [token, reloadClassificationCatalogs]);
+
+  const addMarketRegime = useCallback(async (payload: Omit<CatalogOption, 'id'>) => {
+    const created = await createMarketRegimeCatalogOption(token, payload);
+    await reloadClassificationCatalogs();
+    return created;
+  }, [token, reloadClassificationCatalogs]);
+
+  const editMarketRegime = useCallback(async (id: number, payload: Omit<CatalogOption, 'id'>) => {
+    const updated = await updateMarketRegimeCatalogOption(token, id, payload);
+    await reloadClassificationCatalogs();
+    return updated;
+  }, [token, reloadClassificationCatalogs]);
+
+  const removeMarketRegime = useCallback(async (id: number) => {
+    await deleteMarketRegimeCatalogOption(token, id);
+    await reloadClassificationCatalogs();
+  }, [token, reloadClassificationCatalogs]);
+
+  const mapCountryExposureAlias = useCallback(async (sourceName: string, countryId: number) => {
+    try {
+      setError(null);
+      await upsertCountryExposureAlias(token, sourceName, countryId);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        onUnauthorized?.('Session expired or invalid token. Please login again.');
+      }
+      throw err;
+    }
+  }, [token, onUnauthorized]);
+
+  const mapRegionExposureAlias = useCallback(async (sourceName: string, regionId: number) => {
+    try {
+      setError(null);
+      await upsertRegionExposureAlias(token, sourceName, regionId);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        onUnauthorized?.('Session expired or invalid token. Please login again.');
+      }
+      throw err;
+    }
+  }, [token, onUnauthorized]);
+
   return {
-    types, instruments, platforms,
+    types, countries, regions, sectors, industries, marketRegimes, instruments, platforms,
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
     refreshPrices,
+    refreshExposures,
     addManualPrice,
+    exposuresByInstrument,
+    loadInstrumentExposures,
+    addInstrumentExposure,
+    editInstrumentExposure,
+    removeInstrumentExposure,
     addPlatform, editPlatform, removePlatform,
+    addCountry, editCountry, removeCountry,
+    addRegion, editRegion, removeRegion,
+    addSector, editSector, removeSector,
+    addIndustry, editIndustry, removeIndustry,
+    addMarketRegime, editMarketRegime, removeMarketRegime,
+    mapCountryExposureAlias,
+    mapRegionExposureAlias,
   };
 }

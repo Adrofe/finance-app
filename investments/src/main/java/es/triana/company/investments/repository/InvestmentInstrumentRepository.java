@@ -18,4 +18,12 @@ public interface InvestmentInstrumentRepository extends JpaRepository<Investment
 	boolean existsByCodeIgnoreCase(String code);
 
 	boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
+
+	boolean existsByCountryId(Long countryId);
+
+	boolean existsByRegionId(Long regionId);
+
+	boolean existsBySectorId(Long sectorId);
+
+	boolean existsByIndustryId(Long industryId);
 }

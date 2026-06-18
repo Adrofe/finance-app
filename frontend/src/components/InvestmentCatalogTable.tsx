@@ -6,7 +6,7 @@ import {
   INVESTMENT_MARKET_OPTIONS,
   INVESTMENT_PRICE_SOURCE_OPTIONS,
 } from '../constants/visualConfig';
-import type { InvestmentInstrument, InvestmentPlatform, InvestmentType } from '../types/investments';
+import type { CatalogOption, ExposureSuggestion, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType } from '../types/investments';
 import './investment-catalog.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -19,7 +19,9 @@ const fmtPrice = (n?: number) =>
 const fmtDate = (s?: string) =>
   s ? new Date(s).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-type Section = 'instruments' | 'platforms';
+type Section = 'instruments' | 'platforms' | 'classifications';
+type ClassificationKind = 'countries' | 'regions' | 'sectors' | 'industries' | 'marketRegimes';
+type ExposureMode = 'UNIQUE' | 'COMPOUND';
 
 // ─── Instrument form state ────────────────────────────────────────────────────
 
@@ -34,11 +36,26 @@ const EMPTY_INSTRUMENT = {
   lastPriceSource: '',
   lastPriceAt: '',
   scraperUrl: '',
+  finectUrl: '',
+  countryId: '',
+  regionId: '',
+  sectorId: '',
+  industryId: '',
 };
 
 // ─── Platform form state ──────────────────────────────────────────────────────
 
 const EMPTY_PLATFORM = { code: '', name: '' };
+const EMPTY_CLASSIFICATION = { code: '', name: '' };
+const EMPTY_EXPOSURE = {
+  dimension: 'SECTOR' as InvestmentInstrumentExposure['dimension'],
+  countryId: '',
+  regionId: '',
+  sectorId: '',
+  industryId: '',
+  marketRegimeId: '',
+  weightPct: '',
+};
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -53,7 +70,7 @@ const getTypeLabel = (type: InvestmentType) => {
 };
 
 // ─── Sort helpers ─────────────────────────────────────────────────────────────
-type SortColKey = 'name' | 'symbol' | 'code' | 'market' | 'currency';
+type SortColKey = 'name' | 'symbol' | 'code' | 'market' | 'currency' | 'countryCode' | 'region' | 'sector' | 'industry';
 
 const SortIcon = ({ col, active, dir }: { col: SortColKey; active: SortColKey; dir: 'asc' | 'desc' }) => (
   col !== active
@@ -65,18 +82,33 @@ const SortIcon = ({ col, active, dir }: { col: SortColKey; active: SortColKey; d
 
 export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized }) => {
   const {
-    types, instruments, platforms,
+    types, countries, regions, sectors, industries, marketRegimes, instruments, platforms,
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
     refreshPrices,
+    refreshExposures,
     addManualPrice,
     addPlatform, editPlatform, removePlatform,
+    addCountry, editCountry, removeCountry,
+    addRegion, editRegion, removeRegion,
+    addSector, editSector, removeSector,
+    addIndustry, editIndustry, removeIndustry,
+    addMarketRegime, editMarketRegime, removeMarketRegime,
+    mapCountryExposureAlias,
+    mapRegionExposureAlias,
+    exposuresByInstrument,
+    loadInstrumentExposures,
+    addInstrumentExposure,
+    editInstrumentExposure,
+    removeInstrumentExposure,
   } = useInvestmentCatalog(token, onUnauthorized);
 
   const [section, setSection] = useState<Section>('instruments');
+  const [classificationKind, setClassificationKind] = useState<ClassificationKind>('countries');
 
   // ── shared modal state ────────────────────────────────────────────────────
   const [showForm, setShowForm]           = useState(false);
+  const [showExposureModal, setShowExposureModal] = useState(false);
   const [editingId, setEditingId]         = useState<number | null>(null);
   const [submitting, setSubmitting]       = useState(false);
   const [formError, setFormError]         = useState<string | null>(null);
@@ -90,6 +122,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [searchQuery, setSearchQuery]           = useState('');
   const [sortKey, setSortKey]                   = useState<SortColKey>('name');
   const [sortDir, setSortDir]                   = useState<'asc' | 'desc'>('asc');
+  const [regionSuggestions, setRegionSuggestions] = useState<ExposureSuggestion[]>([]);
+  const [countrySuggestions, setCountrySuggestions] = useState<ExposureSuggestion[]>([]);
+  const [marketRegimeSuggestions, setMarketRegimeSuggestions] = useState<ExposureSuggestion[]>([]);
+  const [regionSuggestionTargets, setRegionSuggestionTargets] = useState<Record<string, string>>({});
+  const [countrySuggestionTargets, setCountrySuggestionTargets] = useState<Record<string, string>>({});
+  const [suggestionCreateKind, setSuggestionCreateKind] = useState<Record<string, 'regions' | 'countries' | 'marketRegimes'>>({});
+  const [mappingSuggestionKey, setMappingSuggestionKey] = useState<string | null>(null);
 
   // ── instrument form ───────────────────────────────────────────────────────
   const [instrForm, setInstrForm] = useState({ ...EMPTY_INSTRUMENT });
@@ -105,6 +144,39 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [platForm, setPlatForm] = useState({ ...EMPTY_PLATFORM });
   const onPlatChange = (k: keyof typeof EMPTY_PLATFORM, v: string) =>
     setPlatForm(s => ({ ...s, [k]: v }));
+
+  // ── classification form ───────────────────────────────────────────────────
+  const [classForm, setClassForm] = useState({ ...EMPTY_CLASSIFICATION });
+  const onClassChange = (k: keyof typeof EMPTY_CLASSIFICATION, v: string) =>
+    setClassForm(s => ({ ...s, [k]: v }));
+
+  const [exposureForm, setExposureForm] = useState({ ...EMPTY_EXPOSURE });
+  const [exposureEditingId, setExposureEditingId] = useState<number | null>(null);
+  const [exposureSubmitting, setExposureSubmitting] = useState(false);
+  const [exposureError, setExposureError] = useState<string | null>(null);
+  const [exposureMode, setExposureMode] = useState<ExposureMode>('UNIQUE');
+  const onExposureChange = (k: keyof typeof EMPTY_EXPOSURE, v: string) =>
+    setExposureForm(s => ({ ...s, [k]: v }));
+
+  const classificationItems = useMemo<CatalogOption[]>(() => {
+    switch (classificationKind) {
+      case 'countries': return countries;
+      case 'regions': return regions;
+      case 'sectors': return sectors;
+      case 'industries': return industries;
+      case 'marketRegimes': return marketRegimes;
+    }
+  }, [classificationKind, countries, regions, sectors, industries, marketRegimes]);
+
+  const classificationLabel = useMemo(() => {
+    switch (classificationKind) {
+      case 'countries': return 'Country';
+      case 'regions': return 'Region';
+      case 'sectors': return 'Sector';
+      case 'industries': return 'Industry';
+      case 'marketRegimes': return 'Market regime';
+    }
+  }, [classificationKind]);
 
   const [manualPriceForm, setManualPriceForm] = useState(() => ({
     instrumentId: '',
@@ -122,6 +194,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       i.name.toLowerCase().includes(q) ||
       i.symbol.toLowerCase().includes(q) ||
       i.code.toLowerCase().includes(q) ||
+      (i.countryName ?? i.countryCode ?? '').toLowerCase().includes(q) ||
+      (i.regionName ?? i.regionCode ?? '').toLowerCase().includes(q) ||
+      (i.sectorName ?? i.sectorCode ?? '').toLowerCase().includes(q) ||
+      (i.industryName ?? i.industryCode ?? '').toLowerCase().includes(q) ||
       (types.find(t => t.id === i.typeId)?.name ?? '').toLowerCase().includes(q)
     );
     return [...list].sort((a, b) => {
@@ -129,11 +205,19 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                : sortKey === 'code'     ? a.code
                : sortKey === 'market'   ? (a.market ?? '')
                : sortKey === 'currency' ? a.currency
+               : sortKey === 'countryCode' ? (a.countryName ?? a.countryCode ?? '')
+               : sortKey === 'region' ? (a.regionName ?? a.regionCode ?? '')
+               : sortKey === 'sector' ? (a.sectorName ?? a.sectorCode ?? '')
+               : sortKey === 'industry' ? (a.industryName ?? a.industryCode ?? '')
                : a.name;
       const bv = sortKey === 'symbol'   ? b.symbol
                : sortKey === 'code'     ? b.code
                : sortKey === 'market'   ? (b.market ?? '')
                : sortKey === 'currency' ? b.currency
+               : sortKey === 'countryCode' ? (b.countryName ?? b.countryCode ?? '')
+               : sortKey === 'region' ? (b.regionName ?? b.regionCode ?? '')
+               : sortKey === 'sector' ? (b.sectorName ?? b.sectorCode ?? '')
+               : sortKey === 'industry' ? (b.industryName ?? b.industryCode ?? '')
                : b.name;
       return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
     });
@@ -146,6 +230,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     );
   }, [platforms, searchQuery]);
 
+  const filteredClassifications = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return classificationItems.filter(item =>
+      !q || item.name.toLowerCase().includes(q) || item.code.toLowerCase().includes(q)
+    );
+  }, [classificationItems, searchQuery]);
+
   const toggleSort = (col: SortColKey) => {
     if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(col); setSortDir('asc'); }
@@ -154,16 +245,48 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   // ── open/close form ───────────────────────────────────────────────────────
   const openCreate = () => {
     setShowManualPrice(false);
+    setShowExposureModal(false);
     setManualError(null);
     setEditingId(null);
     setFormError(null);
+    setExposureMode('UNIQUE');
+    resetExposureForm();
     if (section === 'instruments') setInstrForm({ ...EMPTY_INSTRUMENT });
-    else setPlatForm({ ...EMPTY_PLATFORM });
+    else if (section === 'platforms') setPlatForm({ ...EMPTY_PLATFORM });
+    else setClassForm({ ...EMPTY_CLASSIFICATION });
     setShowForm(true);
   };
 
-  const openEdit = (item: InvestmentInstrument | InvestmentPlatform) => {
+  const openClassificationCreate = (kind: 'regions' | 'countries' | 'marketRegimes', presetName?: string) => {
+    setSection('classifications');
+    setClassificationKind(kind);
     setShowManualPrice(false);
+    setShowExposureModal(false);
+    setManualError(null);
+    setEditingId(null);
+    setFormError(null);
+    setClassForm({
+      code: presetName ? presetName.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') : '',
+      name: presetName ?? '',
+    });
+    setShowForm(true);
+  };
+
+  const openRegionCreate = (presetName?: string) => {
+    openClassificationCreate('regions', presetName);
+  };
+
+  const openCountryCreate = (presetName?: string) => {
+    openClassificationCreate('countries', presetName);
+  };
+
+  const openMarketRegimeCreate = (presetName?: string) => {
+    openClassificationCreate('marketRegimes', presetName);
+  };
+
+  const openEdit = async (item: InvestmentInstrument | InvestmentPlatform | CatalogOption) => {
+    setShowManualPrice(false);
+    setShowExposureModal(false);
     setManualError(null);
     setEditingId(item.id);
     setFormError(null);
@@ -180,15 +303,41 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPriceSource: i.lastPriceSource ?? '',
         lastPriceAt: i.lastPriceAt ? i.lastPriceAt.slice(0, 16) : '',
         scraperUrl: i.scraperUrl ?? '',
+        finectUrl: i.finectUrl ?? '',
+        countryId: i.countryId != null ? String(i.countryId) : '',
+        regionId: i.regionId != null ? String(i.regionId) : '',
+        sectorId: i.sectorId != null ? String(i.sectorId) : '',
+        industryId: i.industryId != null ? String(i.industryId) : '',
       });
+      setExposureEditingId(null);
+      setExposureError(null);
+      setExposureForm({ ...EMPTY_EXPOSURE });
+      try {
+        const loadedExposures = await loadInstrumentExposures(i.id);
+        setExposureMode(loadedExposures.length > 0 ? 'COMPOUND' : 'UNIQUE');
+      } catch (err: unknown) {
+        const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+        setExposureError(eRes?.response?.data?.message || eRes?.message || 'Error loading exposures');
+        setExposureMode('UNIQUE');
+      }
     } else {
-      const p = item as InvestmentPlatform;
-      setPlatForm({ code: p.code, name: p.name });
+      if (section === 'platforms') {
+        const p = item as InvestmentPlatform;
+        setPlatForm({ code: p.code, name: p.name });
+      } else {
+        const c = item as unknown as CatalogOption;
+        setClassForm({ code: c.code, name: c.name });
+      }
     }
     setShowForm(true);
   };
 
-  const closeForm = () => { setShowForm(false); setEditingId(null); setFormError(null); };
+  const closeForm = () => {
+    setShowForm(false);
+    setShowExposureModal(false);
+    setEditingId(null);
+    setFormError(null);
+  };
 
   const openManualPrice = () => {
     setShowForm(false);
@@ -228,6 +377,19 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         lastPriceSource: instrForm.lastPriceSource.trim() || undefined,
         lastPriceAt: instrForm.lastPriceAt || undefined,
         scraperUrl: instrForm.scraperUrl.trim() || undefined,
+        finectUrl: instrForm.finectUrl.trim() || undefined,
+        countryId: supportsExposureEditing && exposureMode === 'COMPOUND'
+          ? undefined
+          : (instrForm.countryId ? Number(instrForm.countryId) : undefined),
+        regionId: supportsExposureEditing && exposureMode === 'COMPOUND'
+          ? undefined
+          : (instrForm.regionId ? Number(instrForm.regionId) : undefined),
+        sectorId: supportsExposureEditing && exposureMode === 'COMPOUND'
+          ? undefined
+          : (instrForm.sectorId ? Number(instrForm.sectorId) : undefined),
+        industryId: supportsExposureEditing && exposureMode === 'COMPOUND'
+          ? undefined
+          : (instrForm.industryId ? Number(instrForm.industryId) : undefined),
       };
       if (editingId) await editInstrument(editingId, payload);
       else await addInstrument(payload);
@@ -260,13 +422,141 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     }
   };
 
+  const submitClassification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setSubmitting(true);
+    try {
+      const payload: Omit<CatalogOption, 'id'> = {
+        code: classForm.code.trim(),
+        name: classForm.name.trim(),
+      };
+
+      if (classificationKind === 'countries') {
+        if (editingId) await editCountry(editingId, payload);
+        else await addCountry(payload);
+      } else if (classificationKind === 'regions') {
+        if (editingId) await editRegion(editingId, payload);
+        else await addRegion(payload);
+      } else if (classificationKind === 'sectors') {
+        if (editingId) await editSector(editingId, payload);
+        else await addSector(payload);
+      } else if (classificationKind === 'marketRegimes') {
+        if (editingId) await editMarketRegime(editingId, payload);
+        else await addMarketRegime(payload);
+      } else {
+        if (editingId) await editIndustry(editingId, payload);
+        else await addIndustry(payload);
+      }
+
+      closeForm();
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setFormError(eRes?.response?.data?.message || eRes?.message || `Error saving ${classificationLabel.toLowerCase()}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resetExposureForm = () => {
+    setExposureEditingId(null);
+    setExposureError(null);
+    setExposureForm({ ...EMPTY_EXPOSURE });
+  };
+
+  const instrumentExposures = editingId ? exposuresByInstrument[editingId] ?? [] : [];
+  const supportsExposureEditing = Boolean(selectedType && ['ETF', 'FUND'].includes(selectedType.code));
+
+  const selectedExposureOptions = useMemo(() => {
+    switch (exposureForm.dimension) {
+      case 'COUNTRY': return countries;
+      case 'REGION': return regions;
+      case 'SECTOR': return sectors;
+      case 'INDUSTRY': return industries;
+      case 'MARKET_REGIME': return marketRegimes;
+    }
+  }, [countries, exposureForm.dimension, industries, marketRegimes, regions, sectors]);
+
+  const exposureTotalWeight = useMemo(
+    () => instrumentExposures.reduce((sum, item) => sum + Number(item.weightPct || 0), 0),
+    [instrumentExposures],
+  );
+
+  const submitExposure = async () => {
+    if (!editingId) return;
+    setExposureError(null);
+    setExposureSubmitting(true);
+    try {
+      const payload = {
+        dimension: exposureForm.dimension,
+        countryId: exposureForm.dimension === 'COUNTRY' && exposureForm.countryId ? Number(exposureForm.countryId) : undefined,
+        regionId: exposureForm.dimension === 'REGION' && exposureForm.regionId ? Number(exposureForm.regionId) : undefined,
+        sectorId: exposureForm.dimension === 'SECTOR' && exposureForm.sectorId ? Number(exposureForm.sectorId) : undefined,
+        industryId: exposureForm.dimension === 'INDUSTRY' && exposureForm.industryId ? Number(exposureForm.industryId) : undefined,
+        marketRegimeId: exposureForm.dimension === 'MARKET_REGIME' && exposureForm.marketRegimeId ? Number(exposureForm.marketRegimeId) : undefined,
+        weightPct: Number(exposureForm.weightPct),
+      } satisfies Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>;
+      if (exposureEditingId) await editInstrumentExposure(editingId, exposureEditingId, payload);
+      else await addInstrumentExposure(editingId, payload);
+      resetExposureForm();
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setExposureError(eRes?.response?.data?.message || eRes?.message || 'Error saving exposure');
+    } finally {
+      setExposureSubmitting(false);
+    }
+  };
+
+  const editExposure = (item: InvestmentInstrumentExposure) => {
+    setExposureEditingId(item.id);
+    setExposureError(null);
+    setExposureForm({
+      dimension: item.dimension,
+      countryId: item.countryId != null ? String(item.countryId) : '',
+      regionId: item.regionId != null ? String(item.regionId) : '',
+      sectorId: item.sectorId != null ? String(item.sectorId) : '',
+      industryId: item.industryId != null ? String(item.industryId) : '',
+      marketRegimeId: item.marketRegimeId != null ? String(item.marketRegimeId) : '',
+      weightPct: String(item.weightPct),
+    });
+  };
+
+  const deleteExposure = async (item: InvestmentInstrumentExposure) => {
+    if (!editingId) return;
+    setExposureError(null);
+    try {
+      await removeInstrumentExposure(editingId, item.id);
+      if (exposureEditingId === item.id) resetExposureForm();
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setExposureError(eRes?.response?.data?.message || eRes?.message || 'Error deleting exposure');
+    }
+  };
+
+  const openExposureManager = async () => {
+    if (!editingId) return;
+    setExposureError(null);
+    try {
+      await loadInstrumentExposures(editingId);
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setExposureError(eRes?.response?.data?.message || eRes?.message || 'Error loading exposures');
+    }
+    setShowExposureModal(true);
+  };
+
   // ── delete handler ────────────────────────────────────────────────────────
   const handleDelete = async () => {
     if (!confirmDelete) return;
     setDeleting(true);
     try {
       if (section === 'instruments') await removeInstrument(confirmDelete.id);
-      else await removePlatform(confirmDelete.id);
+      else if (section === 'platforms') await removePlatform(confirmDelete.id);
+      else if (classificationKind === 'countries') await removeCountry(confirmDelete.id);
+      else if (classificationKind === 'regions') await removeRegion(confirmDelete.id);
+      else if (classificationKind === 'sectors') await removeSector(confirmDelete.id);
+      else if (classificationKind === 'marketRegimes') await removeMarketRegime(confirmDelete.id);
+      else await removeIndustry(confirmDelete.id);
       setConfirmDelete(null);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } }; message?: string };
@@ -294,6 +584,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     setRefreshingPrices(true);
     try {
       const result = await refreshPrices();
+      if (result.mode === 'background-started') {
+        setRefreshMessage('Price refresh started in background. Reload in a few seconds to see updated values.');
+        return;
+      }
       setRefreshMessage(
         result.updatedInstruments > 0
           ? `Prices refreshed for ${result.updatedInstruments} instruments.`
@@ -304,6 +598,88 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       setRefreshMessage(e?.response?.data?.message || e?.message || 'Error refreshing instrument prices');
     } finally {
       setRefreshingPrices(false);
+    }
+  };
+
+  const handleRefreshExposures = async () => {
+    setRefreshMessage(null);
+    setRefreshingPrices(true);
+    try {
+      const result = await refreshExposures();
+      setRegionSuggestions(result.suggestedRegions ?? []);
+      setCountrySuggestions(result.suggestedCountries ?? []);
+      setMarketRegimeSuggestions(result.suggestedMarketRegimes ?? []);
+      setRegionSuggestionTargets({});
+      setCountrySuggestionTargets({});
+      const createKinds: Record<string, 'regions' | 'countries' | 'marketRegimes'> = {};
+      (result.suggestedRegions ?? []).forEach(item => {
+        createKinds[item.name] = 'regions';
+      });
+      (result.suggestedCountries ?? []).forEach(item => {
+        createKinds[item.name] = createKinds[item.name] ?? 'countries';
+      });
+      (result.suggestedMarketRegimes ?? []).forEach(item => {
+        createKinds[item.name] = 'marketRegimes';
+      });
+      setSuggestionCreateKind(createKinds);
+      setRefreshMessage(
+        result.updatedInstruments > 0
+          ? `Compound exposures refreshed for ${result.updatedInstruments} instruments and ${result.updatedExposures} rows.`
+          : 'Refresh finished. No compound exposures were updated.'
+      );
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setRefreshMessage(e?.response?.data?.message || e?.message || 'Error refreshing compound exposures');
+    } finally {
+      setRefreshingPrices(false);
+    }
+  };
+
+  const applyRegionSuggestionMapping = async (sourceName: string) => {
+    const selectedTarget = regionSuggestionTargets[sourceName];
+    if (!selectedTarget) {
+      setRefreshMessage(`Selecciona una región destino para "${sourceName}".`);
+      return;
+    }
+    setMappingSuggestionKey(`REGION:${sourceName}`);
+    try {
+      await mapRegionExposureAlias(sourceName, Number(selectedTarget));
+      setRegionSuggestions(prev => prev.filter(item => item.name !== sourceName));
+      setRegionSuggestionTargets(prev => {
+        const next = { ...prev };
+        delete next[sourceName];
+        return next;
+      });
+      setRefreshMessage(`Alias guardado: "${sourceName}" se asociará automáticamente en próximos refresh.`);
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setRefreshMessage(eRes?.response?.data?.message || eRes?.message || `No se pudo guardar el alias para "${sourceName}".`);
+    } finally {
+      setMappingSuggestionKey(null);
+    }
+  };
+
+  const applyCountrySuggestionMapping = async (sourceName: string) => {
+    const selectedTarget = countrySuggestionTargets[sourceName];
+    if (!selectedTarget) {
+      setRefreshMessage(`Selecciona un país destino para "${sourceName}".`);
+      return;
+    }
+    setMappingSuggestionKey(`COUNTRY:${sourceName}`);
+    try {
+      await mapCountryExposureAlias(sourceName, Number(selectedTarget));
+      setCountrySuggestions(prev => prev.filter(item => item.name !== sourceName));
+      setCountrySuggestionTargets(prev => {
+        const next = { ...prev };
+        delete next[sourceName];
+        return next;
+      });
+      setRefreshMessage(`Alias guardado: "${sourceName}" se asociará automáticamente en próximos refresh.`);
+    } catch (err: unknown) {
+      const eRes = err as { response?: { data?: { message?: string } }; message?: string };
+      setRefreshMessage(eRes?.response?.data?.message || eRes?.message || `No se pudo guardar el alias para "${sourceName}".`);
+    } finally {
+      setMappingSuggestionKey(null);
     }
   };
 
@@ -391,6 +767,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         >
           🏦 Platforms
         </button>
+        <button
+          type="button"
+          className={`ict-toggle-btn${section === 'classifications' ? ' active' : ''}`}
+          onClick={() => switchSection('classifications')}
+        >
+          🌍 Classifications
+        </button>
       </div>
 
       {/* ── KPI cards ────────────────────────────────────────────────────── */}
@@ -432,7 +815,9 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
             className="ict-search"
             placeholder={section === 'instruments'
               ? 'Buscar por nombre, símbolo, código o tipo…'
-              : 'Buscar plataforma…'}
+              : section === 'platforms'
+                ? 'Buscar plataforma…'
+                : 'Buscar clasificación…'}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
@@ -458,12 +843,28 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
               {refreshingPrices ? '⏳ Actualizando…' : '↻ Refresh prices'}
             </button>
           )}
+          {section === 'instruments' && (
+            <button
+              type="button"
+              className="ict-btn-refresh"
+              onClick={handleRefreshExposures}
+              disabled={refreshingPrices}
+            >
+              {refreshingPrices ? '⏳ Actualizando…' : '↻ Refresh exposures'}
+            </button>
+          )}
           <button
             type="button"
             className={`ict-btn-add${showForm ? ' ict-btn-add--cancel' : ''}`}
             onClick={showForm ? closeForm : openCreate}
           >
-            {showForm ? '✕ Cancelar' : section === 'instruments' ? '+ Nuevo activo' : '+ Nueva plataforma'}
+            {showForm
+              ? '✕ Cancelar'
+              : section === 'instruments'
+                ? '+ Nuevo activo'
+                : section === 'platforms'
+                  ? '+ Nueva plataforma'
+                  : `+ Nuevo ${classificationLabel}`}
           </button>
         </div>
       </div>
@@ -480,6 +881,146 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         <div className="ict-toast-info" role="status">
           <span>{refreshMessage}</span>
           <button type="button" onClick={() => setRefreshMessage(null)}>Cerrar</button>
+        </div>
+      )}
+
+      {regionSuggestions.length > 0 && (
+        <div className="ict-toast-warning" role="status">
+          <div className="ict-toast-warning__content">
+            <strong>Regiones detectadas sin catálogo</strong>
+            <p>Puedes asociarlas a una región existente para guardar el alias en BBDD, o crear una nueva.</p>
+            <ul className="ict-suggestion-list">
+              {regionSuggestions.map(item => (
+                <li key={item.name} className="ict-suggestion-row">
+                  <span>{item.name}{item.occurrences > 1 ? ` (${item.occurrences})` : ''}</span>
+                  <select
+                    className="ict-select"
+                    value={regionSuggestionTargets[item.name] ?? ''}
+                    onChange={(e) => setRegionSuggestionTargets(prev => ({ ...prev, [item.name]: e.target.value }))}
+                  >
+                    <option value="">Asociar a región...</option>
+                    {regions.map(region => (
+                      <option key={region.id} value={region.id}>{region.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="ict-btn-mini"
+                    onClick={() => applyRegionSuggestionMapping(item.name)}
+                    disabled={mappingSuggestionKey === `REGION:${item.name}`}
+                  >
+                    {mappingSuggestionKey === `REGION:${item.name}` ? 'Guardando…' : 'Asociar'}
+                  </button>
+                  <select
+                    className="ict-select"
+                    value={suggestionCreateKind[item.name] ?? 'regions'}
+                    onChange={(e) => setSuggestionCreateKind(prev => ({
+                      ...prev,
+                      [item.name]: e.target.value as 'regions' | 'countries' | 'marketRegimes',
+                    }))}
+                  >
+                    <option value="regions">Crear como región</option>
+                    <option value="countries">Crear como país</option>
+                    <option value="marketRegimes">Crear como market regime</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="ict-btn-mini"
+                    onClick={() => (suggestionCreateKind[item.name] === 'countries'
+                      ? openCountryCreate(item.name)
+                      : suggestionCreateKind[item.name] === 'marketRegimes'
+                        ? openMarketRegimeCreate(item.name)
+                        : openRegionCreate(item.name))}
+                  >
+                    Crear
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" onClick={() => setRegionSuggestions([])}>Cerrar</button>
+        </div>
+      )}
+
+      {countrySuggestions.length > 0 && (
+        <div className="ict-toast-warning" role="status">
+          <div className="ict-toast-warning__content">
+            <strong>Países detectados sin catálogo</strong>
+            <p>Asócialos a un país existente para guardar el alias y evitar nuevas incidencias.</p>
+            <ul className="ict-suggestion-list">
+              {countrySuggestions.map(item => (
+                <li key={item.name} className="ict-suggestion-row">
+                  <span>{item.name}{item.occurrences > 1 ? ` (${item.occurrences})` : ''}</span>
+                  <select
+                    className="ict-select"
+                    value={countrySuggestionTargets[item.name] ?? ''}
+                    onChange={(e) => setCountrySuggestionTargets(prev => ({ ...prev, [item.name]: e.target.value }))}
+                  >
+                    <option value="">Asociar a país...</option>
+                    {countries.map(country => (
+                      <option key={country.id} value={country.id}>{country.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="ict-btn-mini"
+                    onClick={() => applyCountrySuggestionMapping(item.name)}
+                    disabled={mappingSuggestionKey === `COUNTRY:${item.name}`}
+                  >
+                    {mappingSuggestionKey === `COUNTRY:${item.name}` ? 'Guardando…' : 'Asociar'}
+                  </button>
+                  <select
+                    className="ict-select"
+                    value={suggestionCreateKind[item.name] ?? 'countries'}
+                    onChange={(e) => setSuggestionCreateKind(prev => ({
+                      ...prev,
+                      [item.name]: e.target.value as 'regions' | 'countries' | 'marketRegimes',
+                    }))}
+                  >
+                    <option value="countries">Crear como país</option>
+                    <option value="regions">Crear como región</option>
+                    <option value="marketRegimes">Crear como market regime</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="ict-btn-mini"
+                    onClick={() => (suggestionCreateKind[item.name] === 'regions'
+                      ? openRegionCreate(item.name)
+                      : suggestionCreateKind[item.name] === 'marketRegimes'
+                        ? openMarketRegimeCreate(item.name)
+                        : openCountryCreate(item.name))}
+                  >
+                    Crear
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" onClick={() => setCountrySuggestions([])}>Cerrar</button>
+        </div>
+      )}
+
+      {marketRegimeSuggestions.length > 0 && (
+        <div className="ict-toast-warning" role="status">
+          <div className="ict-toast-warning__content">
+            <strong>Market regimes detectados sin catálogo</strong>
+            <p>Puedes crearlos directamente para que queden disponibles en la dimensión MARKET_REGIME.</p>
+            <ul className="ict-suggestion-list">
+              {marketRegimeSuggestions.map(item => (
+                <li key={item.name} className="ict-suggestion-row">
+                  <span>{item.name}{item.occurrences > 1 ? ` (${item.occurrences})` : ''}</span>
+                  <button
+                    type="button"
+                    className="ict-btn-mini"
+                    onClick={() => openMarketRegimeCreate(item.name)}
+                  >
+                    Crear
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" onClick={() => setMarketRegimeSuggestions([])}>Cerrar</button>
         </div>
       )}
 
@@ -711,7 +1252,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 />
               </div>
               <div className="modal-row">
-                <label>Scraper URL</label>
+                <label>Price scraper URL</label>
                 <input
                   type="url"
                   maxLength={500}
@@ -720,12 +1261,214 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                   onChange={e => onInstrChange('scraperUrl', e.target.value)}
                 />
               </div>
+              <div className="modal-row">
+                <label>Finect URL</label>
+                <input
+                  type="url"
+                  maxLength={500}
+                  placeholder="https://..."
+                  value={instrForm.finectUrl}
+                  onChange={e => onInstrChange('finectUrl', e.target.value)}
+                />
+              </div>
+              {supportsExposureEditing && (
+                <div className="ict-exposure-mode-switch">
+                  <span className="ict-exposure-mode-switch__label">Exposure mode</span>
+                  <div className="ict-exposure-mode-switch__controls">
+                    <button
+                      type="button"
+                      className={`ict-toggle-chip${exposureMode === 'UNIQUE' ? ' active' : ''}`}
+                      onClick={() => setExposureMode('UNIQUE')}
+                    >
+                      Unique
+                    </button>
+                    <button
+                      type="button"
+                      className={`ict-toggle-chip${exposureMode === 'COMPOUND' ? ' active' : ''}`}
+                      onClick={() => setExposureMode('COMPOUND')}
+                    >
+                      Compound
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(!supportsExposureEditing || exposureMode === 'UNIQUE') && (
+                <>
+                  <div className="modal-row">
+                    <label>Country</label>
+                    <select
+                      className="modal-select"
+                      value={instrForm.countryId}
+                      onChange={e => onInstrChange('countryId', e.target.value)}
+                    >
+                      <option value="">-- Select country --</option>
+                      {countries.map(option => (
+                        <option key={option.id} value={option.id}>{option.name} ({option.code})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="modal-row">
+                    <label>Region</label>
+                    <select
+                      className="modal-select"
+                      value={instrForm.regionId}
+                      onChange={e => onInstrChange('regionId', e.target.value)}
+                    >
+                      <option value="">-- Select region --</option>
+                      {regions.map(option => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="modal-row">
+                    <label>Sector</label>
+                    <select
+                      className="modal-select"
+                      value={instrForm.sectorId}
+                      onChange={e => onInstrChange('sectorId', e.target.value)}
+                    >
+                      <option value="">-- Select sector --</option>
+                      {sectors.map(option => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="modal-row">
+                    <label>Industry</label>
+                    <select
+                      className="modal-select"
+                      value={instrForm.industryId}
+                      onChange={e => onInstrChange('industryId', e.target.value)}
+                    >
+                      <option value="">-- Select industry --</option>
+                      {industries.map(option => (
+                        <option key={option.id} value={option.id}>{option.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {supportsExposureEditing && exposureMode === 'COMPOUND' && (
+                <div className="ict-exposure-summary-row">
+                  <div className="ict-exposure-summary-row__text">
+                    <strong>Compound exposure enabled</strong>
+                    {editingId
+                      ? <span>{instrumentExposures.length} entries • total {exposureTotalWeight.toFixed(2)}%</span>
+                      : <span>Save the instrument first to configure compound exposure.</span>}
+                  </div>
+                  <button
+                    type="button"
+                    className="ict-btn-manage-exposure"
+                    onClick={openExposureManager}
+                    disabled={!editingId}
+                  >
+                    Manage exposure
+                  </button>
+                </div>
+              )}
               {formError && <div className="modal-error">{formError}</div>}
               <div className="modal-actions">
                 <button className="at-btn-primary" type="submit" disabled={submitting}>
                   {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Create'}
                 </button>
                 <button className="at-btn-secondary" type="button" onClick={closeForm}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showExposureModal && showForm && section === 'instruments' && supportsExposureEditing && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal ict-exposure-modal">
+            <div className="modal-header">
+              <h4>Compound exposure editor</h4>
+              <button className="modal-close" type="button" onClick={() => setShowExposureModal(false)}>✕</button>
+            </div>
+            <form
+              className="modal-body"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void submitExposure();
+              }}
+            >
+              <div className="ict-exposure-form-grid">
+                <div className="modal-row">
+                  <label>Dimension</label>
+                  <select
+                    className="modal-select"
+                    value={exposureForm.dimension}
+                    onChange={e => onExposureChange('dimension', e.target.value)}
+                  >
+                    <option value="SECTOR">Sector</option>
+                    <option value="REGION">Region</option>
+                    <option value="COUNTRY">Country</option>
+                    <option value="INDUSTRY">Industry</option>
+                    <option value="MARKET_REGIME">Market regime</option>
+                  </select>
+                </div>
+                <div className="modal-row">
+                  <label>{exposureForm.dimension === 'COUNTRY' ? 'Country' : exposureForm.dimension === 'REGION' ? 'Region' : exposureForm.dimension === 'SECTOR' ? 'Sector' : exposureForm.dimension === 'INDUSTRY' ? 'Industry' : 'Market regime'}</label>
+                  <select
+                    className="modal-select"
+                    value={exposureForm.dimension === 'COUNTRY' ? exposureForm.countryId : exposureForm.dimension === 'REGION' ? exposureForm.regionId : exposureForm.dimension === 'SECTOR' ? exposureForm.sectorId : exposureForm.dimension === 'INDUSTRY' ? exposureForm.industryId : exposureForm.marketRegimeId}
+                    onChange={e => {
+                      const next = e.target.value;
+                      setExposureForm(current => ({
+                        ...current,
+                        countryId: exposureForm.dimension === 'COUNTRY' ? next : '',
+                        regionId: exposureForm.dimension === 'REGION' ? next : '',
+                        sectorId: exposureForm.dimension === 'SECTOR' ? next : '',
+                        industryId: exposureForm.dimension === 'INDUSTRY' ? next : '',
+                        marketRegimeId: exposureForm.dimension === 'MARKET_REGIME' ? next : '',
+                      }));
+                    }}
+                  >
+                    <option value="">-- Select bucket --</option>
+                    {selectedExposureOptions.map(option => (
+                      <option key={option.id} value={option.id}>{option.name} ({option.code})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="modal-row">
+                  <label>Weight %</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={exposureForm.weightPct}
+                    onChange={e => onExposureChange('weightPct', e.target.value)}
+                    placeholder="e.g. 12.5"
+                  />
+                </div>
+              </div>
+
+              <div className="modal-actions modal-actions--compact">
+                <button className="at-btn-primary" type="submit" disabled={exposureSubmitting}>
+                  {exposureSubmitting ? 'Saving…' : exposureEditingId ? 'Update exposure' : 'Add exposure'}
+                </button>
+                <button className="at-btn-secondary" type="button" onClick={resetExposureForm}>Clear</button>
+              </div>
+
+              {exposureError && <div className="modal-error">{exposureError}</div>}
+
+              <div className="ict-exposure-list">
+                {instrumentExposures.length === 0 ? (
+                  <div className="ict-empty ict-empty--compact">No exposures added yet.</div>
+                ) : instrumentExposures.map(item => (
+                  <div key={item.id} className="ict-exposure-item">
+                    <span className="ict-exposure-item__label">{item.dimension}</span>
+                    <span className="ict-exposure-item__bucket">{item.bucketName ?? item.bucketCode ?? '—'}</span>
+                    <span className="ict-exposure-item__weight">{Number(item.weightPct).toFixed(2)}%</span>
+                    <div className="ict-actions">
+                      <button type="button" className="ict-btn-icon" onClick={() => editExposure(item)}>✏️</button>
+                      <button type="button" className="ict-btn-icon ict-btn-icon--danger" onClick={() => deleteExposure(item)}>🗑</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </form>
           </div>
@@ -759,6 +1502,47 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                   placeholder="Full name"
                   value={platForm.name}
                   onChange={e => onPlatChange('name', e.target.value)}
+                />
+              </div>
+              {formError && <div className="modal-error">{formError}</div>}
+              <div className="modal-actions">
+                <button className="at-btn-primary" type="submit" disabled={submitting}>
+                  {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Create'}
+                </button>
+                <button className="at-btn-secondary" type="button" onClick={closeForm}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══ CLASSIFICATION FORM MODAL ══ */}
+      {showForm && section === 'classifications' && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <h4>{editingId ? `Edit ${classificationLabel}` : `New ${classificationLabel}`}</h4>
+              <button className="modal-close" type="button" onClick={closeForm}>✕</button>
+            </div>
+            <form onSubmit={submitClassification} className="modal-body">
+              <div className="modal-row">
+                <label>Code *</label>
+                <input
+                  required
+                  maxLength={classificationKind === 'countries' ? 2 : classificationKind === 'regions' ? 40 : classificationKind === 'sectors' ? 60 : classificationKind === 'industries' ? 80 : 80}
+                  placeholder={`e.g. ${classificationKind === 'countries' ? 'US' : 'TECH'}`}
+                  value={classForm.code}
+                  onChange={e => onClassChange('code', e.target.value.toUpperCase())}
+                />
+              </div>
+              <div className="modal-row">
+                <label>Name *</label>
+                <input
+                  required
+                  maxLength={classificationKind === 'countries' ? 120 : classificationKind === 'regions' ? 120 : classificationKind === 'sectors' ? 140 : classificationKind === 'industries' ? 180 : 160}
+                  placeholder={`Display name for ${classificationLabel.toLowerCase()}`}
+                  value={classForm.name}
+                  onChange={e => onClassChange('name', e.target.value)}
                 />
               </div>
               {formError && <div className="modal-error">{formError}</div>}
@@ -820,16 +1604,29 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 <th className="ict-th ict-th-sortable" onClick={() => toggleSort('currency')}>
                   Currency <SortIcon col="currency" active={sortKey} dir={sortDir} />
                 </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('countryCode')}>
+                  Country <SortIcon col="countryCode" active={sortKey} dir={sortDir} />
+                </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('region')}>
+                  Region <SortIcon col="region" active={sortKey} dir={sortDir} />
+                </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('sector')}>
+                  Sector <SortIcon col="sector" active={sortKey} dir={sortDir} />
+                </th>
+                <th className="ict-th ict-th-sortable" onClick={() => toggleSort('industry')}>
+                  Industry <SortIcon col="industry" active={sortKey} dir={sortDir} />
+                </th>
                 <th className="ict-th ict-th--right">Last price</th>
                 <th className="ict-th">Source</th>
                 <th className="ict-th">Price date</th>
-                <th className="ict-th">Scraper</th>
+                <th className="ict-th">Price URL</th>
+                <th className="ict-th">Finect URL</th>
                 <th className="ict-th ict-th--actions" aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
               {filteredInstruments.length === 0 && (
-                <tr><td colSpan={11} className="ict-empty">
+                <tr><td colSpan={16} className="ict-empty">
                   {instruments.length === 0
                     ? 'No hay activos. Añade uno para empezar.'
                     : 'Ningún activo coincide con la búsqueda.'}
@@ -859,12 +1656,23 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                     </td>
                     <td className="ict-td"><span className="ict-muted">{instr.market ?? '—'}</span></td>
                     <td className="ict-td"><span className="ict-badge" style={{ background: '#f5f3ff', color: '#5b21b6', borderColor: '#ddd6fe' }}>{instr.currency}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.countryName ?? instr.countryCode ?? '—'}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.regionName ?? instr.regionCode ?? '—'}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.sectorName ?? instr.sectorCode ?? '—'}</span></td>
+                    <td className="ict-td"><span className="ict-muted">{instr.industryName ?? instr.industryCode ?? '—'}</span></td>
                     <td className="ict-td ict-td--right"><span className="ict-price">{fmtPrice(instr.lastPrice)}</span></td>
                     <td className="ict-td"><span className="ict-muted">{instr.lastPriceSource ?? '—'}</span></td>
                     <td className="ict-td"><span className="ict-muted">{fmtDate(instr.lastPriceAt)}</span></td>
                     <td className="ict-td">
                       {instr.scraperUrl ? (
                         <a className="ict-scraper-link" href={instr.scraperUrl} target="_blank" rel="noreferrer">🔗 URL</a>
+                      ) : (
+                        <span className="ict-muted">—</span>
+                      )}
+                    </td>
+                    <td className="ict-td">
+                      {instr.finectUrl ? (
+                        <a className="ict-scraper-link" href={instr.finectUrl} target="_blank" rel="noreferrer">🔗 Finect</a>
                       ) : (
                         <span className="ict-muted">—</span>
                       )}
@@ -937,6 +1745,47 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* ══ CLASSIFICATION TABLE ══ */}
+      {section === 'classifications' && (
+        <>
+          <div className="ict-section-toggle" style={{ marginTop: '-4px' }}>
+            <button type="button" className={`ict-toggle-btn${classificationKind === 'countries' ? ' active' : ''}`} onClick={() => setClassificationKind('countries')}>Countries</button>
+            <button type="button" className={`ict-toggle-btn${classificationKind === 'regions' ? ' active' : ''}`} onClick={() => setClassificationKind('regions')}>Regions</button>
+            <button type="button" className={`ict-toggle-btn${classificationKind === 'sectors' ? ' active' : ''}`} onClick={() => setClassificationKind('sectors')}>Sectors</button>
+            <button type="button" className={`ict-toggle-btn${classificationKind === 'industries' ? ' active' : ''}`} onClick={() => setClassificationKind('industries')}>Industries</button>
+            <button type="button" className={`ict-toggle-btn${classificationKind === 'marketRegimes' ? ' active' : ''}`} onClick={() => setClassificationKind('marketRegimes')}>Market Regimes</button>
+          </div>
+          <div className="ict-container">
+            <table className="ict-table">
+              <thead>
+                <tr>
+                  <th className="ict-th">Code</th>
+                  <th className="ict-th">Name</th>
+                  <th className="ict-th ict-th--actions" aria-label="Actions"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClassifications.length === 0 && (
+                  <tr><td colSpan={3} className="ict-empty">No hay elementos para este catálogo.</td></tr>
+                )}
+                {filteredClassifications.map(item => (
+                  <tr key={item.id} className="ict-row">
+                    <td className="ict-td"><span className="ict-code">{item.code}</span></td>
+                    <td className="ict-td"><span className="ict-name">{item.name}</span></td>
+                    <td className="ict-td">
+                      <div className="ict-actions">
+                        <button type="button" className="ict-btn-icon" title="Edit" onClick={() => openEdit(item)}>✏️</button>
+                        <button type="button" className="ict-btn-icon ict-btn-icon--danger" title="Delete" onClick={() => setConfirmDelete({ id: item.id, name: item.name })}>🗑</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

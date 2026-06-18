@@ -37,11 +37,32 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
   const { summary, positions, byInstrument, loading, error, clearError, reload } = useInvestmentsOverview(token, onUnauthorized);
   const [recalculating, setRecalculating] = useState(false);
   const [search, setSearch] = useState('');
+  const [countryFilter, setCountryFilter] = useState('');
+  const [regionFilter, setRegionFilter] = useState('');
+  const [sectorFilter, setSectorFilter] = useState('');
+  const [industryFilter, setIndustryFilter] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('currentValue');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [normalizeToEur, setNormalizeToEur] = useState(false);
   const [eurRates, setEurRates] = useState<Map<string, number>>(new Map());
   const [loadingRates, setLoadingRates] = useState(false);
+
+  const countryOptions = useMemo(
+    () => [...new Set(byInstrument.map((g) => g.countryCode).filter(Boolean))].sort(),
+    [byInstrument],
+  );
+  const regionOptions = useMemo(
+    () => [...new Set(byInstrument.map((g) => g.region).filter(Boolean))].sort(),
+    [byInstrument],
+  );
+  const sectorOptions = useMemo(
+    () => [...new Set(byInstrument.map((g) => g.sector).filter(Boolean))].sort(),
+    [byInstrument],
+  );
+  const industryOptions = useMemo(
+    () => [...new Set(byInstrument.map((g) => g.industry).filter(Boolean))].sort(),
+    [byInstrument],
+  );
 
   const foreignCurrenciesStr = useMemo(
     () => [...new Set(byInstrument.map((g) => g.currency).filter((c) => c && c !== 'EUR'))].sort().join(','),
@@ -121,7 +142,15 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
         )
       : byInstrument;
 
-    return [...filtered].sort((a, b) => {
+    const classificationFiltered = filtered.filter((g) => {
+      if (countryFilter && g.countryCode !== countryFilter) return false;
+      if (regionFilter && g.region !== regionFilter) return false;
+      if (sectorFilter && g.sector !== sectorFilter) return false;
+      if (industryFilter && g.industry !== industryFilter) return false;
+      return true;
+    });
+
+    return [...classificationFiltered].sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
         case 'symbol':         cmp = a.instrumentSymbol.localeCompare(b.instrumentSymbol); break;
@@ -133,7 +162,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [byInstrument, search, sortKey, sortDir, normalizeToEur, toEur]);
+  }, [byInstrument, search, sortKey, sortDir, normalizeToEur, toEur, countryFilter, regionFilter, sectorFilter, industryFilter]);
 
   if (loading) {
     return <p className="state">Cargando resumen de inversiones…</p>;
@@ -232,6 +261,38 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
         </div>
       </div>
 
+      <div className="io-filters-row">
+        <select className="io-filter-select" value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)}>
+          <option value="">País (todos)</option>
+          {countryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <select className="io-filter-select" value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)}>
+          <option value="">Región (todas)</option>
+          {regionOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <select className="io-filter-select" value={sectorFilter} onChange={(e) => setSectorFilter(e.target.value)}>
+          <option value="">Sector (todos)</option>
+          {sectorOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <select className="io-filter-select" value={industryFilter} onChange={(e) => setIndustryFilter(e.target.value)}>
+          <option value="">Industria (todas)</option>
+          {industryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <button
+          type="button"
+          className="io-btn-clear-filters"
+          onClick={() => {
+            setCountryFilter('');
+            setRegionFilter('');
+            setSectorFilter('');
+            setIndustryFilter('');
+          }}
+          disabled={!countryFilter && !regionFilter && !sectorFilter && !industryFilter}
+        >
+          Limpiar filtros
+        </button>
+      </div>
+
       {/* ── Table ────────────────────────────────────────────────────────── */}
       <div className="io-table-wrap">
         <table className="io-table">
@@ -241,6 +302,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
                 Instrumento <SortIcon active={sortKey === 'symbol'} dir={sortDir} />
               </th>
               <th>Plataformas</th>
+              <th>Clasificación</th>
               <th className="io-right">Pos.</th>
               <th className="io-right io-th-sortable" onClick={() => handleSort('quantity')}>
                 Cantidad <SortIcon active={sortKey === 'quantity'} dir={sortDir} />
@@ -262,7 +324,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
           <tbody>
             {displayRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="io-empty">
+                <td colSpan={9} className="io-empty">
                   {search ? 'No hay instrumentos que coincidan con el filtro.' : 'Todavía no hay inversiones para mostrar.'}
                 </td>
               </tr>
@@ -293,6 +355,17 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
                       {group.platforms.map((p) => (
                         <span key={p} className="io-platform-chip">{p}</span>
                       ))}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="io-classification">
+                      {group.countryCode && <span className="io-class-chip">🌍 {group.countryCode}</span>}
+                      {group.region && <span className="io-class-chip">{group.region}</span>}
+                      {group.sector && <span className="io-class-chip">{group.sector}</span>}
+                      {group.industry && <span className="io-class-chip">{group.industry}</span>}
+                      {!group.countryCode && !group.region && !group.sector && !group.industry && (
+                        <span className="io-dim">—</span>
+                      )}
                     </div>
                   </td>
                   <td className="io-right io-dim">{group.positions}</td>

@@ -1,10 +1,13 @@
 import axios from 'axios';
 import type { ApiResponse } from '../types/api';
 import type {
+  CatalogOption,
   InvestmentInstrument,
   InvestmentPlatform,
   InvestmentType,
+  InvestmentInstrumentExposure,
   PriceRefreshResult,
+  ExposureRefreshResult,
   PriceUpdateDraft,
 } from '../types/investments';
 
@@ -18,6 +21,128 @@ const headers = (token: string) => ({ Authorization: `Bearer ${token}` });
 export async function fetchInvestmentTypes(token: string): Promise<InvestmentType[]> {
   const res = await axios.get<ApiResponse<InvestmentType[]>>(`${BASE}/types`, { headers: headers(token) });
   return res.data.data ?? [];
+}
+
+export async function fetchCountryCatalog(token: string): Promise<CatalogOption[]> {
+  const res = await axios.get<ApiResponse<CatalogOption[]>>(`${BASE}/countries`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function fetchRegionCatalog(token: string): Promise<CatalogOption[]> {
+  const res = await axios.get<ApiResponse<CatalogOption[]>>(`${BASE}/regions`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function fetchSectorCatalog(token: string): Promise<CatalogOption[]> {
+  const res = await axios.get<ApiResponse<CatalogOption[]>>(`${BASE}/sectors`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function fetchIndustryCatalog(token: string): Promise<CatalogOption[]> {
+  const res = await axios.get<ApiResponse<CatalogOption[]>>(`${BASE}/industries`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function fetchMarketRegimeCatalog(token: string): Promise<CatalogOption[]> {
+  const res = await axios.get<ApiResponse<CatalogOption[]>>(`${BASE}/market-regimes`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function createCountryCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/countries`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateCountryCatalogOption(token: string, id: number, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.put<ApiResponse<CatalogOption>>(`${BASE}/countries/${id}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteCountryCatalogOption(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/countries/${id}`, { headers: headers(token) });
+}
+
+export async function createRegionCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/regions`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateRegionCatalogOption(token: string, id: number, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.put<ApiResponse<CatalogOption>>(`${BASE}/regions/${id}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteRegionCatalogOption(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/regions/${id}`, { headers: headers(token) });
+}
+
+export async function upsertCountryExposureAlias(token: string, sourceName: string, targetId: number): Promise<void> {
+  await axios.post(`${BASE}/countries/aliases`, { sourceName, targetId }, { headers: headers(token) });
+}
+
+export async function upsertRegionExposureAlias(token: string, sourceName: string, targetId: number): Promise<void> {
+  await axios.post(`${BASE}/regions/aliases`, { sourceName, targetId }, { headers: headers(token) });
+}
+
+export async function createSectorCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/sectors`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateSectorCatalogOption(token: string, id: number, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.put<ApiResponse<CatalogOption>>(`${BASE}/sectors/${id}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteSectorCatalogOption(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/sectors/${id}`, { headers: headers(token) });
+}
+
+export async function createIndustryCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/industries`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateIndustryCatalogOption(token: string, id: number, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.put<ApiResponse<CatalogOption>>(`${BASE}/industries/${id}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteIndustryCatalogOption(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/industries/${id}`, { headers: headers(token) });
+}
+
+export async function createMarketRegimeCatalogOption(token: string, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.post<ApiResponse<CatalogOption>>(`${BASE}/market-regimes`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateMarketRegimeCatalogOption(token: string, id: number, payload: Omit<CatalogOption, 'id'>): Promise<CatalogOption> {
+  const res = await axios.put<ApiResponse<CatalogOption>>(`${BASE}/market-regimes/${id}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteMarketRegimeCatalogOption(token: string, id: number): Promise<void> {
+  await axios.delete(`${BASE}/market-regimes/${id}`, { headers: headers(token) });
+}
+
+export async function fetchInstrumentExposures(token: string, instrumentId: number): Promise<InvestmentInstrumentExposure[]> {
+  const res = await axios.get<ApiResponse<InvestmentInstrumentExposure[]>>(`${BASE}/instruments/${instrumentId}/exposures`, { headers: headers(token) });
+  return res.data.data ?? [];
+}
+
+export async function createInstrumentExposure(token: string, instrumentId: number, payload: Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>): Promise<InvestmentInstrumentExposure> {
+  const res = await axios.post<ApiResponse<InvestmentInstrumentExposure>>(`${BASE}/instruments/${instrumentId}/exposures`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function updateInstrumentExposure(token: string, instrumentId: number, exposureId: number, payload: Omit<InvestmentInstrumentExposure, 'id' | 'instrumentId' | 'bucketCode' | 'bucketName'>): Promise<InvestmentInstrumentExposure> {
+  const res = await axios.put<ApiResponse<InvestmentInstrumentExposure>>(`${BASE}/instruments/${instrumentId}/exposures/${exposureId}`, payload, { headers: headers(token) });
+  return res.data.data;
+}
+
+export async function deleteInstrumentExposure(token: string, instrumentId: number, exposureId: number): Promise<void> {
+  await axios.delete(`${BASE}/instruments/${instrumentId}/exposures/${exposureId}`, { headers: headers(token) });
 }
 
 // ─── Instruments ──────────────────────────────────────────────────────────────
@@ -64,6 +189,16 @@ export async function deletePlatform(token: string, id: number): Promise<void> {
 
 export async function refreshInstrumentPrices(token: string): Promise<PriceRefreshResult> {
   const res = await axios.post<ApiResponse<PriceRefreshResult>>(`${INVESTMENTS_BASE}/prices/refresh/auto`, undefined, { headers: headers(token) });
+  return res.data.data ?? {
+    updatedInstruments: 0,
+    recalculatedPositions: 0,
+    instrumentIds: [],
+    mode: 'background-started',
+  };
+}
+
+export async function refreshCompoundExposures(token: string): Promise<ExposureRefreshResult> {
+  const res = await axios.post<ApiResponse<ExposureRefreshResult>>(`${INVESTMENTS_BASE}/exposures/refresh`, undefined, { headers: headers(token) });
   return res.data.data;
 }
 
