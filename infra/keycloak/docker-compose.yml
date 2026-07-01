@@ -7,6 +7,10 @@ services:
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME: ${KEYCLOAK_DOMAIN:-auth.local}
+      KC_HOSTNAME_STRICT: false
     ports:
       - "8080:8080"
     networks:
