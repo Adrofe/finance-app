@@ -15,7 +15,7 @@ docker-compose -f docker-compose.yml down
 (cd infra/db && docker-compose up --build -d)
 (cd infra/keycloak && docker-compose up --build -d)
 (cd infra/rabbitmq && docker-compose up --build -d)
-docker-compose -f docker-compose.yml up --build -d
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build -d
 
 echo "All services are up and running."
 echo "Frontend available on http://localhost:${FRONTEND_PORT}"

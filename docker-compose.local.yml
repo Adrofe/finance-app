@@ -1,0 +1,8 @@
+services:
+  frontend:
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+
+  gateway:
+    ports:
+      - "8088:8080"
