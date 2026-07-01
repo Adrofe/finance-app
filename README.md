@@ -57,9 +57,65 @@ finance-app is a modular personal finance application built with Java Spring Boo
     - Keycloak and RabbitMQ will be accessible according to their respective docker-compose files
     - The banking backend will be available on the port configured in its .env
 
+### Start app services only (local)
+
+Use the local overlay to expose frontend and gateway on host ports:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+```
+
+Default local ports with this overlay:
+
+- Frontend: `http://localhost:5173`
+- Gateway API: `http://localhost:8088`
+
 ## Testing
 
 WIP
+
+## Production HTTPS Deployment (Recommended)
+
+This project includes a production-ready HTTPS entrypoint using Caddy + Let's Encrypt.
+
+### 1. DNS records
+
+Create DNS records pointing to your server public IP:
+
+- `APP_DOMAIN` (example: `app.example.com`)
+- `KEYCLOAK_DOMAIN` (example: `auth.example.com`)
+
+### 2. Environment variables
+
+In your root `.env` file, set:
+
+```env
+APP_DOMAIN=app.example.com
+KEYCLOAK_DOMAIN=auth.example.com
+LETSENCRYPT_EMAIL=you@example.com
+VITE_KEYCLOAK_BASE_URL=https://auth.example.com
+VITE_KEYCLOAK_REALM=finance-app
+VITE_KEYCLOAK_CLIENT_ID=finance-client
+```
+
+### 3. Start infrastructure and app
+
+Start infra first (db, keycloak, rabbitmq), then app with production overlay:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+### 4. Exposed ports (production)
+
+- Public: `80`, `443` (Caddy only)
+- Internal only: frontend, gateway, banking, investments, wealth, budget
+
+### 5. Security notes
+
+- Keep backend ports closed in cloud firewall/security group.
+- Keep only 22, 80, 443 open to internet.
+- Caddy automatically provisions and renews TLS certificates.
 
 ## Current development status
 

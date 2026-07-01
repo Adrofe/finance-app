@@ -1,0 +1,30 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - gateway
+    networks:
+      - finance-net
+
+  frontend:
+    ports: []
+    expose:
+      - "80"
+
+  gateway:
+    ports: []
+    expose:
+      - "8080"
+
+volumes:
+  caddy_data:
+  caddy_config:
