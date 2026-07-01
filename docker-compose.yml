@@ -31,8 +31,8 @@ services:
       dockerfile: investments/Dockerfile
     env_file:
       - ./investments/.env
-    ports:
-      - "8082:8082"
+    expose:
+      - "8082"
     networks:
       - finance-net
 
@@ -42,8 +42,8 @@ services:
       dockerfile: wealth/Dockerfile
     env_file:
       - ./wealth/.env
-    ports:
-      - "8083:8083"
+    expose:
+      - "8083"
     networks:
       - finance-net
 
@@ -55,8 +55,8 @@ services:
       - ./budget/.env
     depends_on:
       - banking
-    ports:
-      - "8084:8084"
+    expose:
+      - "8084"
     networks:
       - finance-net
 
@@ -69,12 +69,9 @@ services:
         VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM}
         VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID}
     depends_on:
-      - banking
-      - investments
-      - wealth
-      - budget
-    ports:
-      - "${FRONTEND_PORT:-5173}:80"
+      - gateway
+    expose:
+      - "80"
     networks:
       - finance-net
 
