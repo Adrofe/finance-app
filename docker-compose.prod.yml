@@ -2,6 +2,10 @@ services:
   caddy:
     image: caddy:2.8-alpine
     restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      KEYCLOAK_DOMAIN: ${KEYCLOAK_DOMAIN}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
     ports:
       - "80:80"
       - "443:443"

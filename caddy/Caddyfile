@@ -1,8 +1,8 @@
 {
-    email {$LETSENCRYPT_EMAIL}
+    email {$LETSENCRYPT_EMAIL:noreply@example.com}
 }
 
-{$APP_DOMAIN} {
+{$APP_DOMAIN:app.local} {
     encode zstd gzip
 
     header {
@@ -18,7 +18,7 @@
     reverse_proxy frontend:80
 }
 
-{$KEYCLOAK_DOMAIN} {
+{$KEYCLOAK_DOMAIN:auth.local} {
     encode zstd gzip
 
     header {
