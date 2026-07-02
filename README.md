@@ -44,6 +44,12 @@ finance-app is a modular personal finance application built with Java Spring Boo
     ./up-all.sh
     ```
 
+    For VPS production stack (infra + app + Caddy/HTTPS):
+
+    ```bash
+    ./up-all-prod.sh
+    ```
+
     This script:
 
     - Creates the Docker network if it does not exist
@@ -104,6 +110,18 @@ Start infra first (db, keycloak, rabbitmq), then app with production overlay:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Or use the helper script:
+
+```bash
+./up-all-prod.sh
+```
+
+To stop full production stack:
+
+```bash
+./down-all-prod.sh
 ```
 
 ### 4. Exposed ports (production)
