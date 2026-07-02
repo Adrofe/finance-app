@@ -19,7 +19,7 @@ Usage: restore-full-db.sh --backup-file <path> [--allow-active-microservices]
 
 Options:
   --backup-file <path>              .sql, .sql.gz, or .zip backup file
-  --allow-active-microservices      Allow restore while app containers are running (not recommended)
+  --allow-active-microservices      Stop active microservices automatically and continue restore
 USAGE
 }
 
@@ -96,7 +96,7 @@ if [[ "$(docker ps --filter "name=^/${CONTAINER_NAME}$" --format '{{.Names}}')" 
   exit 1
 fi
 
-service_names=(banking investments wealth budget frontend)
+service_names=(banking investments wealth budget frontend gateway)
 active_microservices=()
 for service in "${service_names[@]}"; do
   while IFS= read -r container; do
@@ -106,10 +106,17 @@ for service in "${service_names[@]}"; do
   done < <(docker ps --filter "label=com.docker.compose.service=${service}" --format '{{.Names}}')
 done
 
-if [[ ${#active_microservices[@]} -gt 0 && "$ALLOW_ACTIVE_MICROSERVICES" != "true" ]]; then
-  echo "Restore blocked because active microservice containers were detected: ${active_microservices[*]}." >&2
-  echo "Stop app services first or run again with --allow-active-microservices." >&2
-  exit 1
+if [[ ${#active_microservices[@]} -gt 0 ]]; then
+  if [[ "$ALLOW_ACTIVE_MICROSERVICES" != "true" ]]; then
+    echo "Restore blocked because active microservice containers were detected: ${active_microservices[*]}." >&2
+    echo "Stop app services first or run again with --allow-active-microservices to stop them automatically." >&2
+    exit 1
+  fi
+
+  echo "Forced restore requested. Stopping active microservice containers: ${active_microservices[*]}"
+  for container in "${active_microservices[@]}"; do
+    docker stop "$container" >/dev/null || true
+  done
 fi
 
 RESTORE_SQL_FILE="$BACKUP_PATH"

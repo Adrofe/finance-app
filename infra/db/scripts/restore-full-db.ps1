@@ -65,7 +65,7 @@ if (-not ($runningContainer -contains $containerName)) {
 }
 
 # By default, block restore when app services are still running.
-$serviceNames = @("banking", "investments", "wealth", "budget", "frontend")
+$serviceNames = @("banking", "investments", "wealth", "budget", "frontend", "gateway")
 $activeMicroserviceContainers = @()
 foreach ($service in $serviceNames) {
     $containersForService = @(docker ps --filter "label=com.docker.compose.service=$service" --format "{{.Names}}")
@@ -76,9 +76,18 @@ foreach ($service in $serviceNames) {
     }
 }
 
-if ($activeMicroserviceContainers.Count -gt 0 -and -not $AllowActiveMicroservices) {
-    $activeList = $activeMicroserviceContainers -join ", "
-    throw "Restore blocked because active microservice containers were detected: $activeList. Stop app services first or run again with -AllowActiveMicroservices."
+if ($activeMicroserviceContainers.Count -gt 0) {
+    $uniqueActiveContainers = @($activeMicroserviceContainers | Sort-Object -Unique)
+    $activeList = $uniqueActiveContainers -join ", "
+
+    if (-not $AllowActiveMicroservices) {
+        throw "Restore blocked because active microservice containers were detected: $activeList. Stop app services first or run again with -AllowActiveMicroservices to stop them automatically."
+    }
+
+    Write-Host "Forced restore requested. Stopping active microservice containers: $activeList"
+    foreach ($container in $uniqueActiveContainers) {
+        docker stop $container | Out-Null
+    }
 }
 
 $tempSqlFile = ""

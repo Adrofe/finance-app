@@ -83,7 +83,7 @@ Important:
 
 - Keep database container running (`finance-db`).
 - Stop application services before restoring to avoid writes during import.
-- The restore script now checks active microservices (`banking`, `investments`, `wealth`, `budget`, `frontend`) and stops by default if any are running.
+- The restore script checks active microservices (`banking`, `investments`, `wealth`, `budget`, `frontend`, `gateway`) and blocks by default if any are running.
 
 Restore from `.sql`:
 
@@ -97,7 +97,7 @@ Restore from `.zip`:
 powershell -ExecutionPolicy Bypass -File .\infra\db\scripts\restore-full-db.ps1 -BackupFile .\infra\db\backups\finance-db-full-YYYYMMDD_HHMMSS.sql.zip
 ```
 
-Force restore even if microservices are active (not recommended):
+Force restore and automatically stop active microservices first:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\infra\db\scripts\restore-full-db.ps1 -BackupFile .\infra\db\backups\finance-db-full-YYYYMMDD_HHMMSS.sql.zip -AllowActiveMicroservices
@@ -141,7 +141,7 @@ Restore from `.sql`, `.sql.gz`, or `.zip`:
 ./infra/db/scripts/restore-full-db.sh --backup-file ./infra/db/backups/finance-db-full-YYYYMMDD_HHMMSS.sql.gz
 ```
 
-Force restore even when app services are active (not recommended):
+Force restore and automatically stop active app services first:
 
 ```bash
 ./infra/db/scripts/restore-full-db.sh --backup-file ./infra/db/backups/finance-db-full-YYYYMMDD_HHMMSS.sql.gz --allow-active-microservices
