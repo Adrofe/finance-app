@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 BACKUP_SCRIPT="$SCRIPT_DIR/backup-full-db.sh"
 
 CLOUD_TARGET="gdrive:finance-app-backups"
@@ -17,7 +17,7 @@ Defaults:
 USAGE
 }
 
-while [[ $# -gt 0 ]]; do
+while [ "$#" -gt 0 ]; do
   case "$1" in
     --cloud-target)
       CLOUD_TARGET="${2:-}"
@@ -39,15 +39,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ! -f "$BACKUP_SCRIPT" ]]; then
+if [ ! -f "$BACKUP_SCRIPT" ]; then
   echo "Base script was not found: $BACKUP_SCRIPT" >&2
   exit 1
 fi
 
 echo "Running compressed backup with upload target: $CLOUD_TARGET"
 
-if [[ -n "$OUTPUT_DIR" ]]; then
-  "$BACKUP_SCRIPT" --compress --cloud-target "$CLOUD_TARGET" --output-dir "$OUTPUT_DIR"
+if [ -n "$OUTPUT_DIR" ]; then
+  sh "$BACKUP_SCRIPT" --compress --cloud-target "$CLOUD_TARGET" --output-dir "$OUTPUT_DIR"
 else
-  "$BACKUP_SCRIPT" --compress --cloud-target "$CLOUD_TARGET"
+  sh "$BACKUP_SCRIPT" --compress --cloud-target "$CLOUD_TARGET"
 fi

@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 DB_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$DB_DIR/.env"
 CONTAINER_NAME="finance-db"
@@ -21,7 +21,7 @@ Options:
 USAGE
 }
 
-while [[ $# -gt 0 ]]; do
+while [ "$#" -gt 0 ]; do
   case "$1" in
     --output-dir)
       OUTPUT_DIR="${2:-}"
@@ -48,35 +48,35 @@ while [[ $# -gt 0 ]]; do
 done
 
 require_command() {
-  local name="$1"
-  local hint="$2"
+  name="$1"
+  hint="$2"
   if ! command -v "$name" >/dev/null 2>&1; then
     echo "Command '$name' was not found. $hint" >&2
     exit 1
   fi
 }
 
-if [[ ! -f "$ENV_FILE" ]]; then
+if [ ! -f "$ENV_FILE" ]; then
   echo "Could not find $ENV_FILE. Create infra/db/.env first from .env.example." >&2
   exit 1
 fi
 
 read_env_var() {
-  local key="$1"
-  local line
+  key="$1"
   line="$(grep -E "^[[:space:]]*${key}=" "$ENV_FILE" | tail -n 1 || true)"
-  if [[ -z "$line" ]]; then
+  if [ -z "$line" ]; then
     return 1
   fi
 
-  local value
   value="${line#*=}"
-  value="${value%$'\r'}"
+  value="$(printf '%s' "$value" | tr -d '\r')"
 
-  # Remove surrounding double quotes if present.
-  if [[ "$value" =~ ^\".*\"$ ]]; then
-    value="${value:1:${#value}-2}"
-  fi
+  case "$value" in
+    \"*\")
+      value="${value#\"}"
+      value="${value%\"}"
+      ;;
+  esac
 
   printf '%s' "$value"
 }
@@ -84,24 +84,24 @@ read_env_var() {
 POSTGRES_USER="$(read_env_var POSTGRES_USER || true)"
 POSTGRES_PASSWORD="$(read_env_var POSTGRES_PASSWORD || true)"
 
-if [[ -z "$POSTGRES_USER" ]]; then
+if [ -z "$POSTGRES_USER" ]; then
   echo "Missing required variable 'POSTGRES_USER' in $ENV_FILE" >&2
   exit 1
 fi
 
-if [[ -z "$POSTGRES_PASSWORD" ]]; then
+if [ -z "$POSTGRES_PASSWORD" ]; then
   echo "Missing required variable 'POSTGRES_PASSWORD' in $ENV_FILE" >&2
   exit 1
 fi
 
 require_command docker "Install Docker and try again."
 
-if [[ "$(docker ps --filter "name=^/${CONTAINER_NAME}$" --format '{{.Names}}')" != "$CONTAINER_NAME" ]]; then
+if [ "$(docker ps --filter "name=^/${CONTAINER_NAME}$" --format '{{.Names}}')" != "$CONTAINER_NAME" ]; then
   echo "Container '$CONTAINER_NAME' is not running. Start the database first (infra/db/docker-compose up -d)." >&2
   exit 1
 fi
 
-if [[ -z "$OUTPUT_DIR" ]]; then
+if [ -z "$OUTPUT_DIR" ]; then
   OUTPUT_DIR="$DB_DIR/backups"
 fi
 mkdir -p "$OUTPUT_DIR"
@@ -119,12 +119,12 @@ docker cp "${CONTAINER_NAME}:${CONTAINER_BACKUP_FILE}" "$HOST_BACKUP_FILE" >/dev
 docker exec "$CONTAINER_NAME" rm -f "$CONTAINER_BACKUP_FILE" >/dev/null
 
 ARTIFACT_FOR_UPLOAD="$HOST_BACKUP_FILE"
-if [[ "$COMPRESS" == "true" ]]; then
+if [ "$COMPRESS" = "true" ]; then
   gzip -f "$HOST_BACKUP_FILE"
   ARTIFACT_FOR_UPLOAD="${HOST_BACKUP_FILE}.gz"
 fi
 
-if [[ -n "$CLOUD_TARGET" ]]; then
+if [ -n "$CLOUD_TARGET" ]; then
   require_command rclone "Install rclone and configure a remote (Google Drive, OneDrive, S3, Azure Blob, etc.)."
   echo "Uploading backup to cloud target $CLOUD_TARGET ..."
   rclone copy "$ARTIFACT_FOR_UPLOAD" "$CLOUD_TARGET" --progress
