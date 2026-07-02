@@ -9,15 +9,17 @@ CONTAINER_NAME="finance-db"
 OUTPUT_DIR=""
 COMPRESS=false
 CLOUD_TARGET=""
+RETENTION_DAYS=30
 
 usage() {
   cat <<'USAGE'
-Usage: backup-full-db.sh [--output-dir <path>] [--compress] [--cloud-target <remote:path>]
+Usage: backup-full-db.sh [--output-dir <path>] [--compress] [--cloud-target <remote:path>] [--retention-days <days>]
 
 Options:
   --output-dir <path>       Destination folder (default: infra/db/backups)
   --compress                Compress output into .sql.gz and remove .sql
   --cloud-target <target>   Upload artifact with rclone copy (example: gdrive:finance-app-backups)
+  --retention-days <days>   Delete local backups older than N days (default: 30)
 USAGE
 }
 
@@ -35,6 +37,10 @@ while [ "$#" -gt 0 ]; do
       CLOUD_TARGET="${2:-}"
       shift 2
       ;;
+    --retention-days)
+      RETENTION_DAYS="${2:-}"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -46,6 +52,13 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+case "$RETENTION_DAYS" in
+  ''|*[!0-9]*)
+    echo "Invalid value for --retention-days: $RETENTION_DAYS (must be a non-negative integer)." >&2
+    exit 1
+    ;;
+esac
 
 require_command() {
   name="$1"
@@ -128,6 +141,20 @@ if [ -n "$CLOUD_TARGET" ]; then
   require_command rclone "Install rclone and configure a remote (Google Drive, OneDrive, S3, Azure Blob, etc.)."
   echo "Uploading backup to cloud target $CLOUD_TARGET ..."
   rclone copy "$ARTIFACT_FOR_UPLOAD" "$CLOUD_TARGET" --progress
+fi
+
+echo "Deleting local backups older than $RETENTION_DAYS days from $OUTPUT_DIR ..."
+find "$OUTPUT_DIR" -maxdepth 1 -type f \( -name 'finance-db-full-*.sql' -o -name 'finance-db-full-*.sql.gz' -o -name 'finance-db-full-*.sql.zip' \) -mtime +"$RETENTION_DAYS" -print | while IFS= read -r old_file; do
+  rm -f "$old_file"
+done
+
+if [ -n "$CLOUD_TARGET" ]; then
+  echo "Deleting remote backups older than $RETENTION_DAYS days from $CLOUD_TARGET ..."
+  rclone delete "$CLOUD_TARGET" \
+    --include "finance-db-full-*.sql" \
+    --include "finance-db-full-*.sql.gz" \
+    --include "finance-db-full-*.sql.zip" \
+    --min-age "${RETENTION_DAYS}d"
 fi
 
 echo "Backup created successfully: $ARTIFACT_FOR_UPLOAD"

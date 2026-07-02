@@ -1,7 +1,8 @@
 param(
     [string]$OutputDir = "",
     [switch]$Compress,
-    [string]$CloudTarget = ""
+    [string]$CloudTarget = "",
+    [int]$RetentionDays = 30
 )
 
 Set-StrictMode -Version Latest
@@ -94,6 +95,30 @@ if (-not [string]::IsNullOrWhiteSpace($CloudTarget)) {
     Assert-Command -Name "rclone" -Hint "Install rclone and configure a remote (Google Drive, OneDrive, S3, Azure Blob, etc.)."
     Write-Host "Uploading backup to cloud target $CloudTarget ..."
     rclone copy $artifactForUpload $CloudTarget --progress
+}
+
+if ($RetentionDays -lt 0) {
+    throw "RetentionDays must be 0 or greater."
+}
+
+$thresholdDate = (Get-Date).AddDays(-$RetentionDays)
+$oldBackups = Get-ChildItem -Path $OutputDir -File |
+    Where-Object {
+        $_.Name -like "finance-db-full-*" -and
+        @(".sql", ".zip", ".gz") -contains $_.Extension.ToLowerInvariant() -and
+        $_.LastWriteTime -lt $thresholdDate
+    }
+
+if ($oldBackups.Count -gt 0) {
+    Write-Host "Deleting local backups older than $RetentionDays days from $OutputDir ..."
+    foreach ($oldFile in $oldBackups) {
+        Remove-Item -Path $oldFile.FullName -Force
+    }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($CloudTarget)) {
+    Write-Host "Deleting remote backups older than $RetentionDays days from $CloudTarget ..."
+    rclone delete $CloudTarget --include "finance-db-full-*.sql" --include "finance-db-full-*.sql.gz" --include "finance-db-full-*.sql.zip" --min-age "${RetentionDays}d"
 }
 
 Write-Host "Backup created successfully: $artifactForUpload"
