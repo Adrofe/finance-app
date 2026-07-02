@@ -1,13 +1,12 @@
-#!/bin/bash
+#!/bin/sh
 
-set -euo pipefail
+set -eu
 
 require_running_service() {
-  local service_name="$1"
-  shift
-  local running_services="$1"
+  service_name="$1"
+  running_services="$2"
 
-  if ! grep -qx "$service_name" <<< "$running_services"; then
+  if ! printf '%s\n' "$running_services" | grep -Fxq "$service_name"; then
     return 1
   fi
 
@@ -15,17 +14,15 @@ require_running_service() {
 }
 
 check_stack_services() {
-  local stack_label="$1"
-  local list_cmd="$2"
-  local logs_cmd_prefix="$3"
+  stack_label="$1"
+  list_cmd="$2"
+  logs_cmd_prefix="$3"
   shift 3
-  local required_services=("$@")
 
-  local running_services
   running_services="$(eval "$list_cmd" || true)"
 
-  local failed=0
-  for svc in "${required_services[@]}"; do
+  failed=0
+  for svc in "$@"; do
     if ! require_running_service "$svc" "$running_services"; then
       failed=1
       echo "[$stack_label] Service '$svc' is not running." >&2
@@ -35,7 +32,7 @@ check_stack_services() {
     fi
   done
 
-  return "$failed"
+  return $failed
 }
 
 # Ensure shared external network exists
@@ -91,7 +88,7 @@ if check_stack_services \
   app_ok=1
 fi
 
-if [[ "$db_ok" -eq 1 && "$keycloak_ok" -eq 1 && "$rabbitmq_ok" -eq 1 && "$app_ok" -eq 1 ]]; then
+if [ "$db_ok" -eq 1 ] && [ "$keycloak_ok" -eq 1 ] && [ "$rabbitmq_ok" -eq 1 ] && [ "$app_ok" -eq 1 ]; then
   echo "Production stack is up and all required services are running."
   exit 0
 fi
