@@ -41,6 +41,9 @@ Scripts location:
 - `infra/db/scripts/backup-full-db.ps1`
 - `infra/db/scripts/restore-full-db.ps1`
 - `infra/db/scripts/backup-gdrive.ps1` (wrapper: compressed backup + upload to Google Drive path by default)
+- `infra/db/scripts/backup-full-db.sh`
+- `infra/db/scripts/restore-full-db.sh`
+- `infra/db/scripts/backup-gdrive.sh` (wrapper: compressed backup + upload to Google Drive path by default)
 
 ### Create full backup
 
@@ -105,3 +108,47 @@ powershell -ExecutionPolicy Bypass -File .\infra\db\scripts\restore-full-db.ps1 
 - Daily automated backup with Windows Task Scheduler.
 - Keep retention policy (e.g. last 30 days in cloud).
 - Test restore at least once per month in a non-production environment.
+
+## Linux / VPS Scripts (cron-friendly)
+
+Make scripts executable:
+
+```bash
+chmod +x infra/db/scripts/*.sh
+```
+
+Create full backup:
+
+```bash
+./infra/db/scripts/backup-full-db.sh
+```
+
+Create compressed backup and upload to cloud target:
+
+```bash
+./infra/db/scripts/backup-full-db.sh --compress --cloud-target "gdrive:finance-app-backups"
+```
+
+Google Drive wrapper (compression enabled by default):
+
+```bash
+./infra/db/scripts/backup-gdrive.sh
+```
+
+Restore from `.sql`, `.sql.gz`, or `.zip`:
+
+```bash
+./infra/db/scripts/restore-full-db.sh --backup-file ./infra/db/backups/finance-db-full-YYYYMMDD_HHMMSS.sql.gz
+```
+
+Force restore even when app services are active (not recommended):
+
+```bash
+./infra/db/scripts/restore-full-db.sh --backup-file ./infra/db/backups/finance-db-full-YYYYMMDD_HHMMSS.sql.gz --allow-active-microservices
+```
+
+Example cron entry (daily backup at 03:00):
+
+```cron
+0 3 * * * cd /opt/finance-app && ./infra/db/scripts/backup-gdrive.sh >> /var/log/finance-db-backup.log 2>&1
+```
