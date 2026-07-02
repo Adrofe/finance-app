@@ -61,13 +61,38 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
-# shellcheck disable=SC1090
-set -a
-source "$ENV_FILE"
-set +a
+read_env_var() {
+  local key="$1"
+  local line
+  line="$(grep -E "^[[:space:]]*${key}=" "$ENV_FILE" | tail -n 1 || true)"
+  if [[ -z "$line" ]]; then
+    return 1
+  fi
 
-: "${POSTGRES_USER:?Missing required variable 'POSTGRES_USER' in $ENV_FILE}"
-: "${POSTGRES_PASSWORD:?Missing required variable 'POSTGRES_PASSWORD' in $ENV_FILE}"
+  local value
+  value="${line#*=}"
+  value="${value%$'\r'}"
+
+  # Remove surrounding double quotes if present.
+  if [[ "$value" =~ ^\".*\"$ ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+
+  printf '%s' "$value"
+}
+
+POSTGRES_USER="$(read_env_var POSTGRES_USER || true)"
+POSTGRES_PASSWORD="$(read_env_var POSTGRES_PASSWORD || true)"
+
+if [[ -z "$POSTGRES_USER" ]]; then
+  echo "Missing required variable 'POSTGRES_USER' in $ENV_FILE" >&2
+  exit 1
+fi
+
+if [[ -z "$POSTGRES_PASSWORD" ]]; then
+  echo "Missing required variable 'POSTGRES_PASSWORD' in $ENV_FILE" >&2
+  exit 1
+fi
 
 require_command docker "Install Docker and try again."
 
