@@ -1,18 +1,17 @@
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Transaction } from '../types/banking';
 import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
 import { CreateTransactionModal } from './CreateTransactionModal';
 import { EditTransactionTaxModal } from './EditTransactionTaxModal';
 import { BatchTransactionModal } from './BatchTransactionModal';
 import { getCategoryVisual, getInstitutionLogo, getMerchantLogo } from '../constants/visualConfig';
-import { deleteTransaction } from '../services/transactionsService';
+import { deleteTransaction, searchTransactions, type TransactionsSearchRequest } from '../services/transactionsService';
 import { TransactionEditableRow } from './TransactionEditableRow';
 import {
   TransactionsFiltersPanel,
   type TransactionFilters,
   EMPTY_FILTERS,
-  applyFilters,
   countActiveFilters,
 } from './TransactionsFiltersPanel';
 import './TransactionsTable.css';
@@ -62,6 +61,73 @@ function formatDate(dateStr?: string): { day: string; rest: string } {
   };
 }
 
+function parseRange(filters: TransactionFilters): { startDate?: string; endDate?: string } {
+  if (filters.dateMode === 'range') {
+    return {
+      startDate: filters.dateFrom || undefined,
+      endDate: filters.dateTo || undefined,
+    };
+  }
+
+  if (filters.dateMode === 'month' && filters.dateMonth) {
+    const [yearRaw, monthRaw] = filters.dateMonth.split('-');
+    const year = Number(yearRaw);
+    const month = Number(monthRaw);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+      return {};
+    }
+
+    const startDate = `${yearRaw}-${monthRaw}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endDate = `${yearRaw}-${monthRaw}-${String(lastDay).padStart(2, '0')}`;
+    return { startDate, endDate };
+  }
+
+  if (filters.dateMode === 'year' && filters.dateYear) {
+    return {
+      startDate: `${filters.dateYear}-01-01`,
+      endDate: `${filters.dateYear}-12-31`,
+    };
+  }
+
+  return {};
+}
+
+function parseNumber(value: string): number | undefined {
+  if (value.trim() === '') {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function pickSingle(values: number[]): number | undefined {
+  return values.length === 1 ? values[0] : undefined;
+}
+
+function buildSearchRequest(filters: TransactionFilters, page: number, size: number): TransactionsSearchRequest {
+  const { startDate, endDate } = parseRange(filters);
+  const description = filters.descriptionText.trim();
+
+  return {
+    accountId: pickSingle(filters.sourceAccountIds),
+    categoryId: filters.parentCategoryIds.length === 0 ? pickSingle(filters.categoryIds) : undefined,
+    tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
+    statusId: pickSingle(filters.statusIds),
+    typeId: pickSingle(filters.typeIds),
+    startDate,
+    endDate,
+    minAmount: parseNumber(filters.amountMin),
+    maxAmount: parseNumber(filters.amountMax),
+    description: description.length > 0 ? description : undefined,
+    page,
+    size,
+    sortBy: 'bookingDate',
+    sortDirection: 'DESC',
+  };
+}
+
 export function TransactionsTable({ items, accessToken, onRefresh, highlightTransactionId, onClearHighlight }: TransactionsTableProps) {
   const {
     statusMap,
@@ -88,13 +154,82 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
   const [filters,         setFilters]           = useState<TransactionFilters>(EMPTY_FILTERS);
   const [editingId,       setEditingId]         = useState<number | null>(null);
   const [editingTaxId,    setEditingTaxId]      = useState<number | null>(null);
+  const [page,            setPage]              = useState(0);
+  const [pageSize,        setPageSize]          = useState(25);
+  const [serverItems,     setServerItems]       = useState<Transaction[]>([]);
+  const [totalElements,   setTotalElements]     = useState(0);
+  const [totalPages,      setTotalPages]        = useState(1);
+  const [loadingPage,     setLoadingPage]       = useState(false);
+  const [pageError,       setPageError]         = useState('');
+  const [refreshTick,     setRefreshTick]       = useState(0);
 
-  const filteredItems  = highlightTransactionId != null
-    ? items.filter(t => t.id === highlightTransactionId)
-    : applyFilters(items, filters, categories);
   const activeFilters  = countActiveFilters(filters);
+  const highlightedItems = highlightTransactionId != null
+    ? items.filter(t => t.id === highlightTransactionId)
+    : [];
+  const displayedItems = highlightTransactionId != null ? highlightedItems : serverItems;
+  const effectiveTotalElements = highlightTransactionId != null ? highlightedItems.length : totalElements;
+  const effectiveTotalPages = highlightTransactionId != null ? 1 : Math.max(1, totalPages);
+  const currentPage = highlightTransactionId != null ? 0 : Math.min(page, effectiveTotalPages - 1);
+  const pageStart = effectiveTotalElements === 0 ? 0 : currentPage * pageSize;
+  const pageEnd = highlightTransactionId != null ? effectiveTotalElements : Math.min(pageStart + pageSize, effectiveTotalElements);
 
-  const handleSuccess = () => { if (onRefresh) onRefresh(); };
+  useEffect(() => {
+    setPage(0);
+  }, [filters, highlightTransactionId, pageSize]);
+
+  useEffect(() => {
+    if (highlightTransactionId != null) {
+      return;
+    }
+
+    if (page > totalPages - 1) {
+      setPage(Math.max(0, totalPages - 1));
+    }
+  }, [highlightTransactionId, page, totalPages]);
+
+  useEffect(() => {
+    if (highlightTransactionId != null) {
+      setLoadingPage(false);
+      setPageError('');
+      return;
+    }
+
+    if (!accessToken) {
+      setServerItems([]);
+      setTotalElements(0);
+      setTotalPages(1);
+      setPageError('');
+      setLoadingPage(false);
+      return;
+    }
+
+    setLoadingPage(true);
+    setPageError('');
+
+    searchTransactions(accessToken, buildSearchRequest(filters, page, pageSize))
+      .then((result) => {
+        setServerItems(result.content || []);
+        setTotalElements(result.totalElements ?? 0);
+        setTotalPages(Math.max(1, result.totalPages ?? 1));
+      })
+      .catch(() => {
+        setServerItems([]);
+        setTotalElements(0);
+        setTotalPages(1);
+        setPageError('Could not load paginated transactions.');
+      })
+      .finally(() => {
+        setLoadingPage(false);
+      });
+  }, [accessToken, filters, page, pageSize, highlightTransactionId, refreshTick]);
+
+  const handleSuccess = () => {
+    if (onRefresh) {
+      onRefresh();
+    }
+    setRefreshTick(prev => prev + 1);
+  };
 
   // Toggle individual row selection
   const toggleSelect = (id: number) => {
@@ -106,7 +241,7 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
   };
 
   // Select-all / deselect-all
-  const allIds      = filteredItems.map(t => t.id).filter((id): id is number => id != null);
+  const allIds      = displayedItems.map(t => t.id).filter((id): id is number => id != null);
   const allSelected = allIds.length > 0 && allIds.every(id => selected.has(id));
 
   const toggleSelectAll = () => {
@@ -131,7 +266,10 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
       }
       setConfirm(null);
       exitSelectMode();
-      if (onRefresh) onRefresh();
+      if (onRefresh) {
+        onRefresh();
+      }
+      setRefreshTick(prev => prev + 1);
     } finally {
       setDeleting(false);
     }
@@ -145,7 +283,7 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
     return false;
   };
 
-  const summaryItems = filteredItems.filter(t => !isInternalTransfer(t));
+  const summaryItems = displayedItems.filter(t => !isInternalTransfer(t));
   const totalIncome   = summaryItems.filter(t => (t.amount ?? 0) > 0).reduce((s, t) => s + (t.amount ?? 0), 0);
   const totalExpenses = summaryItems.filter(t => (t.amount ?? 0) < 0).reduce((s, t) => s + (t.amount ?? 0), 0);
   const net           = totalIncome + totalExpenses;
@@ -226,9 +364,10 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
           <div className="tt-stat">
             <span className="tt-stat-label">Transacciones</span>
             <span className="tt-stat-value">
-              {activeFilters > 0
-                ? <>{filteredItems.length} <span className="tt-stat-total">/ {items.length}</span></>
-                : items.length}
+              {effectiveTotalElements}
+              {activeFilters > 0 && highlightTransactionId == null && (
+                <span className="tt-stat-total"> filtradas</span>
+              )}
             </span>
           </div>
           <div className="tt-stat tt-stat--income">
@@ -245,6 +384,20 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
           </div>
         </div>
         <div className="tt-toolbar-right">
+          <div className="tt-page-size-wrap">
+            <label htmlFor="tt-page-size" className="tt-page-size-label">Por página</label>
+            <select
+              id="tt-page-size"
+              className="tt-page-size-select"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
           {selectMode && selected.size > 0 && (
             <button
               className="btn-delete-selected"
@@ -303,6 +456,8 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
         </div>
       )}
 
+      {pageError && <p className="state error">{pageError}</p>}
+
       {/* ── Table ── */}
       <div className="tt-container">
         <table className="tt-table">
@@ -332,7 +487,11 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
             </tr>
           </thead>
           <tbody>
-            {filteredItems.length === 0 ? (
+            {loadingPage ? (
+              <tr className="tt-empty-row">
+                <td colSpan={totalCols}>Loading transactions...</td>
+              </tr>
+            ) : displayedItems.length === 0 ? (
               <tr className="tt-empty-row">
                 <td colSpan={totalCols}>
                   {activeFilters > 0
@@ -340,7 +499,7 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
                     : 'No hay transacciones'}
                 </td>
               </tr>
-            ) : filteredItems.map((tx, index) => {
+            ) : displayedItems.map((tx, index) => {
               const txId       = tx.id;
               const isSelected = txId != null && selected.has(txId);
 
@@ -564,6 +723,55 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
           </tbody>
         </table>
       </div>
+
+      {highlightTransactionId == null && (
+        <div className="tt-pagination" aria-label="Paginacion de transacciones">
+          <div className="tt-pagination-info">
+            Mostrando {effectiveTotalElements === 0 ? 0 : pageStart + 1}-{pageEnd} de {effectiveTotalElements}
+          </div>
+          <div className="tt-pagination-controls">
+            <button
+              type="button"
+              className="tt-page-btn"
+              onClick={() => setPage(0)}
+              disabled={currentPage === 0 || loadingPage}
+              title="Primera pagina"
+            >
+              «
+            </button>
+            <button
+              type="button"
+              className="tt-page-btn"
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={currentPage === 0 || loadingPage}
+              title="Pagina anterior"
+            >
+              ‹
+            </button>
+            <span className="tt-page-indicator">
+              Pagina {effectiveTotalElements === 0 ? 0 : currentPage + 1} de {effectiveTotalPages}
+            </span>
+            <button
+              type="button"
+              className="tt-page-btn"
+              onClick={() => setPage(p => Math.min(effectiveTotalPages - 1, p + 1))}
+              disabled={currentPage >= effectiveTotalPages - 1 || loadingPage}
+              title="Pagina siguiente"
+            >
+              ›
+            </button>
+            <button
+              type="button"
+              className="tt-page-btn"
+              onClick={() => setPage(effectiveTotalPages - 1)}
+              disabled={currentPage >= effectiveTotalPages - 1 || loadingPage}
+              title="Ultima pagina"
+            >
+              »
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
