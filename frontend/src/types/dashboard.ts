@@ -1,6 +1,7 @@
 export type DashboardSummary = {
   totalIncome: number;
   totalExpenses: number;
+  totalInvestments: number;
   net: number;
   savingsRate: number | null;
   transactionCount: number;

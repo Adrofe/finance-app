@@ -81,7 +81,7 @@
 
 .db-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 
@@ -120,6 +120,7 @@
 
 .db-kpi--income   { border-left-color: #22c55e; }
 .db-kpi--expenses { border-left-color: #ef4444; }
+.db-kpi--investments { border-left-color: #7c3aed; }
 .db-kpi--net      { border-left-color: var(--brand); }
 .db-kpi--savings  { border-left-color: #0d9488; }
 .db-kpi--count    { border-left-color: #8b5cf6; }
@@ -147,6 +148,7 @@
 
 .db-kpi--income   .db-kpi-value { color: #15803d; }
 .db-kpi--expenses .db-kpi-value { color: #b91c1c; }
+.db-kpi--investments .db-kpi-value { color: #6d28d9; }
 .db-kpi--net      .db-kpi-value { color: var(--brand-strong); }
 .db-kpi--savings  .db-kpi-value { color: #0f766e; }
 
