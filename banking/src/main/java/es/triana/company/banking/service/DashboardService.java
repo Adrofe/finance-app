@@ -35,14 +35,16 @@ public class DashboardService {
     public DashboardSummaryDTO getSummary(Long tenantId, LocalDate startDate, LocalDate endDate) {
         LocalDate start = resolveStart(startDate);
         LocalDate end   = resolveEnd(endDate);
-        BigDecimal income   = nullSafe(transactionRepository.sumIncomeByPeriod(tenantId, start, end));
-        BigDecimal expenses = nullSafe(transactionRepository.sumExpensesByPeriod(tenantId, start, end));
-        Long count          = transactionRepository.countByPeriod(tenantId, start, end);
-        BigDecimal net      = income.add(expenses);
+        BigDecimal income      = nullSafe(transactionRepository.sumIncomeByPeriod(tenantId, start, end));
+        BigDecimal expenses    = nullSafe(transactionRepository.sumExpensesByPeriod(tenantId, start, end));
+        BigDecimal investments = nullSafe(transactionRepository.sumInvestmentsByPeriod(tenantId, start, end)).abs();
+        Long count             = transactionRepository.countByPeriod(tenantId, start, end);
+        BigDecimal net         = income.add(expenses).subtract(investments);
+        BigDecimal savings     = income.add(expenses);
 
         Double savingsRate = null;
         if (income.compareTo(BigDecimal.ZERO) > 0) {
-            savingsRate = net
+            savingsRate = savings
                     .divide(income, 4, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(100))
                     .setScale(1, RoundingMode.HALF_UP)
@@ -52,6 +54,7 @@ public class DashboardService {
         return DashboardSummaryDTO.builder()
                 .totalIncome(income)
                 .totalExpenses(expenses)
+            .totalInvestments(investments)
                 .net(net)
                 .savingsRate(savingsRate)
                 .transactionCount(count)
