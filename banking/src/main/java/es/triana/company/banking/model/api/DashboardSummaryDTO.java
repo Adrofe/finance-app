@@ -15,8 +15,9 @@ public class DashboardSummaryDTO {
 
     private BigDecimal totalIncome;
     private BigDecimal totalExpenses;
+    private BigDecimal totalInvestments;
     private BigDecimal net;
-    /** (net / totalIncome) * 100, rounded to 1 decimal. Null when income is zero. */
+    /** ((totalIncome - totalExpensesAbs) / totalIncome) * 100, rounded to 1 decimal. Null when income is zero. */
     private Double savingsRate;
     private Long transactionCount;
 }
