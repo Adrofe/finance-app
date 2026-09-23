@@ -60,7 +60,7 @@ interface KpiCardProps {
   label: string;
   value: string;
   sub?: string;
-  variant: 'income' | 'expenses' | 'net' | 'savings' | 'count';
+  variant: 'income' | 'expenses' | 'investments' | 'net' | 'savings' | 'count';
   onClick?: () => void;
   active?: boolean;
 }
@@ -182,6 +182,7 @@ type DetailsFilter =
   | { mode: 'all' }
   | { mode: 'income' }
   | { mode: 'expenses' }
+  | { mode: 'investments' }
   | { mode: 'category'; categoryId: number; name: string }
   | { mode: 'parentCategory'; parentCode: string; name: string };
 
@@ -212,6 +213,12 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
     if (tx.sourceAccountId != null && tx.destinationAccountId != null) return true;
     return false;
   }, [typeMap]);
+
+  const isInvestmentTransaction = useCallback((tx: Transaction): boolean => {
+    if (tx.amount == null || tx.amount >= 0 || tx.categoryId == null) return false;
+    const code = (categoryCodeMap[tx.categoryId] || '').toUpperCase();
+    return code === 'SAV' || code.startsWith('SAV.');
+  }, [categoryCodeMap]);
 
   const loadData = useCallback(async () => {
     if (!token) return;
@@ -284,7 +291,8 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
     const filtered = periodTransactions.filter((tx) => {
       const amount = tx.amount ?? 0;
       if (detailsFilter.mode === 'income') return amount > 0;
-      if (detailsFilter.mode === 'expenses') return amount < 0;
+      if (detailsFilter.mode === 'expenses') return amount < 0 && !isInvestmentTransaction(tx);
+      if (detailsFilter.mode === 'investments') return isInvestmentTransaction(tx);
       if (detailsFilter.mode === 'category') {
         if (amount >= 0 || tx.categoryId == null) return false;
         return tx.categoryId === detailsFilter.categoryId;
@@ -301,11 +309,12 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
     return [...filtered]
       .sort((a, b) => toTimestamp(b.bookingDate) - toTimestamp(a.bookingDate))
       .slice(0, 15);
-  }, [categoryCodeMap, detailsFilter, periodTransactions, toTimestamp]);
+  }, [categoryCodeMap, detailsFilter, isInvestmentTransaction, periodTransactions, toTimestamp]);
 
   const detailsTitle = useMemo(() => {
     if (detailsFilter.mode === 'income') return 'Transacciones que componen los ingresos';
     if (detailsFilter.mode === 'expenses') return 'Transacciones que componen los gastos';
+    if (detailsFilter.mode === 'investments') return 'Transacciones de inversión';
     if (detailsFilter.mode === 'category') return `Transacciones de ${detailsFilter.name}`;
     if (detailsFilter.mode === 'parentCategory') return `Transacciones de ${detailsFilter.name} (padre)`;
     return 'Últimas transacciones del periodo';
@@ -313,7 +322,8 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
 
   const detailsSubtitle = useMemo(() => {
     if (detailsFilter.mode === 'income') return 'Mostrando solo ingresos del periodo activo';
-    if (detailsFilter.mode === 'expenses') return 'Mostrando solo gastos del periodo activo';
+    if (detailsFilter.mode === 'expenses') return 'Mostrando solo gastos no vinculados a inversión';
+    if (detailsFilter.mode === 'investments') return 'Mostrando solo aportaciones a ahorro e inversión';
     if (detailsFilter.mode === 'category') return `Mostrando gastos de la categoría ${detailsFilter.name}`;
     if (detailsFilter.mode === 'parentCategory') return `Mostrando gastos de la categoría padre ${detailsFilter.name} y sus hijas`;
     return 'Mostrando transacciones más recientes en el periodo activo';
@@ -473,6 +483,15 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
               value={fmt(Math.abs(summary.totalExpenses))}
               onClick={() => setDetailsFilter(prev => prev.mode === 'expenses' ? { mode: 'all' } : { mode: 'expenses' })}
               active={detailsFilter.mode === 'expenses'}
+            />
+            <KpiCard
+              icon="🏦"
+              label="Inversiones"
+              variant="investments"
+              value={fmt(summary.totalInvestments)}
+              sub="Aportaciones a ahorro e inversión"
+              onClick={() => setDetailsFilter(prev => prev.mode === 'investments' ? { mode: 'all' } : { mode: 'investments' })}
+              active={detailsFilter.mode === 'investments'}
             />
             <KpiCard
               icon="📊"
