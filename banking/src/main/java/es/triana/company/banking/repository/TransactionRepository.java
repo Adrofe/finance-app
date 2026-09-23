@@ -86,8 +86,24 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 			  and t.bookingDate <= :endDate
 			  and (t.transactionType is null or upper(t.transactionType.name) <> 'TRANSFER')
 			  and t.amount < 0
+			  and (t.category is null or (upper(t.category.code) <> 'SAV' and upper(t.category.code) not like 'SAV.%'))
 			""")
 	java.math.BigDecimal sumExpensesByPeriod(
+			@Param("tenantId")  Long tenantId,
+			@Param("startDate") LocalDate startDate,
+			@Param("endDate")   LocalDate endDate);
+
+	@Query("""
+			select sum(t.amount) from Transaction t
+			where t.tenantId = :tenantId
+			  and t.bookingDate >= :startDate
+			  and t.bookingDate <= :endDate
+			  and (t.transactionType is null or upper(t.transactionType.name) <> 'TRANSFER')
+			  and t.amount < 0
+			  and t.category is not null
+			  and (upper(t.category.code) = 'SAV' or upper(t.category.code) like 'SAV.%')
+			""")
+	java.math.BigDecimal sumInvestmentsByPeriod(
 			@Param("tenantId")  Long tenantId,
 			@Param("startDate") LocalDate startDate,
 			@Param("endDate")   LocalDate endDate);
@@ -119,6 +135,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 			  and (t.transactionType is null or upper(t.transactionType.name) <> 'TRANSFER')
 			  and t.amount < 0
 			  and t.category is not null
+			  and (upper(t.category.code) <> 'SAV' and upper(t.category.code) not like 'SAV.%')
 			group by t.category.id, t.category.code, t.category.name
 			order by sum(t.amount) asc
 			""")
@@ -137,6 +154,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
 			  and t.bookingDate >= :startDate
 			  and t.bookingDate <= :endDate
 			  and (t.transactionType is null or upper(t.transactionType.name) <> 'TRANSFER')
+			  and (t.amount > 0 or t.category is null or (upper(t.category.code) <> 'SAV' and upper(t.category.code) not like 'SAV.%'))
 			order by t.bookingDate asc
 			""")
 	List<Object[]> findDateAmountSeries(
