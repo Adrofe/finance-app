@@ -32,4 +32,5 @@ export type DashboardPreset =
   | '3-months'
   | '6-months'
   | 'this-year'
+  | 'last-year'
   | 'custom';

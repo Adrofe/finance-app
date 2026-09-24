@@ -36,11 +36,12 @@ const PRESET_LABELS: Record<DashboardPreset, string> = {
   '3-months':   'Últimos 3m',
   '6-months':   'Últimos 6m',
   'this-year':  'Este año',
+  'last-year':  'Año pasado',
   'custom':     'Personalizado',
 };
 
 const PRESETS: DashboardPreset[] = [
-  'this-month', 'last-month', '3-months', '6-months', 'this-year', 'custom',
+  'this-month', 'last-month', '3-months', '6-months', 'this-year', 'last-year', 'custom',
 ];
 
 function getPresetRange(preset: DashboardPreset): { start: string; end: string } {
@@ -53,6 +54,7 @@ function getPresetRange(preset: DashboardPreset): { start: string; end: string }
     case '3-months':   return { start: toISO(new Date(y, m - 2, 1)), end: toISO(t) };
     case '6-months':   return { start: toISO(new Date(y, m - 5, 1)), end: toISO(t) };
     case 'this-year':  return { start: toISO(new Date(y, 0, 1)),     end: toISO(t) };
+    case 'last-year':  return { start: toISO(new Date(y - 1, 0, 1)), end: toISO(new Date(y - 1, 11, 31)) };
     default:           return { start: '', end: '' };
   }
 }
