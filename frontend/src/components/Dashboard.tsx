@@ -198,6 +198,8 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
   const [customEnd, setCustomEnd]     = useState('');
   const [detailsFilter, setDetailsFilter] = useState<DetailsFilter>({ mode: 'all' });
   const [categoryView, setCategoryView] = useState<CategoryViewMode>('parent');
+  const [sortField, setSortField] = useState<'date' | 'amount'>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const { start, end } = useMemo(() => {
     if (preset === 'custom') return { start: customStart, end: customEnd };
@@ -313,9 +315,14 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
     });
 
     return [...filtered]
-      .sort((a, b) => toTimestamp(b.bookingDate) - toTimestamp(a.bookingDate))
+      .sort((a, b) => {
+        const diff = sortField === 'amount'
+          ? (a.amount ?? 0) - (b.amount ?? 0)
+          : toTimestamp(a.bookingDate) - toTimestamp(b.bookingDate);
+        return sortDir === 'asc' ? diff : -diff;
+      })
       .slice(0, 15);
-  }, [categoryCodeMap, detailsFilter, isInvestmentTransaction, periodTransactions, toTimestamp]);
+  }, [categoryCodeMap, detailsFilter, isInvestmentTransaction, periodTransactions, sortDir, sortField, toTimestamp]);
 
   const detailsTitle = useMemo(() => {
     if (detailsFilter.mode === 'income') return 'Transacciones que componen los ingresos';
@@ -349,16 +356,8 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
 
     return childRows
       .slice()
-      .sort((a, b) => {
-        const aCode = (a.categoryCode || '').toUpperCase();
-        const bCode = (b.categoryCode || '').toUpperCase();
-        const aParent = aCode.split('.')[0] || aCode;
-        const bParent = bCode.split('.')[0] || bCode;
-        if (aParent !== bParent) return aParent.localeCompare(bParent);
-        return aCode.localeCompare(bCode);
-      })
       .map((c) => ({
-        level: 'child',
+        level: 'child' as const,
         categoryId: c.categoryId,
         name: c.categoryName,
         code: c.categoryCode,
@@ -368,7 +367,8 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
         count: c.transactionCount,
         color: getCategoryVisual(c.categoryCode).color,
         emoji: getCategoryVisual(c.categoryCode).emoji,
-      }));
+      }))
+      .sort((a, b) => b.pct - a.pct);
   }, [categories]);
 
   const parentPieData = useMemo<PieSlice[]>(() => {
@@ -408,7 +408,7 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
         color: getCategoryVisual(parentCode).color,
         emoji: getCategoryVisual(parentCode).emoji,
       }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => b.pct - a.pct);
   }, [catalogCategories, categories]);
 
   const pieData = categoryView === 'parent' ? parentPieData : childPieData;
@@ -714,15 +714,52 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
             {visibleTransactions.length === 0 ? (
               <p className="db-empty">No hay transacciones para este filtro en el periodo seleccionado.</p>
             ) : (
-              <ul className="db-recent-list">
-                {visibleTransactions.map((tx, i) => (
-                  <RecentRow
-                    key={tx.id ?? tx.externalId ?? i}
-                    tx={tx}
-                    categoryCodeMap={categoryCodeMap}
-                  />
-                ))}
-              </ul>
+              <>
+                <ul className="db-recent-list">
+                  {visibleTransactions.map((tx, i) => (
+                    <RecentRow
+                      key={tx.id ?? tx.externalId ?? i}
+                      tx={tx}
+                      categoryCodeMap={categoryCodeMap}
+                    />
+                  ))}
+                </ul>
+                <div className="db-sort-bar">
+                  <span className="db-sort-label">Ordenar por</span>
+                  <div className="db-view-toggle" role="group" aria-label="Ordenar por fecha">
+                    <button
+                      type="button"
+                      className={`db-view-btn${sortField === 'date' && sortDir === 'desc' ? ' active' : ''}`}
+                      onClick={() => { setSortField('date'); setSortDir('desc'); }}
+                    >
+                      Fecha ↓
+                    </button>
+                    <button
+                      type="button"
+                      className={`db-view-btn${sortField === 'date' && sortDir === 'asc' ? ' active' : ''}`}
+                      onClick={() => { setSortField('date'); setSortDir('asc'); }}
+                    >
+                      Fecha ↑
+                    </button>
+                  </div>
+                  <div className="db-view-toggle" role="group" aria-label="Ordenar por importe">
+                    <button
+                      type="button"
+                      className={`db-view-btn${sortField === 'amount' && sortDir === 'desc' ? ' active' : ''}`}
+                      onClick={() => { setSortField('amount'); setSortDir('desc'); }}
+                    >
+                      Importe mayor
+                    </button>
+                    <button
+                      type="button"
+                      className={`db-view-btn${sortField === 'amount' && sortDir === 'asc' ? ' active' : ''}`}
+                      onClick={() => { setSortField('amount'); setSortDir('asc'); }}
+                    >
+                      Importe menor
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </article>
         </>

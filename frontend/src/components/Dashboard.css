@@ -346,6 +346,22 @@
   border-color: #a6c6e9;
 }
 
+.db-sort-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.db-sort-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 .db-recent-list {
   list-style: none;
   margin: 0;
