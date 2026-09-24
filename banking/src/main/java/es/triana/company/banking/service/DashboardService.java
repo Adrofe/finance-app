@@ -39,7 +39,8 @@ public class DashboardService {
         BigDecimal expenses    = nullSafe(transactionRepository.sumExpensesByPeriod(tenantId, start, end));
         BigDecimal investments = nullSafe(transactionRepository.sumInvestmentsByPeriod(tenantId, start, end)).abs();
         Long count             = transactionRepository.countByPeriod(tenantId, start, end);
-        BigDecimal net         = income.add(expenses).subtract(investments);
+        // expenses already excludes investment (SAV*) transactions, so investments must not be subtracted again
+        BigDecimal net         = income.add(expenses);
         BigDecimal savings     = income.add(expenses);
 
         Double savingsRate = null;
