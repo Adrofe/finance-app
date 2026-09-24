@@ -700,16 +700,40 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
                 <h3 className="db-chart-title">{detailsTitle}</h3>
                 <span className="db-recent-subtitle">{detailsSubtitle}</span>
               </div>
-              <span className="db-recent-count">{visibleTransactions.length} mostradas</span>
-              {detailsFilter.mode !== 'all' && (
+              <div className="db-recent-actions">
                 <button
                   type="button"
-                  className="db-clear-filter"
-                  onClick={() => setDetailsFilter({ mode: 'all' })}
+                  className={`db-sort-btn${sortField === 'date' ? ' active' : ''}`}
+                  onClick={() => {
+                    if (sortField === 'date') setSortDir(direction => direction === 'desc' ? 'asc' : 'desc');
+                    else { setSortField('date'); setSortDir('desc'); }
+                  }}
+                  title="Ordenar por fecha"
                 >
-                  Limpiar filtro
+                  Fecha {sortField === 'date' && sortDir === 'asc' ? '↑' : '↓'}
                 </button>
-              )}
+                <button
+                  type="button"
+                  className={`db-sort-btn${sortField === 'amount' ? ' active' : ''}`}
+                  onClick={() => {
+                    if (sortField === 'amount') setSortDir(direction => direction === 'desc' ? 'asc' : 'desc');
+                    else { setSortField('amount'); setSortDir('desc'); }
+                  }}
+                  title="Ordenar por importe"
+                >
+                  Importe {sortField === 'amount' && sortDir === 'asc' ? '↑' : '↓'}
+                </button>
+                <span className="db-recent-count">{visibleTransactions.length} mostradas</span>
+                {detailsFilter.mode !== 'all' && (
+                  <button
+                    type="button"
+                    className="db-clear-filter"
+                    onClick={() => setDetailsFilter({ mode: 'all' })}
+                  >
+                    Limpiar filtro
+                  </button>
+                )}
+              </div>
             </div>
             {visibleTransactions.length === 0 ? (
               <p className="db-empty">No hay transacciones para este filtro en el periodo seleccionado.</p>
@@ -724,41 +748,6 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
                     />
                   ))}
                 </ul>
-                <div className="db-sort-bar">
-                  <span className="db-sort-label">Ordenar por</span>
-                  <div className="db-view-toggle" role="group" aria-label="Ordenar por fecha">
-                    <button
-                      type="button"
-                      className={`db-view-btn${sortField === 'date' && sortDir === 'desc' ? ' active' : ''}`}
-                      onClick={() => { setSortField('date'); setSortDir('desc'); }}
-                    >
-                      Fecha ↓
-                    </button>
-                    <button
-                      type="button"
-                      className={`db-view-btn${sortField === 'date' && sortDir === 'asc' ? ' active' : ''}`}
-                      onClick={() => { setSortField('date'); setSortDir('asc'); }}
-                    >
-                      Fecha ↑
-                    </button>
-                  </div>
-                  <div className="db-view-toggle" role="group" aria-label="Ordenar por importe">
-                    <button
-                      type="button"
-                      className={`db-view-btn${sortField === 'amount' && sortDir === 'desc' ? ' active' : ''}`}
-                      onClick={() => { setSortField('amount'); setSortDir('desc'); }}
-                    >
-                      Importe mayor
-                    </button>
-                    <button
-                      type="button"
-                      className={`db-view-btn${sortField === 'amount' && sortDir === 'asc' ? ' active' : ''}`}
-                      onClick={() => { setSortField('amount'); setSortDir('asc'); }}
-                    >
-                      Importe menor
-                    </button>
-                  </div>
-                </div>
               </>
             )}
           </article>

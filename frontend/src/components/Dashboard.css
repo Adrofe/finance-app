@@ -328,6 +328,32 @@
   color: var(--muted);
 }
 
+.db-recent-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.db-sort-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  color: #315571;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.db-sort-btn.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
 .db-clear-filter {
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -344,22 +370,6 @@
 .db-clear-filter:hover {
   background: #deedff;
   border-color: #a6c6e9;
-}
-
-.db-sort-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding-top: 10px;
-  margin-top: 4px;
-  border-top: 1px solid var(--line);
-}
-
-.db-sort-label {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--muted);
 }
 
 .db-recent-list {
