@@ -3,7 +3,7 @@ import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import axios from 'axios';
 import type { CreateTransactionRequest, Transaction, TaxType } from '../types/banking';
 import { CatalogService, Account, Tag, Merchant, TransactionCategory, TransactionStatus, TransactionType } from '../services/catalogService';
-import { getCategoryVisual, getMerchantLogo, getInstitutionLogo } from '../constants/visualConfig';
+import { getCategoryVisual, getMerchantLogo, getInstitutionLogo, sortCategoryParents } from '../constants/visualConfig';
 import './CreateTransactionModal.css';
 
 type TransactionModalInitialValues = Partial<CreateTransactionRequest>;
@@ -186,7 +186,7 @@ export function CreateTransactionModal({
   };
 
   // ── Category helpers ──────────────────────────────────────────────────────
-  const parentCategories = categories.filter(c => !c.parentId);
+  const parentCategories = sortCategoryParents(categories.filter(c => !c.parentId));
   const childCategoriesMap = categories.reduce<Record<number, TransactionCategory[]>>((acc, cat) => {
     if (cat.parentId) {
       if (!acc[cat.parentId]) acc[cat.parentId] = [];

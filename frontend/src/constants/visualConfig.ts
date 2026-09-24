@@ -76,6 +76,7 @@ export const CATEGORY_VISUALS: Record<string, { emoji: string; color: string }> 
   'INT':    { emoji: '🔄', color: '#607D8B' },
   'ADJ':    { emoji: '⚖️', color: '#9E9E9E' },
   'OTH':    { emoji: '📦', color: '#9E9E9E' },
+  'TRAVEL': { emoji: '🧳', color: '#0288D1' },
 
   // --- Food subcategories ---
   'FOOD.SUP':  { emoji: '🛒', color: '#EF9A9A' },
@@ -120,8 +121,14 @@ export const CATEGORY_VISUALS: Record<string, { emoji: string; color: string }> 
   'TRANSP.TAXI':    { emoji: '🚕', color: '#42A5F5' },
   'TRANSP.FUEL':    { emoji: '⛽', color: '#2196F3' },
   'TRANSP.MAINT':   { emoji: '🔧', color: '#1E88E5' },
-  'TRANSP.TRAVEL':  { emoji: '✈️', color: '#0288D1' },
   'TRANSP.OTH':     { emoji: '🚗', color: '#1976D2' },
+
+  // --- Travel ---
+  'TRAVEL.FLIGHT':  { emoji: '✈️', color: '#0288D1' },
+  'TRAVEL.HOTEL':   { emoji: '🏨', color: '#0277BD' },
+  'TRAVEL.TRANSIT': { emoji: '🚆', color: '#039BE5' },
+  'TRAVEL.CAR':     { emoji: '🚙', color: '#01579B' },
+  'TRAVEL.OTH':     { emoji: '🧳', color: '#0288D1' },
 
   // --- Dwelling ---
   'DWELL.RENT':  { emoji: '🏠', color: '#FFCC02' },
@@ -175,6 +182,20 @@ export const CATEGORY_VISUALS: Record<string, { emoji: string; color: string }> 
   'SAV.OTH':    { emoji: '💎', color: '#00695C' },
   
 };
+
+const CATEGORY_PARENT_ORDER = [
+  'FOOD', 'PURCH', 'ENT', 'SUBSCR', 'HEALTH', 'TRANSP', 'DWELL', 'INSUR',
+  'TAXES', 'COMM', 'EDU', 'DON', 'INC', 'SAV', 'TRAVEL', 'INT', 'ADJ', 'OTH',
+];
+
+export function sortCategoryParents<T extends { code?: string }>(categories: T[]): T[] {
+  return [...categories].sort((a, b) => {
+    const aIndex = CATEGORY_PARENT_ORDER.indexOf((a.code || '').toUpperCase());
+    const bIndex = CATEGORY_PARENT_ORDER.indexOf((b.code || '').toUpperCase());
+    return (aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex)
+      - (bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex);
+  });
+}
 
 // Local bank logo paths (served from /public/bank-logos/)
 export const INSTITUTION_LOGOS: Record<string, string> = {

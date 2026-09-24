@@ -9,7 +9,7 @@ import {
 } from '../services/catalogService';
 import { createTransaction } from '../services/transactionsService';
 import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
-import { getInstitutionLogo, getCategoryVisual, getMerchantLogo } from '../constants/visualConfig';
+import { getInstitutionLogo, getCategoryVisual, getMerchantLogo, sortCategoryParents } from '../constants/visualConfig';
 import type { TaxType } from '../types/banking';
 import axios from 'axios';
 import './BatchTransactionModal.css';
@@ -217,7 +217,7 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
   // ── Derived catalog helpers ───────────────────────────────────────────────
   const selectedAccount  = accounts.find(a => a.id === accountId);
   const selectedCategory = categories.find(c => c.id === categoryId);
-  const parentCategories = categories.filter(c => !c.parentId);
+  const parentCategories = sortCategoryParents(categories.filter(c => !c.parentId));
   const childrenByParent = categories.reduce<Record<number, TransactionCategory[]>>((acc, c) => {
     if (c.parentId) (acc[c.parentId] ??= []).push(c);
     return acc;
