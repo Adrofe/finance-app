@@ -50,6 +50,7 @@ public class MarketPriceClient {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient;
+    private final FinectPriceClient finectPriceClient;
 
     @Value("${investments.prices.providers.twelvedata.time-series-url}")
     private String twelveDataTimeSeriesUrl;
@@ -80,7 +81,8 @@ public class MarketPriceClient {
     @Value("${investments.prices.scraper.user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36}")
     private String scraperUserAgent;
 
-    public MarketPriceClient() {
+    public MarketPriceClient(FinectPriceClient finectPriceClient) {
+        this.finectPriceClient = finectPriceClient;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .followRedirects(HttpClient.Redirect.NORMAL)
@@ -88,6 +90,10 @@ public class MarketPriceClient {
     }
 
     public Optional<MarketQuote> fetchLatestQuote(InvestmentInstrument instrument) {
+        if (usesFinect(instrument)) {
+            return finectPriceClient.fetchLatestQuote(instrument);
+        }
+
         Optional<MarketQuote> quote = fetchFromTwelveDataSingle(instrument);
         if (quote.isPresent()) {
             return quote;
@@ -109,9 +115,20 @@ public class MarketPriceClient {
             return result;
         }
 
-        List<List<InvestmentInstrument>> chunks = partition(valid, maxBatchSize);
+        List<InvestmentInstrument> finectInstruments = valid.stream()
+            .filter(this::usesFinect)
+            .toList();
+        List<InvestmentInstrument> twelveDataInstruments = valid.stream()
+            .filter(instrument -> !usesFinect(instrument))
+            .toList();
+
+        for (InvestmentInstrument instrument : finectInstruments) {
+            finectPriceClient.fetchLatestQuote(instrument).ifPresent(quote -> result.put(instrument.getId(), quote));
+        }
+
+        List<List<InvestmentInstrument>> chunks = partition(twelveDataInstruments, maxBatchSize);
         LOG.info("Fetching quotes for {} instruments in {} batch(es) of up to {} (delay between batches: {}ms)",
-                valid.size(), chunks.size(), maxBatchSize, batchDelayMs);
+            twelveDataInstruments.size(), chunks.size(), maxBatchSize, batchDelayMs);
 
         for (int i = 0; i < chunks.size(); i++) {
             if (i > 0) {
@@ -128,7 +145,7 @@ public class MarketPriceClient {
         }
 
         if (scraperEnabled) {
-            for (InvestmentInstrument instrument : valid) {
+            for (InvestmentInstrument instrument : twelveDataInstruments) {
                 if (!result.containsKey(instrument.getId())) {
                     fetchFromScraper(instrument).ifPresent(quote -> result.put(instrument.getId(), quote));
                 }
@@ -136,6 +153,10 @@ public class MarketPriceClient {
         }
 
         return result;
+    }
+
+    private boolean usesFinect(InvestmentInstrument instrument) {
+        return instrument.getFinectUrl() != null && !instrument.getFinectUrl().isBlank();
     }
 
     private void fetchBatch(List<InvestmentInstrument> chunk, Map<Long, MarketQuote> resultMap) {
