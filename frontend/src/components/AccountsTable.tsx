@@ -128,8 +128,8 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
   const [confirmDeleteId, setConfirmDeleteId] = React.useState<number | null>(null);
   const [confirmDeleteName, setConfirmDeleteName] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
-  const [sortField, setSortField] = React.useState<AccountSortField | null>(null);
-  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc');
+  const [sortField, setSortField] = React.useState<AccountSortField | null>('realBalance');
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
 
   const [form, setForm] = React.useState({
     name: '',
