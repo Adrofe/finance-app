@@ -24,7 +24,7 @@ public class FinectPriceClient {
     private static final Logger LOG = LoggerFactory.getLogger(FinectPriceClient.class);
     private static final String SOURCE_FINECT = "FINECT";
     private static final Pattern NAV_PATTERN = Pattern.compile(
-            "(?i)([0-9]{1,3}(?:[.\\s][0-9]{3})*(?:,[0-9]+)?|[0-9]+(?:\\.[0-9]+)?)\\s*(?:€|EUR)\\s*Fecha\\s+de\\s+actualizaci[oó]n\\s+valor\\s+liquidativo");
+            "(?i)([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]+|[0-9]+(?:\\.[0-9]+)?)\\s*(?:€|EUR)\\s*Fecha\\s+(?:de\\s+)?(?:actualizaci[oó]n\\s+)?valor\\s+liquidativo");
 
     private final HttpClient httpClient;
 

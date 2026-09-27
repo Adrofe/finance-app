@@ -53,7 +53,8 @@ class FinectPriceClientTest {
     void parseQuote_readsFinectNavAndConvertsSpanishDecimal() {
         FinectPriceClient client = new FinectPriceClient();
         InvestmentInstrument instrument = InvestmentInstrument.builder().currency("EUR").build();
-        String html = "<div>51,95€<span>Fecha de actualización valor liquidativo:</span>24/09/2026</div>";
+        String html = "<div><span>51,95</span><span>€</span></div>"
+                + "<span>Fecha de <!-- -->valor liquidativo:<!-- -->24/09/2026</span>";
 
         MarketPriceClient.MarketQuote quote = client.parseQuote(html, instrument).orElseThrow();
 
