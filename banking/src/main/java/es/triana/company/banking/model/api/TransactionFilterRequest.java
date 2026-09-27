@@ -16,6 +16,9 @@ public class TransactionFilterRequest {
 
     private Long categoryId;
 
+    /** Transactions assigned to any of these categories. */
+    private List<Long> categoryIds;
+
     /** Transactions that have ANY of these tags */
     private List<Long> tagIds;
 

@@ -40,7 +40,9 @@ public class TransactionSpecification implements Specification<Transaction> {
             predicates.add(cb.or(isSource, isDestination));
         }
 
-        if (filter.getCategoryId() != null) {
+        if (filter.getCategoryIds() != null && !filter.getCategoryIds().isEmpty()) {
+            predicates.add(root.get("category").get("id").in(filter.getCategoryIds()));
+        } else if (filter.getCategoryId() != null) {
             predicates.add(cb.equal(root.get("category").get("id"), filter.getCategoryId()));
         }
 

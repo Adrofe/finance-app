@@ -106,13 +106,26 @@ function pickSingle(values: number[]): number | undefined {
   return values.length === 1 ? values[0] : undefined;
 }
 
-function buildSearchRequest(filters: TransactionFilters, page: number, size: number): TransactionsSearchRequest {
+function buildSearchRequest(
+  filters: TransactionFilters,
+  categories: { id: number; parentId?: number | null }[],
+  page: number,
+  size: number,
+): TransactionsSearchRequest {
   const { startDate, endDate } = parseRange(filters);
   const description = filters.descriptionText.trim();
+  const categoryIds = Array.from(new Set([
+    ...filters.categoryIds,
+    ...filters.parentCategoryIds,
+    ...categories
+      .filter(category => category.parentId != null && filters.parentCategoryIds.includes(category.parentId))
+      .map(category => category.id),
+  ]));
 
   return {
     accountId: pickSingle(filters.sourceAccountIds),
-    categoryId: filters.parentCategoryIds.length === 0 ? pickSingle(filters.categoryIds) : undefined,
+    categoryId: pickSingle(categoryIds),
+    categoryIds: categoryIds.length > 1 ? categoryIds : undefined,
     tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
     statusId: pickSingle(filters.statusIds),
     typeId: pickSingle(filters.typeIds),
@@ -207,7 +220,7 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
     setLoadingPage(true);
     setPageError('');
 
-    searchTransactions(accessToken, buildSearchRequest(filters, page, pageSize))
+    searchTransactions(accessToken, buildSearchRequest(filters, categories, page, pageSize))
       .then((result) => {
         setServerItems(result.content || []);
         setTotalElements(result.totalElements ?? 0);

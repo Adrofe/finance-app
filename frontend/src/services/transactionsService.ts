@@ -6,6 +6,7 @@ import type { Transaction, CreateTransactionRequest } from '../types/banking';
 export type TransactionsSearchRequest = {
   accountId?: number;
   categoryId?: number;
+  categoryIds?: number[];
   tagIds?: number[];
   merchantId?: number;
   statusId?: number;
