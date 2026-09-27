@@ -114,6 +114,8 @@ interface AccountsTableProps {
   token: string;
 }
 
+type AccountSortField = 'institution' | 'name' | 'iban' | 'type' | 'realBalance' | 'availableBalance';
+
 const fmtBalance = (n: number, currency = 'EUR') =>
   n.toLocaleString('es-ES', { style: 'currency', currency, minimumFractionDigits: 2 });
 
@@ -126,6 +128,8 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
   const [confirmDeleteId, setConfirmDeleteId] = React.useState<number | null>(null);
   const [confirmDeleteName, setConfirmDeleteName] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [sortField, setSortField] = React.useState<AccountSortField | null>(null);
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc');
 
   const [form, setForm] = React.useState({
     name: '',
@@ -168,6 +172,43 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
 
   const totalReal  = accounts.reduce((s, a) => s + (typeof a.lastBalanceReal      === 'number' ? a.lastBalanceReal      : 0), 0);
   const totalAvail  = accounts.reduce((s, a) => s + (typeof a.lastBalanceAvailable === 'number' ? a.lastBalanceAvailable : 0), 0);
+
+  const sortedAccounts = React.useMemo(() => {
+    if (!sortField) return accounts;
+
+    const compareText = (a: string, b: string) => a.localeCompare(b, 'es', { sensitivity: 'base' });
+    const compareNumber = (a?: number, b?: number) => {
+      if (a == null) return b == null ? 0 : 1;
+      if (b == null) return -1;
+      return a - b;
+    };
+
+    return [...accounts].sort((a, b) => {
+      const result = (() => {
+        switch (sortField) {
+          case 'institution': return compareText(a.institutionName || '', b.institutionName || '');
+          case 'name': return compareText(a.name || '', b.name || '');
+          case 'iban': return compareText(a.iban || '', b.iban || '');
+          case 'type': return compareText(a.accountTypeName || '', b.accountTypeName || '');
+          case 'realBalance': return compareNumber(a.lastBalanceReal, b.lastBalanceReal);
+          case 'availableBalance': return compareNumber(a.lastBalanceAvailable, b.lastBalanceAvailable);
+        }
+      })();
+      return sortDirection === 'asc' ? result : -result;
+    });
+  }, [accounts, sortDirection, sortField]);
+
+  const toggleSort = (field: AccountSortField) => {
+    if (sortField === field) {
+      setSortDirection(direction => direction === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    setSortField(field);
+    setSortDirection('asc');
+  };
+
+  const sortIndicator = (field: AccountSortField) =>
+    sortField === field ? (sortDirection === 'asc' ? '↑' : '↓') : '↕';
 
   if (loading) return <div className="at-loading">Cargando cuentas…</div>;
 
@@ -269,17 +310,17 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
         <table className="at-table">
           <thead>
             <tr>
-              <th className="at-th">Institución</th>
-              <th className="at-th">Cuenta</th>
-              <th className="at-th">IBAN</th>
-              <th className="at-th">Tipo</th>
-              <th className="at-th at-th--right">Balance real</th>
-              <th className="at-th at-th--right">Disponible</th>
+              <th className="at-th" aria-sort={sortField === 'institution' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn" onClick={() => toggleSort('institution')}>Institución <span>{sortIndicator('institution')}</span></button></th>
+              <th className="at-th" aria-sort={sortField === 'name' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn" onClick={() => toggleSort('name')}>Cuenta <span>{sortIndicator('name')}</span></button></th>
+              <th className="at-th" aria-sort={sortField === 'iban' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn" onClick={() => toggleSort('iban')}>IBAN <span>{sortIndicator('iban')}</span></button></th>
+              <th className="at-th" aria-sort={sortField === 'type' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn" onClick={() => toggleSort('type')}>Tipo <span>{sortIndicator('type')}</span></button></th>
+              <th className="at-th at-th--right" aria-sort={sortField === 'realBalance' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn at-sort-btn--right" onClick={() => toggleSort('realBalance')}>Balance real <span>{sortIndicator('realBalance')}</span></button></th>
+              <th className="at-th at-th--right" aria-sort={sortField === 'availableBalance' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn at-sort-btn--right" onClick={() => toggleSort('availableBalance')}>Disponible <span>{sortIndicator('availableBalance')}</span></button></th>
               <th className="at-th at-th--actions" aria-label="Acciones"></th>
             </tr>
           </thead>
           <tbody>
-            {accounts.map((acc: Account) => (
+            {sortedAccounts.map((acc: Account) => (
               <tr key={acc.id} className="at-row">
 
                 {/* Institution */}

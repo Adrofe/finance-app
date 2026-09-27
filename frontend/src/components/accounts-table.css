@@ -156,6 +156,29 @@
 .at-th--right   { text-align: right; }
 .at-th--actions { width: 90px; }
 
+.at-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.at-sort-btn--right {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.at-sort-btn:hover {
+  color: #0f6bb4;
+}
+
 /* ─── Rows ────────────────────────────────────────────────────────────────── */
 
 .at-row {
