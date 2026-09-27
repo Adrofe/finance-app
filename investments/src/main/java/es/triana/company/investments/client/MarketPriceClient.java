@@ -91,7 +91,11 @@ public class MarketPriceClient {
 
     public Optional<MarketQuote> fetchLatestQuote(InvestmentInstrument instrument) {
         if (usesFinect(instrument)) {
-            return finectPriceClient.fetchLatestQuote(instrument);
+            Optional<MarketQuote> finectQuote = finectPriceClient.fetchLatestQuote(instrument);
+            if (finectQuote.isPresent()) {
+                return finectQuote;
+            }
+            LOG.info("Finect returned no quote for instrumentId={}; falling back to TwelveData", instrument.getId());
         }
 
         Optional<MarketQuote> quote = fetchFromTwelveDataSingle(instrument);
@@ -118,13 +122,13 @@ public class MarketPriceClient {
         List<InvestmentInstrument> finectInstruments = valid.stream()
             .filter(this::usesFinect)
             .toList();
-        List<InvestmentInstrument> twelveDataInstruments = valid.stream()
-            .filter(instrument -> !usesFinect(instrument))
-            .toList();
-
         for (InvestmentInstrument instrument : finectInstruments) {
             finectPriceClient.fetchLatestQuote(instrument).ifPresent(quote -> result.put(instrument.getId(), quote));
         }
+
+        List<InvestmentInstrument> twelveDataInstruments = valid.stream()
+            .filter(instrument -> !result.containsKey(instrument.getId()))
+            .toList();
 
         List<List<InvestmentInstrument>> chunks = partition(twelveDataInstruments, maxBatchSize);
         LOG.info("Fetching quotes for {} instruments in {} batch(es) of up to {} (delay between batches: {}ms)",
