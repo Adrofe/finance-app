@@ -30,6 +30,59 @@
   grid-column: 1 / -1;
 }
 
+.idb-history-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.idb-history-ranges {
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid #d8e4ef;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.idb-history-ranges button {
+  border: 0;
+  border-right: 1px solid #d8e4ef;
+  padding: 6px 9px;
+  background: #fff;
+  color: #53687b;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.idb-history-ranges button:last-child { border-right: 0; }
+.idb-history-ranges button:hover { background: #f1f7fc; }
+.idb-history-ranges button.active { background: #0f6bb4; color: #fff; }
+
+.idb-history-custom-dates {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.idb-history-custom-dates label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.idb-history-custom-dates input {
+  border: 1px solid #c7d5e4;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
 .idb-filter-section {
   display: flex;
   align-items: center;

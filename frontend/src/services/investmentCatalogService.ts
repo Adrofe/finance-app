@@ -229,10 +229,19 @@ export async function fetchInstrumentHistory(
 export async function fetchPortfolioHistory(
   token: string,
   typeCodes?: string[],
+  from?: string,
+  to?: string,
 ): Promise<PortfolioHistory> {
   const res = await axios.get<ApiResponse<PortfolioHistory>>(
     `${INVESTMENTS_BASE}/history`,
-    { headers: headers(token), params: typeCodes && typeCodes.length > 0 ? { typeCodes } : undefined },
+    {
+      headers: headers(token),
+      params: {
+        ...(typeCodes && typeCodes.length > 0 ? { typeCodes } : {}),
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
+      },
+    },
   );
   return res.data.data;
 }

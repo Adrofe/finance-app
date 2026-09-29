@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -36,6 +36,34 @@ const fmtPct = (value: number | null | undefined) => {
 };
 
 const pnlClass = (value: number | null | undefined) => (safeNumber(value) >= 0 ? 'idb-positive' : 'idb-negative');
+
+type HistoryRange = '1m' | '3m' | '6m' | '1y' | 'ytd' | '3y' | '5y' | 'custom';
+
+const localDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const rangeStart = (range: Exclude<HistoryRange, 'custom'>, today: Date) => {
+  const start = new Date(today);
+  if (range === 'ytd') return `${today.getFullYear()}-01-01`;
+  const months = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, '3y': 36, '5y': 60 }[range];
+  start.setMonth(start.getMonth() - months);
+  return localDate(start);
+};
+
+const historyRanges: Array<{ id: HistoryRange; label: string }> = [
+  { id: '1m', label: '1 mes' },
+  { id: '3m', label: '3 meses' },
+  { id: '6m', label: '6 meses' },
+  { id: '1y', label: '1 año' },
+  { id: 'ytd', label: 'Este año' },
+  { id: '3y', label: '3 años' },
+  { id: '5y', label: '5 años' },
+  { id: 'custom', label: 'Personalizado' },
+];
 
 const exposureSections: Array<{ key: 'countries' | 'regions' | 'sectors' | 'industries' | 'marketRegimes'; label: string }> = [
   { key: 'countries', label: 'Países' },
@@ -93,6 +121,12 @@ const ExposureDonut: React.FC<{ items: ExposureOverviewBucket[] }> = ({ items })
 };
 
 export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized }) => {
+  const [historyRange, setHistoryRange] = useState<HistoryRange>('1y');
+  const [customFrom, setCustomFrom] = useState(() => rangeStart('1m', new Date()));
+  const [customTo, setCustomTo] = useState(() => localDate(new Date()));
+  const today = localDate(new Date());
+  const historyFrom = historyRange === 'custom' ? customFrom : rangeStart(historyRange, new Date());
+  const historyTo = historyRange === 'custom' ? customTo : today;
   const {
     summary,
     taxSummary,
@@ -113,7 +147,7 @@ export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized })
     loading,
     error,
     clearError,
-  } = useInvestmentsDashboard(token, onUnauthorized);
+  } = useInvestmentsDashboard(token, onUnauthorized, historyFrom, historyTo);
 
   const topInstrumentBars = useMemo(() => {
     return instrumentComposition
@@ -207,10 +241,30 @@ export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized })
 
       <div className="idb-grid">
         <article className="idb-card idb-card--wide">
-          <div className="sheet-header">
-            <h3>Histórico de Cartera</h3>
-            <span>Valor de mercado agregado en EUR</span>
+          <div className="idb-history-header">
+            <div className="sheet-header">
+              <h3>Histórico de Cartera</h3>
+              <span>Valor de mercado agregado en EUR</span>
+            </div>
+            <div className="idb-history-ranges" role="group" aria-label="Rango de histórico">
+              {historyRanges.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={historyRange === item.id ? 'active' : ''}
+                  onClick={() => setHistoryRange(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
+          {historyRange === 'custom' && (
+            <div className="idb-history-custom-dates">
+              <label>Desde<input type="date" value={customFrom} max={customTo} onChange={(event) => setCustomFrom(event.target.value)} /></label>
+              <label>Hasta<input type="date" value={customTo} min={customFrom} max={today} onChange={(event) => setCustomTo(event.target.value)} /></label>
+            </div>
+          )}
           {(portfolioHistory?.points ?? []).length === 0 ? (
             <p className="idb-empty">No hay precios históricos para construir la serie.</p>
           ) : (

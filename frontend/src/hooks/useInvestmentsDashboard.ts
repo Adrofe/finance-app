@@ -55,7 +55,12 @@ const sortTypeSummary = (items: InvestmentTypeSummary[]) =>
 const operationRealizedGain = (operation: InvestmentOperation) =>
   (operation.fifoLots ?? []).reduce((sum, lot) => sum + (lot.gainLossEur ?? 0), 0);
 
-export function useInvestmentsDashboard(token: string, onUnauthorized?: (message: string) => void) {
+export function useInvestmentsDashboard(
+  token: string,
+  onUnauthorized?: (message: string) => void,
+  historyFrom?: string,
+  historyTo?: string,
+) {
   const [summary, setSummary] = useState<InvestmentSummary | null>(null);
   const [positions, setPositions] = useState<InvestmentPosition[]>([]);
   const [operations, setOperations] = useState<InvestmentOperation[]>([]);
@@ -154,7 +159,7 @@ export function useInvestmentsDashboard(token: string, onUnauthorized?: (message
     }
 
     try {
-      setPortfolioHistory(await fetchPortfolioHistory(token, selectedTypeCodes));
+      setPortfolioHistory(await fetchPortfolioHistory(token, selectedTypeCodes, historyFrom, historyTo));
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         onUnauthorized?.('Session expired or invalid token. Please login again.');
@@ -165,7 +170,7 @@ export function useInvestmentsDashboard(token: string, onUnauthorized?: (message
         || (err as { message?: string })?.message
         || 'Error loading portfolio history');
     }
-  }, [token, selectedTypeCodes, onUnauthorized]);
+  }, [token, selectedTypeCodes, historyFrom, historyTo, onUnauthorized]);
 
   useEffect(() => {
     loadCore();
