@@ -233,3 +233,19 @@ export type PriceUpdateDraft = {
   source?: string;
   currency?: string;
 };
+
+export type InstrumentHistoryPoint = {
+  date: string;
+  price: number;
+  quantity: number | null;
+  investedEur: number | null;
+  valueEur: number | null;
+};
+
+export type InstrumentHistory = {
+  instrumentId: number;
+  symbol: string;
+  name: string;
+  currency: string;
+  points: InstrumentHistoryPoint[];
+};

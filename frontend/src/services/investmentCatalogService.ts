@@ -9,6 +9,7 @@ import type {
   PriceRefreshResult,
   ExposureRefreshResult,
   PriceUpdateDraft,
+  InstrumentHistory,
 } from '../types/investments';
 
 const BASE = '/v1/api/investments/catalog';
@@ -207,6 +208,19 @@ export async function addManualInstrumentPrice(token: string, payload: PriceUpda
     `${INVESTMENTS_BASE}/prices/refresh`,
     [payload],
     { headers: headers(token) },
+  );
+  return res.data.data;
+}
+
+export async function fetchInstrumentHistory(
+  token: string,
+  instrumentId: number,
+  from?: string,
+  to?: string,
+): Promise<InstrumentHistory> {
+  const res = await axios.get<ApiResponse<InstrumentHistory>>(
+    `${INVESTMENTS_BASE}/instruments/${instrumentId}/history`,
+    { headers: headers(token), params: { from, to } },
   );
   return res.data.data;
 }
