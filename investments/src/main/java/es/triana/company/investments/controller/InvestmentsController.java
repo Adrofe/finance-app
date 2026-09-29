@@ -1,6 +1,7 @@
 package es.triana.company.investments.controller;
 
 import java.util.List;
+import java.time.LocalDate;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,13 +12,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import es.triana.company.investments.model.api.ApiResponse;
+import es.triana.company.investments.model.api.InstrumentHistoryDTO;
 import es.triana.company.investments.model.api.InvestmentDTO;
 import es.triana.company.investments.model.api.InvestmentSummaryDTO;
 import es.triana.company.investments.security.TenantContext;
 import es.triana.company.investments.service.InvestmentService;
+import es.triana.company.investments.service.InstrumentHistoryService;
 import jakarta.validation.Valid;
 
 @RestController
@@ -25,10 +30,15 @@ import jakarta.validation.Valid;
 public class InvestmentsController {
 
     private final InvestmentService investmentService;
+    private final InstrumentHistoryService instrumentHistoryService;
     private final TenantContext tenantContext;
 
-    public InvestmentsController(InvestmentService investmentService, TenantContext tenantContext) {
+    public InvestmentsController(
+            InvestmentService investmentService,
+            InstrumentHistoryService instrumentHistoryService,
+            TenantContext tenantContext) {
         this.investmentService = investmentService;
+        this.instrumentHistoryService = instrumentHistoryService;
         this.tenantContext = tenantContext;
     }
 
@@ -44,6 +54,16 @@ public class InvestmentsController {
         Long tenantId = tenantContext.getCurrentTenantId();
         InvestmentDTO data = investmentService.getById(id, tenantId);
         return ResponseEntity.ok(new ApiResponse<>(200, "Investment retrieved successfully", data));
+    }
+
+    @GetMapping("/instruments/{instrumentId}/history")
+    public ResponseEntity<ApiResponse<InstrumentHistoryDTO>> getInstrumentHistory(
+            @PathVariable("instrumentId") Long instrumentId,
+            @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        InstrumentHistoryDTO data = instrumentHistoryService.getHistory(tenantId, instrumentId, from, to);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Instrument history retrieved successfully", data));
     }
 
     @GetMapping("/summary")
