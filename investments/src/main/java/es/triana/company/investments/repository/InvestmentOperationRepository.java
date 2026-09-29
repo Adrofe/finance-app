@@ -18,6 +18,17 @@ public interface InvestmentOperationRepository extends JpaRepository<InvestmentO
 
     List<InvestmentOperation> findByTenantIdOrderByOperationDateDescIdDesc(Long tenantId);
 
+    @Query("""
+            SELECT o FROM InvestmentOperation o
+            JOIN Investment inv ON inv.id = o.investmentId
+            WHERE inv.instrumentId = :instrumentId
+              AND o.tenantId = :tenantId
+            ORDER BY o.operationDate ASC, o.id ASC
+            """)
+    List<InvestmentOperation> findByInstrumentAndTenantOrderByOperationDateAscIdAsc(
+            @Param("instrumentId") Long instrumentId,
+            @Param("tenantId") Long tenantId);
+
     /**
      * Returns BUY lots for a given investment ordered FIFO (oldest first).
      * Used during sell processing to consume lots in order.

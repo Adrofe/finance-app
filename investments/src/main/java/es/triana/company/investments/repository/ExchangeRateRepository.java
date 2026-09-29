@@ -18,6 +18,9 @@ public interface ExchangeRateRepository extends JpaRepository<ExchangeRate, Long
     Optional<ExchangeRate> findByFromCurrencyAndToCurrencyAndAsOf(
             String fromCurrency, String toCurrency, LocalDate asOf);
 
+    Optional<ExchangeRate> findFirstByFromCurrencyAndToCurrencyAndAsOfLessThanEqualOrderByAsOfDesc(
+            String fromCurrency, String toCurrency, LocalDate asOf);
+
     List<ExchangeRate> findByFromCurrencyAndToCurrencyAndAsOfBetweenOrderByAsOfAsc(
             String fromCurrency, String toCurrency, LocalDate from, LocalDate to);
 
