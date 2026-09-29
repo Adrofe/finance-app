@@ -26,6 +26,19 @@
   gap: 12px;
 }
 
+.idb-card--wide {
+  grid-column: 1 / -1;
+}
+
+.idb-filter-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
 .idb-grid-2 {
   align-items: stretch;
 }

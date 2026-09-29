@@ -97,6 +97,7 @@ export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized })
     summary,
     taxSummary,
     exposureOverview,
+    portfolioHistory,
     selectedTypeCodes,
     setSelectedTypeCodes,
     typeFilters,
@@ -177,7 +178,57 @@ export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized })
         </article>
       </div>
 
+      <div className="idb-filter-section">
+        <span>Filtrar cartera por tipo</span>
+        <div className="idb-filter-chips">
+          <button
+            type="button"
+            className={`idb-chip ${selectedTypeCodes.length === 0 ? 'active' : ''}`}
+            onClick={() => setSelectedTypeCodes([])}
+          >
+            Todos
+          </button>
+          {typeFilters.map((item) => {
+            const active = selectedTypeCodes.includes(item.code);
+            return (
+              <button
+                key={item.code}
+                type="button"
+                className={`idb-chip ${active ? 'active' : ''}`}
+                onClick={() => setSelectedTypeCodes((current) =>
+                  active ? current.filter((code) => code !== item.code) : [...current, item.code])}
+              >
+                {item.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="idb-grid">
+        <article className="idb-card idb-card--wide">
+          <div className="sheet-header">
+            <h3>Histórico de Cartera</h3>
+            <span>Valor de mercado agregado en EUR</span>
+          </div>
+          {(portfolioHistory?.points ?? []).length === 0 ? (
+            <p className="idb-empty">No hay precios históricos para construir la serie.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={portfolioHistory?.points} margin={{ top: 8, right: 16, left: 0, bottom: 6 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e6edf5" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#60758a' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#60758a' }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  formatter={((value: unknown) => [fmtMoney(Number(value)), 'Valor cartera']) as never}
+                  contentStyle={{ borderRadius: 10, border: '1px solid #d6e0eb', fontSize: '0.86rem' }}
+                />
+                <Line type="monotone" dataKey="valueEur" stroke="#0f6bb4" strokeWidth={3} dot={false} name="valueEur" />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </article>
+
         <article className="idb-card">
           <div className="sheet-header">
             <h3>Beneficio Realizado en el Tiempo</h3>
@@ -326,33 +377,9 @@ export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized })
         <div className="idb-tax-header">
           <div className="sheet-header">
             <h3>Exposición de Cartera</h3>
-            <span>Filtrable por tipo de activo (ETF, fondos, acciones, etc.)</span>
+            <span>El filtro también actualiza el histórico de cartera</span>
           </div>
           <span className="idb-exposure-total">Base: {fmtMoney(exposureOverview?.totalCurrentValue ?? 0)}</span>
-        </div>
-
-        <div className="idb-filter-chips">
-          <button
-            type="button"
-            className={`idb-chip ${selectedTypeCodes.length === 0 ? 'active' : ''}`}
-            onClick={() => setSelectedTypeCodes([])}
-          >
-            Todos
-          </button>
-          {typeFilters.map((item) => {
-            const active = selectedTypeCodes.includes(item.code);
-            return (
-              <button
-                key={item.code}
-                type="button"
-                className={`idb-chip ${active ? 'active' : ''}`}
-                onClick={() => setSelectedTypeCodes((current) =>
-                  active ? current.filter((code) => code !== item.code) : [...current, item.code])}
-              >
-                {item.name}
-              </button>
-            );
-          })}
         </div>
 
         <div className="idb-exposure-grid">
