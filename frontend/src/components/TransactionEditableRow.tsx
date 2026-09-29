@@ -21,7 +21,7 @@ type EditField =
   | 'category' | 'merchant' | 'status' | 'type' | 'sourceAccount' | 'tags'
   | null;
 
-type PickerPos = { top: number; left: number; minWidth: number };
+type PickerPos = { top: number; left: number; minWidth: number; maxHeight: number };
 
 const STATUS_STYLES: Record<string, { background: string; color: string }> = {
   BOOKED:    { background: '#dcfce7', color: '#166534' },
@@ -193,7 +193,19 @@ export function TransactionEditableRow({
   const openPicker = (e: React.MouseEvent, field: EditField) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setPickerPos({ top: rect.bottom + 4, left: rect.left, minWidth: Math.max(rect.width, 220) });
+    const viewportPadding = 12;
+    const gap = 4;
+    const preferredHeight = field === 'category' ? 380 : field === 'merchant' ? 360 : field === 'tags' ? 320 : 240;
+    const spaceBelow = window.innerHeight - rect.bottom - gap - viewportPadding;
+    const spaceAbove = rect.top - gap - viewportPadding;
+    const openAbove = spaceBelow < preferredHeight && spaceAbove > spaceBelow;
+    const availableHeight = openAbove ? spaceAbove : spaceBelow;
+    const maxHeight = Math.max(160, Math.min(preferredHeight, availableHeight));
+    const top = openAbove
+      ? Math.max(viewportPadding, rect.top - gap - maxHeight)
+      : rect.bottom + gap;
+
+    setPickerPos({ top, left: rect.left, minWidth: Math.max(rect.width, 220), maxHeight });
     setActiveField(field);
     setCatSearch('');
     setMerchantSearch('');
@@ -319,7 +331,7 @@ export function TransactionEditableRow({
     <div
       ref={pickerRef}
       className="tie-picker tie-cat-picker"
-      style={{ top: pickerPos!.top, left: pickerPos!.left }}
+      style={{ top: pickerPos!.top, left: pickerPos!.left, maxHeight: pickerPos!.maxHeight }}
     >
       <div className="tie-picker-search">
         <input
@@ -383,7 +395,7 @@ export function TransactionEditableRow({
     <div
       ref={pickerRef}
       className="tie-picker tie-status-picker"
-      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: pickerPos!.minWidth }}
+      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: pickerPos!.minWidth, maxHeight: pickerPos!.maxHeight }}
     >
       {statuses.map(s => {
         const st = STATUS_STYLES[s.code] ?? STATUS_STYLES.BOOKED;
@@ -404,7 +416,7 @@ export function TransactionEditableRow({
     <div
       ref={pickerRef}
       className="tie-picker tie-merchant-picker"
-      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: Math.max(pickerPos!.minWidth, 250) }}
+      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: Math.max(pickerPos!.minWidth, 250), maxHeight: pickerPos!.maxHeight }}
     >
       <div className="tie-picker-search">
         <input
@@ -447,7 +459,7 @@ export function TransactionEditableRow({
     <div
       ref={pickerRef}
       className="tie-picker tie-type-picker"
-      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: pickerPos!.minWidth }}
+      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: pickerPos!.minWidth, maxHeight: pickerPos!.maxHeight }}
     >
       {types.map(t => {
         const cls = `tt-type-badge tt-type-${t.name.toUpperCase()}`;
@@ -468,7 +480,7 @@ export function TransactionEditableRow({
     <div
       ref={pickerRef}
       className="tie-picker tie-acc-picker"
-      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: Math.max(pickerPos!.minWidth, 240) }}
+      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: Math.max(pickerPos!.minWidth, 240), maxHeight: pickerPos!.maxHeight }}
     >
       {accounts.map(acc => (
         <button
@@ -490,7 +502,7 @@ export function TransactionEditableRow({
     <div
       ref={pickerRef}
       className="tie-picker tie-tag-picker"
-      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: Math.max(pickerPos!.minWidth, 240) }}
+      style={{ top: pickerPos!.top, left: pickerPos!.left, minWidth: Math.max(pickerPos!.minWidth, 240), maxHeight: pickerPos!.maxHeight }}
     >
       <div className="tie-picker-search">
         <input
