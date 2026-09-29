@@ -159,6 +159,21 @@ export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized })
       }));
   }, [instrumentComposition]);
 
+  const portfolioHistoryDomain = useMemo<[number, number]>(() => {
+    const values = (portfolioHistory?.points ?? [])
+      .map((point) => point.valueEur)
+      .filter((value): value is number => Number.isFinite(value));
+
+    if (values.length === 0) return [0, 1];
+
+    const minimum = Math.min(...values);
+    const maximum = Math.max(...values);
+    const difference = maximum - minimum;
+    const padding = difference > 0 ? difference * 0.08 : Math.max(Math.abs(maximum) * 0.02, 1);
+
+    return [Math.max(0, minimum - padding), maximum + padding];
+  }, [portfolioHistory]);
+
   if (loading) {
     return <p className="state">Cargando dashboard de inversiones...</p>;
   }
@@ -272,7 +287,14 @@ export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized })
               <LineChart data={portfolioHistory?.points} margin={{ top: 8, right: 16, left: 0, bottom: 6 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e6edf5" vertical={false} />
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#60758a' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#60758a' }} axisLine={false} tickLine={false} />
+                <YAxis
+                  domain={portfolioHistoryDomain}
+                  tick={{ fontSize: 11, fill: '#60758a' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(value: number) => `${Math.round(value).toLocaleString('es-ES')} €`}
+                  width={76}
+                />
                 <Tooltip
                   formatter={((value: unknown) => [fmtMoney(Number(value)), 'Valor cartera']) as never}
                   contentStyle={{ borderRadius: 10, border: '1px solid #d6e0eb', fontSize: '0.86rem' }}
