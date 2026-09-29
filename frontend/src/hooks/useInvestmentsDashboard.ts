@@ -8,6 +8,7 @@ import type {
   InvestmentSummary,
   InvestmentTaxSummary,
   InvestmentTypeSummary,
+  PortfolioHistory,
 } from '../types/investments';
 import {
   fetchInvestmentPositions,
@@ -16,6 +17,7 @@ import {
   fetchExposureOverview,
   fetchTaxSummary,
 } from '../services/investmentOperationsService';
+import { fetchPortfolioHistory } from '../services/investmentCatalogService';
 
 type InstrumentComposition = {
   instrumentId: number;
@@ -59,6 +61,7 @@ export function useInvestmentsDashboard(token: string, onUnauthorized?: (message
   const [operations, setOperations] = useState<InvestmentOperation[]>([]);
   const [taxSummary, setTaxSummary] = useState<InvestmentTaxSummary | null>(null);
   const [exposureOverview, setExposureOverview] = useState<ExposureOverview | null>(null);
+  const [portfolioHistory, setPortfolioHistory] = useState<PortfolioHistory | null>(null);
   const [selectedTypeCodes, setSelectedTypeCodes] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
@@ -144,6 +147,26 @@ export function useInvestmentsDashboard(token: string, onUnauthorized?: (message
     }
   }, [token, selectedTypeCodes, onUnauthorized]);
 
+  const loadPortfolioHistory = useCallback(async () => {
+    if (!token) {
+      setPortfolioHistory(null);
+      return;
+    }
+
+    try {
+      setPortfolioHistory(await fetchPortfolioHistory(token, selectedTypeCodes));
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        onUnauthorized?.('Session expired or invalid token. Please login again.');
+        return;
+      }
+      setPortfolioHistory(null);
+      setError((err as { message?: string; response?: { data?: { message?: string } } })?.response?.data?.message
+        || (err as { message?: string })?.message
+        || 'Error loading portfolio history');
+    }
+  }, [token, selectedTypeCodes, onUnauthorized]);
+
   useEffect(() => {
     loadCore();
   }, [loadCore]);
@@ -157,17 +180,22 @@ export function useInvestmentsDashboard(token: string, onUnauthorized?: (message
   }, [loadExposureOverview]);
 
   useEffect(() => {
+    loadPortfolioHistory();
+  }, [loadPortfolioHistory]);
+
+  useEffect(() => {
     const handleInvestmentsUpdated = () => {
       loadCore();
       loadTaxSummary();
       loadExposureOverview();
+      loadPortfolioHistory();
     };
 
     window.addEventListener(FINANCE_EVENTS.INVESTMENTS_UPDATED, handleInvestmentsUpdated);
     return () => {
       window.removeEventListener(FINANCE_EVENTS.INVESTMENTS_UPDATED, handleInvestmentsUpdated);
     };
-  }, [loadCore, loadTaxSummary, loadExposureOverview]);
+  }, [loadCore, loadTaxSummary, loadExposureOverview, loadPortfolioHistory]);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -284,6 +312,7 @@ export function useInvestmentsDashboard(token: string, onUnauthorized?: (message
     operations,
     taxSummary,
     exposureOverview,
+    portfolioHistory,
     selectedTypeCodes,
     setSelectedTypeCodes,
     typeFilters,
