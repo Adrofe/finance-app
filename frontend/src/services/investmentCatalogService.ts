@@ -10,6 +10,7 @@ import type {
   ExposureRefreshResult,
   PriceUpdateDraft,
   InstrumentHistory,
+  PortfolioHistory,
 } from '../types/investments';
 
 const BASE = '/v1/api/investments/catalog';
@@ -221,6 +222,17 @@ export async function fetchInstrumentHistory(
   const res = await axios.get<ApiResponse<InstrumentHistory>>(
     `${INVESTMENTS_BASE}/instruments/${instrumentId}/history`,
     { headers: headers(token), params: { from, to } },
+  );
+  return res.data.data;
+}
+
+export async function fetchPortfolioHistory(
+  token: string,
+  typeCodes?: string[],
+): Promise<PortfolioHistory> {
+  const res = await axios.get<ApiResponse<PortfolioHistory>>(
+    `${INVESTMENTS_BASE}/history`,
+    { headers: headers(token), params: typeCodes && typeCodes.length > 0 ? { typeCodes } : undefined },
   );
   return res.data.data;
 }

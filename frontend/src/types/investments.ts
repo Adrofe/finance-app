@@ -249,3 +249,13 @@ export type InstrumentHistory = {
   currency: string;
   points: InstrumentHistoryPoint[];
 };
+
+export type PortfolioHistoryPoint = {
+  date: string;
+  valueEur: number;
+};
+
+export type PortfolioHistory = {
+  appliedTypeCodes: string[];
+  points: PortfolioHistoryPoint[];
+};
