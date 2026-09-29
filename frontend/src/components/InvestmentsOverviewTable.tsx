@@ -3,6 +3,7 @@ import { useInvestmentsOverview } from '../hooks/useInvestmentsOverview';
 import { recalculateAllPositions } from '../services/investmentOperationsService';
 import { fetchExchangeRates } from '../services/exchangeRatesService';
 import { getInvestmentTypeVisual } from '../constants/visualConfig';
+import { InstrumentHistoryModal } from './InstrumentHistoryModal';
 import './investments-overview.css';
 
 type SortKey = 'symbol' | 'investedAmount' | 'currentValue' | 'pnl' | 'pnlPct' | 'quantity';
@@ -46,6 +47,12 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
   const [normalizeToEur, setNormalizeToEur] = useState(false);
   const [eurRates, setEurRates] = useState<Map<string, number>>(new Map());
   const [loadingRates, setLoadingRates] = useState(false);
+  const [historyInstrument, setHistoryInstrument] = useState<{
+    id: number;
+    symbol: string;
+    name: string;
+    currency: string;
+  } | null>(null);
 
   const countryOptions = useMemo(
     () => [...new Set(byInstrument.map((g) => g.countryCode).filter(Boolean))].sort(),
@@ -186,6 +193,16 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
 
   return (
     <div className="io-wrapper">
+      {historyInstrument && (
+        <InstrumentHistoryModal
+          instrumentId={historyInstrument.id}
+          symbol={historyInstrument.symbol}
+          name={historyInstrument.name}
+          currency={historyInstrument.currency}
+          token={token}
+          onClose={() => setHistoryInstrument(null)}
+        />
+      )}
 
       {/* ── KPI cards ───────────────────────────────────────────────────── */}
       <div className="io-kpi-grid">
@@ -319,12 +336,13 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
               <th className="io-right io-th-sortable" onClick={() => handleSort('pnlPct')}>
                 Rentab. <SortIcon active={sortKey === 'pnlPct'} dir={sortDir} />
               </th>
+              <th className="io-right">Histórico</th>
             </tr>
           </thead>
           <tbody>
             {displayRows.length === 0 && (
               <tr>
-                <td colSpan={9} className="io-empty">
+                <td colSpan={10} className="io-empty">
                   {search ? 'No hay instrumentos que coincidan con el filtro.' : 'Todavía no hay inversiones para mostrar.'}
                 </td>
               </tr>
@@ -381,6 +399,22 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
                     <span className={`io-pct-badge ${pnlPos ? 'io-pct-pos' : 'io-pct-neg'}`}>
                       {fmtPct(group.pnlPct)}
                     </span>
+                  </td>
+                  <td className="io-right">
+                    <button
+                      type="button"
+                      className="io-history-button"
+                      aria-label={`Ver histórico de ${group.instrumentSymbol}`}
+                      title={`Ver histórico de ${group.instrumentSymbol}`}
+                      onClick={() => setHistoryInstrument({
+                        id: group.instrumentId,
+                        symbol: group.instrumentSymbol,
+                        name: group.instrumentName,
+                        currency: group.currency,
+                      })}
+                    >
+                      ↗
+                    </button>
                   </td>
                 </tr>
               );

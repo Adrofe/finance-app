@@ -399,6 +399,25 @@
 .io-pos   { color: #16a34a; }
 .io-neg   { color: #dc2626; }
 
+.io-history-button {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #cbd9d8;
+  border-radius: 5px;
+  background: #fff;
+  color: #087e75;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.io-history-button:hover,
+.io-history-button:focus-visible {
+  border-color: #087e75;
+  background: #edf8f6;
+}
+
 .io-empty {
   text-align: center;
   padding: 32px;
