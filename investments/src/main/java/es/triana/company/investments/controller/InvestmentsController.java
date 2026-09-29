@@ -20,9 +20,11 @@ import es.triana.company.investments.model.api.ApiResponse;
 import es.triana.company.investments.model.api.InstrumentHistoryDTO;
 import es.triana.company.investments.model.api.InvestmentDTO;
 import es.triana.company.investments.model.api.InvestmentSummaryDTO;
+import es.triana.company.investments.model.api.PortfolioHistoryDTO;
 import es.triana.company.investments.security.TenantContext;
 import es.triana.company.investments.service.InvestmentService;
 import es.triana.company.investments.service.InstrumentHistoryService;
+import es.triana.company.investments.service.PortfolioHistoryService;
 import jakarta.validation.Valid;
 
 @RestController
@@ -31,14 +33,17 @@ public class InvestmentsController {
 
     private final InvestmentService investmentService;
     private final InstrumentHistoryService instrumentHistoryService;
+    private final PortfolioHistoryService portfolioHistoryService;
     private final TenantContext tenantContext;
 
     public InvestmentsController(
             InvestmentService investmentService,
             InstrumentHistoryService instrumentHistoryService,
+            PortfolioHistoryService portfolioHistoryService,
             TenantContext tenantContext) {
         this.investmentService = investmentService;
         this.instrumentHistoryService = instrumentHistoryService;
+        this.portfolioHistoryService = portfolioHistoryService;
         this.tenantContext = tenantContext;
     }
 
@@ -64,6 +69,16 @@ public class InvestmentsController {
         Long tenantId = tenantContext.getCurrentTenantId();
         InstrumentHistoryDTO data = instrumentHistoryService.getHistory(tenantId, instrumentId, from, to);
         return ResponseEntity.ok(new ApiResponse<>(200, "Instrument history retrieved successfully", data));
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<ApiResponse<PortfolioHistoryDTO>> getPortfolioHistory(
+            @RequestParam(name = "typeCodes", required = false) List<String> typeCodes,
+            @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        Long tenantId = tenantContext.getCurrentTenantId();
+        PortfolioHistoryDTO data = portfolioHistoryService.getHistory(tenantId, typeCodes, from, to);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Portfolio history retrieved successfully", data));
     }
 
     @GetMapping("/summary")
