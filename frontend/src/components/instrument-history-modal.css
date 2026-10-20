@@ -62,6 +62,27 @@
 .ih-ranges button { min-width: 46px; padding: 6px 10px; border: 0; border-radius: 4px; background: transparent; color: #526a6d; font-size: 12px; font-weight: 650; cursor: pointer; }
 .ih-ranges button.active { background: #087e75; color: #fff; }
 .ih-point-count { color: #718487; font-size: 12px; }
+.ih-edit-toggle { margin-left: auto; padding: 7px 11px; border: 1px solid #b8d4cf; border-radius: 5px; background: #fff; color: #087e75; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ih-edit-toggle:hover, .ih-edit-toggle.active { background: #087e75; color: #fff; }
+
+.ih-price-editor { margin-bottom: 20px; padding: 14px; border: 1px solid #dce7e5; border-radius: 6px; background: #f6faf9; }
+.ih-editor-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; margin-bottom: 10px; }
+.ih-editor-heading h3 { margin: 0 0 3px; font-size: 14px; }
+.ih-editor-heading p { margin: 0; color: #718487; font-size: 11px; }
+.ih-editor-heading label { display: grid; gap: 4px; color: #607477; font-size: 11px; }
+.ih-editor-heading input, .ih-editor-table input { min-height: 32px; padding: 5px 8px; border: 1px solid #cbd9d7; border-radius: 4px; background: #fff; color: #172c30; font: inherit; }
+.ih-editor-table-wrap { max-height: 300px; overflow: auto; border: 1px solid #e1e9e8; border-radius: 5px; background: #fff; }
+.ih-editor-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ih-editor-table th, .ih-editor-table td { padding: 7px 10px; border-bottom: 1px solid #edf1f0; text-align: left; white-space: nowrap; }
+.ih-editor-table th { position: sticky; top: 0; background: #f1f6f5; color: #607477; font-size: 10px; text-transform: uppercase; }
+.ih-editor-table tr:last-child td { border-bottom: 0; }
+.ih-editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.ih-editor-actions button { padding: 5px 9px; border: 1px solid #b8d4cf; border-radius: 4px; background: #fff; color: #087e75; font-size: 11px; font-weight: 700; cursor: pointer; }
+.ih-editor-actions button:hover { background: #e8f4f1; }
+.ih-editor-actions button.secondary { border-color: #d6dfde; color: #607477; }
+.ih-editor-actions button:disabled { opacity: 0.55; cursor: wait; }
+.ih-editor-empty { color: #718487; text-align: center !important; }
+.ih-editor-error { margin: 0 0 8px; color: #a83232; font-size: 12px; }
 
 .ih-body { overflow: auto; padding: 18px 26px 24px; }
 .ih-chart-section + .ih-chart-section { margin-top: 20px; padding-top: 18px; border-top: 1px solid #e2e9e8; }
@@ -80,7 +101,9 @@
   .ih-overlay { padding: 10px; }
   .ih-modal { max-height: 96vh; }
   .ih-header { padding: 18px 16px 14px; }
-  .ih-toolbar { align-items: flex-start; flex-direction: column; padding: 10px 16px; }
+  .ih-toolbar { align-items: flex-start; flex-direction: row; flex-wrap: wrap; padding: 10px 16px; }
   .ih-body { padding: 16px; }
   .ih-chart { height: 200px; }
+  .ih-editor-heading { align-items: flex-start; flex-direction: column; }
+  .ih-edit-toggle { margin-left: 0; }
 }

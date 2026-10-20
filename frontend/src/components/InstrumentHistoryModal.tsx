@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { fetchInstrumentHistory } from '../services/investmentCatalogService';
+import { fetchInstrumentHistory, updateInstrumentHistoryPrice } from '../services/investmentCatalogService';
 import type { InstrumentHistory, InstrumentHistoryPoint } from '../types/investments';
 import './instrument-history-modal.css';
 
@@ -23,6 +23,7 @@ type Props = {
   currency: string;
   token: string;
   onClose: () => void;
+  onSaved?: () => void;
 };
 
 const RANGES: { key: RangeKey; label: string }[] = [
@@ -93,11 +94,18 @@ function HistoryTooltip({
   );
 }
 
-export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, token, onClose }: Props) {
+export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, token, onClose, onSaved }: Props) {
   const [range, setRange] = useState<RangeKey>('1Y');
   const [history, setHistory] = useState<InstrumentHistory | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  const [editingPrices, setEditingPrices] = useState(false);
+  const [editingDate, setEditingDate] = useState('');
+  const [priceDraft, setPriceDraft] = useState('');
+  const [savingDate, setSavingDate] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -108,10 +116,32 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
       .catch(() => { if (active) setError('No se pudo cargar el histórico.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [token, instrumentId, range]);
+  }, [token, instrumentId, range, reloadKey]);
 
   const points = history?.points ?? [];
   const hasPosition = points.some((point) => point.valueEur != null);
+  const editablePoints = [...points].reverse().filter((point) => !dateFilter || point.date === dateFilter);
+
+  const savePrice = async (date: string) => {
+    const price = Number(priceDraft);
+    if (!Number.isFinite(price) || price <= 0) {
+      setSaveError('El precio debe ser mayor que cero.');
+      return;
+    }
+    setSavingDate(date);
+    setSaveError('');
+    try {
+      await updateInstrumentHistoryPrice(token, { instrumentId, date, price });
+      setEditingDate('');
+      setReloadKey((key) => key + 1);
+      onSaved?.();
+    } catch (requestError: unknown) {
+      const errorMessage = requestError as { response?: { data?: { message?: string } }; message?: string };
+      setSaveError(errorMessage.response?.data?.message || errorMessage.message || 'No se pudo guardar el precio.');
+    } finally {
+      setSavingDate('');
+    }
+  };
 
   return (
     <div className="ih-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -140,6 +170,17 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
             ))}
           </div>
           <span className="ih-point-count">{points.length} puntos diarios</span>
+          <button
+            className={`ih-edit-toggle${editingPrices ? ' active' : ''}`}
+            type="button"
+            onClick={() => {
+              setEditingPrices((enabled) => !enabled);
+              setEditingDate('');
+              setSaveError('');
+            }}
+          >
+            {editingPrices ? 'Cerrar edición' : 'Editar precios'}
+          </button>
         </div>
 
         <div className="ih-body">
@@ -148,6 +189,61 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
           {!loading && !error && points.length === 0 ? <p className="ih-state">No hay precios históricos guardados para este instrumento.</p> : null}
           {!loading && !error && points.length > 0 && (
             <>
+              {editingPrices && (
+                <section className="ih-price-editor" aria-label="Editar precios históricos">
+                  <div className="ih-editor-heading">
+                    <div>
+                      <h3>Precios guardados</h3>
+                      <p>Corregir el último día también actualiza el precio actual y las posiciones.</p>
+                    </div>
+                    <label>
+                      Fecha
+                      <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
+                    </label>
+                  </div>
+                  {saveError && <p className="ih-editor-error" role="alert">{saveError}</p>}
+                  <div className="ih-editor-table-wrap">
+                    <table className="ih-editor-table">
+                      <thead><tr><th>Fecha</th><th>Precio ({currency})</th><th /></tr></thead>
+                      <tbody>
+                        {editablePoints.map((point) => (
+                          <tr key={point.date}>
+                            <td>{formatDate(point.date)}</td>
+                            <td>
+                              {editingDate === point.date ? (
+                                <input
+                                  aria-label={`Precio para ${formatDate(point.date)}`}
+                                  type="number"
+                                  min="0.00000001"
+                                  step="any"
+                                  value={priceDraft}
+                                  onChange={(event) => setPriceDraft(event.target.value)}
+                                  autoFocus
+                                />
+                              ) : formatMoney(point.price, currency)}
+                            </td>
+                            <td className="ih-editor-actions">
+                              {editingDate === point.date ? (
+                                <>
+                                  <button type="button" disabled={savingDate === point.date} onClick={() => void savePrice(point.date)}>
+                                    {savingDate === point.date ? 'Guardando…' : 'Guardar'}
+                                  </button>
+                                  <button type="button" className="secondary" onClick={() => { setEditingDate(''); setSaveError(''); }}>Cancelar</button>
+                                </>
+                              ) : (
+                                <button type="button" onClick={() => { setEditingDate(point.date); setPriceDraft(String(point.price)); setSaveError(''); }}>
+                                  Editar
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {editablePoints.length === 0 && <tr><td colSpan={3} className="ih-editor-empty">No hay precios para esa fecha en el rango seleccionado.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
               <section className="ih-chart-section">
                 <div className="ih-chart-heading">
                   <h3>Precio</h3>

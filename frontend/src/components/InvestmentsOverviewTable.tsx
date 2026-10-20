@@ -200,6 +200,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
           name={historyInstrument.name}
           currency={historyInstrument.currency}
           token={token}
+          onSaved={reload}
           onClose={() => setHistoryInstrument(null)}
         />
       )}
