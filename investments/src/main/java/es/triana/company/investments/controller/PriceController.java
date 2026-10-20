@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 import es.triana.company.investments.model.api.ApiResponse;
 import es.triana.company.investments.model.api.ExchangeRateDTO;
 import es.triana.company.investments.model.api.ExchangeRateUpsertRequestDTO;
+import es.triana.company.investments.model.api.HistoricalPriceUpdateRequestDTO;
+import org.springframework.web.bind.annotation.PutMapping;
 import es.triana.company.investments.model.api.PriceRefreshResultDTO;
 import es.triana.company.investments.model.api.PriceUpdateRequestDTO;
 import es.triana.company.investments.service.ExchangeRateRefreshService;
@@ -45,6 +47,13 @@ public class PriceController {
     public ResponseEntity<ApiResponse<PriceRefreshResultDTO>> refreshPricesOnDemand(@RequestBody List<@Valid PriceUpdateRequestDTO> updates) {
         PriceRefreshResultDTO result = priceRefreshService.refreshPricesOnDemand(updates);
         return ResponseEntity.ok(new ApiResponse<>(200, "Prices refreshed on demand", result));
+    }
+
+    @PutMapping("/prices/history")
+    public ResponseEntity<ApiResponse<PriceRefreshResultDTO>> updateHistoricalPrice(
+            @RequestBody @Valid HistoricalPriceUpdateRequestDTO request) {
+        PriceRefreshResultDTO result = priceRefreshService.updateHistoricalPrice(request);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Historical price updated", result));
     }
 
     @PostMapping("/prices/refresh/auto")

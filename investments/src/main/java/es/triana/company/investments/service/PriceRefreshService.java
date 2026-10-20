@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import es.triana.company.investments.client.MarketPriceClient;
 import es.triana.company.investments.model.api.PriceRefreshResultDTO;
 import es.triana.company.investments.model.api.PriceUpdateRequestDTO;
+import es.triana.company.investments.model.api.HistoricalPriceUpdateRequestDTO;
+import java.time.LocalDate;
 import es.triana.company.investments.model.db.Investment;
 import es.triana.company.investments.model.db.InvestmentInstrument;
 import es.triana.company.investments.model.db.InvestmentPrice;
@@ -99,6 +101,55 @@ public class PriceRefreshService {
                 .mode("on-demand")
                 .build();
     }
+
+            @Transactional
+            public PriceRefreshResultDTO updateHistoricalPrice(HistoricalPriceUpdateRequestDTO request) {
+            if (request == null || request.instrumentId() == null || request.instrumentId() <= 0
+                || request.date() == null || request.price() == null || request.price().signum() <= 0) {
+                throw new InvestmentValidationException("instrumentId, date and a positive price are required");
+            }
+
+            InvestmentInstrument instrument = investmentInstrumentRepository.findById(request.instrumentId())
+                .orElseThrow(() -> new InvestmentValidationException("Unknown instrumentId: " + request.instrumentId()));
+            LocalDateTime dayStart = request.date().atStartOfDay();
+            LocalDateTime dayEnd = request.date().plusDays(1).atStartOfDay().minusNanos(1);
+            List<InvestmentPrice> dayPrices = investmentPriceRepository.findByInstrumentIdAndAsOfBetweenOrderByAsOfAscIdAsc(
+                instrument.getId(), dayStart, dayEnd);
+            InvestmentPrice snapshot = dayPrices.isEmpty()
+                ? InvestmentPrice.builder()
+                    .instrumentId(instrument.getId())
+                    .asOf(request.date().atTime(12, 0))
+                    .build()
+                : dayPrices.get(dayPrices.size() - 1);
+
+            boolean isCurrentSnapshot = investmentPriceRepository.findFirstByInstrumentIdOrderByAsOfDescIdDesc(instrument.getId())
+                .map(latest -> latest.getAsOf().toLocalDate().isBefore(request.date())
+                    || (latest.getAsOf().toLocalDate().equals(request.date())
+                        && latest.getId().equals(snapshot.getId())))
+                .orElse(true);
+
+            snapshot.setInstrumentId(instrument.getId());
+            snapshot.setPrice(request.price());
+            snapshot.setSource("MANUAL_UI");
+            snapshot.setCurrency(normalizeCurrency(instrument.getCurrency(), "EUR"));
+            investmentPriceRepository.save(snapshot);
+
+            int recalculatedPositions = 0;
+            if (isCurrentSnapshot) {
+                instrument.setLastPrice(request.price());
+                instrument.setLastPriceSource("MANUAL_UI");
+                instrument.setLastPriceAt(snapshot.getAsOf());
+                investmentInstrumentRepository.save(instrument);
+                recalculatedPositions = recalculateCurrentValues(instrument.getId(), request.price());
+            }
+
+            return PriceRefreshResultDTO.builder()
+                .updatedInstruments(1)
+                .recalculatedPositions(recalculatedPositions)
+                .instrumentIds(List.of(instrument.getId()))
+                .mode("history-edit")
+                .build();
+            }
 
     @Transactional
     public PriceRefreshResultDTO refreshPricesAutomaticallyNow() {

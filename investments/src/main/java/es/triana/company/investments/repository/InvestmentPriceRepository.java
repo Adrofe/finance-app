@@ -12,6 +12,8 @@ public interface InvestmentPriceRepository extends JpaRepository<InvestmentPrice
 
     Optional<InvestmentPrice> findFirstByInstrumentIdOrderByAsOfDesc(Long instrumentId);
 
+    Optional<InvestmentPrice> findFirstByInstrumentIdOrderByAsOfDescIdDesc(Long instrumentId);
+
         Optional<InvestmentPrice> findFirstByInstrumentIdOrderByAsOfAsc(Long instrumentId);
 
         Optional<InvestmentPrice> findFirstByInstrumentIdAndAsOfBeforeOrderByAsOfDescIdDesc(
