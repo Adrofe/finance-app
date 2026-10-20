@@ -23,6 +23,8 @@ public class FinectPriceClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(FinectPriceClient.class);
     private static final String SOURCE_FINECT = "FINECT";
+        private static final Pattern DISPLAYED_NAV_PATTERN = Pattern.compile(
+            "(?is)class=[\"'][^\"']*StyledPercentLabel[^\"']*[\"'][^>]*>.*?<span[^>]*>\\s*([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]+|[0-9]+(?:[.,][0-9]+)?)\\s*</span>\\s*<span[^>]*>\\s*€\\s*</span>");
     private static final Pattern NAV_PATTERN = Pattern.compile(
             "(?i)([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]+|[0-9]+(?:\\.[0-9]+)?)\\s*(?:€|EUR)\\s*Fecha\\s+(?:de\\s+)?(?:actualizaci[oó]n\\s+)?valor\\s+liquidativo");
 
@@ -57,6 +59,12 @@ public class FinectPriceClient {
     }
 
     Optional<MarketPriceClient.MarketQuote> parseQuote(String html, InvestmentInstrument instrument) {
+        Matcher displayedNav = DISPLAYED_NAV_PATTERN.matcher(html);
+        if (displayedNav.find()) {
+            BigDecimal price = parseSpanishPrice(displayedNav.group(1));
+            return Optional.of(new MarketPriceClient.MarketQuote(price, SOURCE_FINECT, instrument.getCurrency()));
+        }
+
         String text = html.replaceAll("(?is)<[^>]+>", " ")
                 .replace("&nbsp;", " ")
                 .replaceAll("\\s+", " ");

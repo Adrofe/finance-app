@@ -62,4 +62,19 @@ class FinectPriceClientTest {
         assertThat(quote.currency()).isEqualTo("EUR");
         assertThat(quote.source()).isEqualTo("FINECT");
     }
+
+    @Test
+    void parseQuote_readsCurrentNavFromFinectDisplayedPriceMarkup() {
+        FinectPriceClient client = new FinectPriceClient();
+        InvestmentInstrument instrument = InvestmentInstrument.builder().currency("EUR").build();
+        String html = "<div class=\"partials__StyledPercentLabel-sc-1bigw9a-1 hSJMZM\">"
+                + "<span class=\"Label-sc-1esfagn-0 kDrrNc\"><span>8,74</span><span>€</span></span>"
+                + "</div><span class=\"Subtitle__SubtitleISIN-sc-1i0tj6c-2\">Datos a "
+                + "<time dateTime=\"2026-10-16T00:00:00.000Z\">16/10/2026</time></span>";
+
+        MarketPriceClient.MarketQuote quote = client.parseQuote(html, instrument).orElseThrow();
+
+        assertThat(quote.price()).isEqualByComparingTo(new BigDecimal("8.74"));
+        assertThat(quote.source()).isEqualTo("FINECT");
+    }
 }
