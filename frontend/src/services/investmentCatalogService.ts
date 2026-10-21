@@ -224,7 +224,7 @@ export async function addManualInstrumentPrice(token: string, payload: PriceUpda
 
 export async function updateInstrumentHistoryPrice(
   token: string,
-  payload: { instrumentId: number; date: string; price: number },
+  payload: { instrumentId: number; date: string; price: number; currency?: string },
 ): Promise<PriceRefreshResult> {
   const res = await axios.put<ApiResponse<PriceRefreshResult>>(
     `${INVESTMENTS_BASE}/prices/history`,

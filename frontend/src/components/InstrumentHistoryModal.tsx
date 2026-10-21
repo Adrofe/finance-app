@@ -106,6 +106,7 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
   const [savingDate, setSavingDate] = useState('');
   const [saveError, setSaveError] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [inputCurrency, setInputCurrency] = useState(currency);
 
   useEffect(() => {
     let active = true;
@@ -131,7 +132,7 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
     setSavingDate(date);
     setSaveError('');
     try {
-      await updateInstrumentHistoryPrice(token, { instrumentId, date, price });
+      await updateInstrumentHistoryPrice(token, { instrumentId, date, price, currency: inputCurrency });
       setEditingDate('');
       setReloadKey((key) => key + 1);
       onSaved?.();
@@ -200,6 +201,15 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
                       Fecha
                       <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
                     </label>
+                    {currency !== 'EUR' && (
+                      <label>
+                        Introducir en
+                        <select value={inputCurrency} onChange={(event) => setInputCurrency(event.target.value)}>
+                          <option value={currency}>{currency} (divisa del activo)</option>
+                          <option value="EUR">EUR (cambio del día)</option>
+                        </select>
+                      </label>
+                    )}
                   </div>
                   {saveError && <p className="ih-editor-error" role="alert">{saveError}</p>}
                   <div className="ih-editor-table-wrap">

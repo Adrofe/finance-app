@@ -106,6 +106,29 @@ class PriceRefreshServiceTest {
     }
 
     @Test
+    void historicalPriceEnteredInEurIsStoredInInstrumentCurrency() {
+        Long instrumentId = 4L;
+        LocalDate date = LocalDate.of(2026, 10, 10);
+        InvestmentInstrument instrument = InvestmentInstrument.builder().id(instrumentId).currency("USD").build();
+        InvestmentPrice edited = InvestmentPrice.builder()
+                .id(20L).instrumentId(instrumentId).asOf(date.atTime(12, 0)).price(new BigDecimal("3.85")).currency("USD").build();
+        InvestmentPrice latest = InvestmentPrice.builder()
+                .id(21L).instrumentId(instrumentId).asOf(date.plusDays(1).atTime(12, 0)).price(BigDecimal.ONE).currency("USD").build();
+        when(instrumentRepository.findById(instrumentId)).thenReturn(Optional.of(instrument));
+        when(priceRepository.findByInstrumentIdAndAsOfBetweenOrderByAsOfAscIdAsc(
+                instrumentId, date.atStartOfDay(), date.plusDays(1).atStartOfDay().minusNanos(1)))
+                .thenReturn(List.of(edited));
+        when(priceRepository.findFirstByInstrumentIdOrderByAsOfDescIdDesc(instrumentId)).thenReturn(Optional.of(latest));
+        when(eurConversionService.fromEur(new BigDecimal("340"), "USD", date)).thenReturn(new BigDecimal("367.2"));
+
+        service().updateHistoricalPrice(new HistoricalPriceUpdateRequestDTO(
+                instrumentId, date, new BigDecimal("340"), "EUR"));
+
+        assertThat(edited.getPrice()).isEqualByComparingTo("367.2");
+        assertThat(edited.getCurrency()).isEqualTo("USD");
+    }
+
+    @Test
     void updatingUsdPriceStoresPositionValueInEur() {
         Long instrumentId = 4L;
         InvestmentInstrument instrument = InvestmentInstrument.builder().id(instrumentId).currency("USD").build();

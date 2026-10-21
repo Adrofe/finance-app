@@ -411,7 +411,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
                         id: group.instrumentId,
                         symbol: group.instrumentSymbol,
                         name: group.instrumentName,
-                        currency: group.currency,
+                        currency: group.instrumentCurrency,
                       })}
                     >
                       ↗

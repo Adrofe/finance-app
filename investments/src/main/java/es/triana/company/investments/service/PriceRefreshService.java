@@ -135,6 +135,16 @@ public class PriceRefreshService {
 
             InvestmentInstrument instrument = investmentInstrumentRepository.findById(request.instrumentId())
                 .orElseThrow(() -> new InvestmentValidationException("Unknown instrumentId: " + request.instrumentId()));
+            String instrumentCurrency = normalizeCurrency(instrument.getCurrency(), "EUR");
+            String inputCurrency = normalizeCurrency(request.currency(), instrumentCurrency);
+            if (!inputCurrency.equals(instrumentCurrency) && !inputCurrency.equals("EUR")) {
+                throw new InvestmentValidationException(
+                    "currency must be the instrument currency (" + instrumentCurrency + ") or EUR");
+            }
+            BigDecimal price = inputCurrency.equals(instrumentCurrency)
+                ? request.price()
+                : eurConversionService.fromEur(request.price(), instrumentCurrency, request.date())
+                    .setScale(8, RoundingMode.HALF_UP);
             LocalDateTime dayStart = request.date().atStartOfDay();
             LocalDateTime dayEnd = request.date().plusDays(1).atStartOfDay().minusNanos(1);
             List<InvestmentPrice> dayPrices = investmentPriceRepository.findByInstrumentIdAndAsOfBetweenOrderByAsOfAscIdAsc(
@@ -153,19 +163,19 @@ public class PriceRefreshService {
                 .orElse(true);
 
             snapshot.setInstrumentId(instrument.getId());
-            snapshot.setPrice(request.price());
+            snapshot.setPrice(price);
             snapshot.setSource("MANUAL_UI");
-            snapshot.setCurrency(normalizeCurrency(instrument.getCurrency(), "EUR"));
+            snapshot.setCurrency(instrumentCurrency);
             investmentPriceRepository.save(snapshot);
 
             int recalculatedPositions = 0;
             if (isCurrentSnapshot) {
-                instrument.setLastPrice(request.price());
+                instrument.setLastPrice(price);
                 instrument.setLastPriceSource("MANUAL_UI");
                 instrument.setLastPriceAt(snapshot.getAsOf());
                 investmentInstrumentRepository.save(instrument);
                 recalculatedPositions = recalculateCurrentValues(
-                    instrument.getId(), request.price(), snapshot.getCurrency());
+                    instrument.getId(), price, snapshot.getCurrency());
             }
 
             return PriceRefreshResultDTO.builder()
