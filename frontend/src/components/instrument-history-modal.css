@@ -82,6 +82,12 @@
 .ih-editor-actions button.secondary { border-color: #d6dfde; color: #607477; }
 .ih-editor-actions button:disabled { opacity: 0.55; cursor: wait; }
 .ih-editor-empty { color: #718487; text-align: center !important; }
+.ih-bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; color: #607477; }
+.ih-bulk-bar input { width: 130px; min-height: 32px; padding: 5px 8px; border: 1px solid #cbd9d7; border-radius: 4px; background: #fff; font: inherit; }
+.ih-bulk-bar button { padding: 6px 10px; border: 1px solid #b8d4cf; border-radius: 4px; background: #fff; color: #087e75; font-size: 11px; font-weight: 700; cursor: pointer; }
+.ih-bulk-bar button:disabled { opacity: 0.5; cursor: not-allowed; }
+.ih-bulk-bar .ih-save-all { margin-left: auto; border-color: #087e75; background: #087e75; color: #fff; }
+.ih-row-changed td { background: #fff8e6; }
 .ih-editor-error { margin: 0 0 8px; color: #a83232; font-size: 12px; }
 
 .ih-body { overflow: auto; padding: 18px 26px 24px; }

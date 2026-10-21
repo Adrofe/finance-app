@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Area,
   CartesianGrid,
@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { fetchInstrumentHistory, updateInstrumentHistoryPrice } from '../services/investmentCatalogService';
+import { fetchInstrumentHistory, updateInstrumentHistoryPrices } from '../services/investmentCatalogService';
 import type { InstrumentHistory, InstrumentHistoryPoint } from '../types/investments';
 import './instrument-history-modal.css';
 
@@ -101,19 +101,21 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
   const [error, setError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const [editingPrices, setEditingPrices] = useState(false);
-  const [editingDate, setEditingDate] = useState('');
-  const [priceDraft, setPriceDraft] = useState('');
-  const [savingDate, setSavingDate] = useState('');
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkValue, setBulkValue] = useState('');
+  const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [inputCurrency, setInputCurrency] = useState(currency);
+  const loadedOnce = useRef(false);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    if (!loadedOnce.current) setLoading(true);
     setError('');
     fetchInstrumentHistory(token, instrumentId, getRangeStart(range), localDate(new Date()))
-      .then((data) => { if (active) setHistory(data); })
+      .then((data) => { if (active) { setHistory(data); loadedOnce.current = true; } })
       .catch(() => { if (active) setError('No se pudo cargar el histórico.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -123,24 +125,55 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
   const hasPosition = points.some((point) => point.valueEur != null);
   const editablePoints = [...points].reverse().filter((point) => !dateFilter || point.date === dateFilter);
 
-  const savePrice = async (date: string) => {
-    const price = Number(priceDraft);
-    if (!Number.isFinite(price) || price <= 0) {
-      setSaveError('El precio debe ser mayor que cero.');
+  const draftOf = (point: InstrumentHistoryPoint) => drafts[point.date] ?? String(point.price);
+  const changedPrices = points
+    .filter((point) => drafts[point.date] !== undefined && Number(drafts[point.date]) !== point.price)
+    .map((point) => ({ date: point.date, price: Number(drafts[point.date]) }));
+  const allVisibleSelected = editablePoints.length > 0 && editablePoints.every((point) => selected.has(point.date));
+
+  const toggleSelected = (date: string) => setSelected((current) => {
+    const next = new Set(current);
+    if (next.has(date)) next.delete(date); else next.add(date);
+    return next;
+  });
+
+  const toggleAllVisible = () => setSelected((current) => {
+    const next = new Set(current);
+    editablePoints.forEach((point) => { if (allVisibleSelected) next.delete(point.date); else next.add(point.date); });
+    return next;
+  });
+
+  const applyBulkValue = () => {
+    if (!(Number(bulkValue) > 0)) {
+      setSaveError('Indica un valor mayor que cero para las filas seleccionadas.');
       return;
     }
-    setSavingDate(date);
+    setSaveError('');
+    setDrafts((current) => {
+      const next = { ...current };
+      selected.forEach((date) => { next[date] = bulkValue; });
+      return next;
+    });
+  };
+
+  const saveAll = async () => {
+    if (changedPrices.some((item) => !Number.isFinite(item.price) || item.price <= 0)) {
+      setSaveError('Todos los precios deben ser mayores que cero.');
+      return;
+    }
+    setSaving(true);
     setSaveError('');
     try {
-      await updateInstrumentHistoryPrice(token, { instrumentId, date, price, currency: inputCurrency });
-      setEditingDate('');
+      await updateInstrumentHistoryPrices(token, { instrumentId, currency: inputCurrency, prices: changedPrices });
+      setDrafts({});
+      setSelected(new Set());
       setReloadKey((key) => key + 1);
       onSaved?.();
     } catch (requestError: unknown) {
       const errorMessage = requestError as { response?: { data?: { message?: string } }; message?: string };
-      setSaveError(errorMessage.response?.data?.message || errorMessage.message || 'No se pudo guardar el precio.');
+      setSaveError(errorMessage.response?.data?.message || errorMessage.message || 'No se pudieron guardar los precios.');
     } finally {
-      setSavingDate('');
+      setSaving(false);
     }
   };
 
@@ -176,7 +209,8 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
             type="button"
             onClick={() => {
               setEditingPrices((enabled) => !enabled);
-              setEditingDate('');
+              setDrafts({});
+              setSelected(new Set());
               setSaveError('');
             }}
           >
@@ -185,10 +219,10 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
         </div>
 
         <div className="ih-body">
-          {loading ? <p className="ih-state">Cargando histórico…</p> : null}
+          {loading && !history ? <p className="ih-state">Cargando histórico…</p> : null}
           {!loading && error ? <p className="ih-state ih-error">{error}</p> : null}
           {!loading && !error && points.length === 0 ? <p className="ih-state">No hay precios históricos guardados para este instrumento.</p> : null}
-          {!loading && !error && points.length > 0 && (
+          {!error && points.length > 0 && (
             <>
               {editingPrices && (
                 <section className="ih-price-editor" aria-label="Editar precios históricos">
@@ -212,42 +246,51 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
                     )}
                   </div>
                   {saveError && <p className="ih-editor-error" role="alert">{saveError}</p>}
+                  <div className="ih-bulk-bar">
+                    <span>{selected.size} seleccionadas</span>
+                    <input
+                      aria-label="Valor para las filas seleccionadas"
+                      type="number"
+                      min="0.00000001"
+                      step="any"
+                      placeholder={`Precio (${inputCurrency})`}
+                      value={bulkValue}
+                      onChange={(event) => setBulkValue(event.target.value)}
+                    />
+                    <button type="button" disabled={selected.size === 0} onClick={applyBulkValue}>Rellenar seleccionadas</button>
+                    <button type="button" className="ih-save-all" disabled={saving || changedPrices.length === 0} onClick={() => void saveAll()}>
+                      {saving ? 'Guardando…' : `Guardar ${changedPrices.length} cambios`}
+                    </button>
+                  </div>
                   <div className="ih-editor-table-wrap">
                     <table className="ih-editor-table">
-                      <thead><tr><th>Fecha</th><th>Precio ({currency})</th><th /></tr></thead>
+                      <thead>
+                        <tr>
+                          <th><input type="checkbox" aria-label="Seleccionar todas" checked={allVisibleSelected} onChange={toggleAllVisible} /></th>
+                          <th>Fecha</th>
+                          <th>Precio ({inputCurrency})</th>
+                        </tr>
+                      </thead>
                       <tbody>
-                        {editablePoints.map((point) => (
-                          <tr key={point.date}>
-                            <td>{formatDate(point.date)}</td>
-                            <td>
-                              {editingDate === point.date ? (
+                        {editablePoints.map((point) => {
+                          const changed = drafts[point.date] !== undefined && Number(drafts[point.date]) !== point.price;
+                          return (
+                            <tr key={point.date} className={changed ? 'ih-row-changed' : undefined}>
+                              <td><input type="checkbox" aria-label={`Seleccionar ${formatDate(point.date)}`} checked={selected.has(point.date)} onChange={() => toggleSelected(point.date)} /></td>
+                              <td>{formatDate(point.date)}</td>
+                              <td>
                                 <input
                                   aria-label={`Precio para ${formatDate(point.date)}`}
                                   type="number"
                                   min="0.00000001"
                                   step="any"
-                                  value={priceDraft}
-                                  onChange={(event) => setPriceDraft(event.target.value)}
-                                  autoFocus
+                                  value={draftOf(point)}
+                                  onChange={(event) => setDrafts((current) => ({ ...current, [point.date]: event.target.value }))}
                                 />
-                              ) : formatMoney(point.price, currency)}
-                            </td>
-                            <td className="ih-editor-actions">
-                              {editingDate === point.date ? (
-                                <>
-                                  <button type="button" disabled={savingDate === point.date} onClick={() => void savePrice(point.date)}>
-                                    {savingDate === point.date ? 'Guardando…' : 'Guardar'}
-                                  </button>
-                                  <button type="button" className="secondary" onClick={() => { setEditingDate(''); setSaveError(''); }}>Cancelar</button>
-                                </>
-                              ) : (
-                                <button type="button" onClick={() => { setEditingDate(point.date); setPriceDraft(String(point.price)); setSaveError(''); }}>
-                                  Editar
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                            </tr>
+                          );
+                        })}
                         {editablePoints.length === 0 && <tr><td colSpan={3} className="ih-editor-empty">No hay precios para esa fecha en el rango seleccionado.</td></tr>}
                       </tbody>
                     </table>

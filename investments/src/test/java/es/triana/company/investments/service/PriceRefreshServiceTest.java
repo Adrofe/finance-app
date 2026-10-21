@@ -106,6 +106,35 @@ class PriceRefreshServiceTest {
     }
 
     @Test
+    void batchUpdateEditsSeveralDaysAndKeepsDuplicateRowsInSync() {
+        Long instrumentId = 4L;
+        LocalDate d1 = LocalDate.of(2026, 10, 3);
+        LocalDate d2 = LocalDate.of(2026, 10, 4);
+        InvestmentInstrument instrument = instrument(instrumentId);
+        InvestmentPrice d1First = price(1L, d1.atTime(9, 0), "3.85");
+        InvestmentPrice d1Last = price(2L, d1.atTime(9, 0), "3.85");
+        InvestmentPrice d2Only = price(3L, d2.atTime(12, 0), "3.85");
+        InvestmentPrice latest = price(4L, d2.plusDays(5).atTime(12, 0), "9");
+        when(instrumentRepository.findById(instrumentId)).thenReturn(Optional.of(instrument));
+        when(priceRepository.findByInstrumentIdAndAsOfBetweenOrderByAsOfAscIdAsc(
+                instrumentId, d1.atStartOfDay(), d1.plusDays(1).atStartOfDay().minusNanos(1)))
+                .thenReturn(List.of(d1First, d1Last));
+        when(priceRepository.findByInstrumentIdAndAsOfBetweenOrderByAsOfAscIdAsc(
+                instrumentId, d2.atStartOfDay(), d2.plusDays(1).atStartOfDay().minusNanos(1)))
+                .thenReturn(List.of(d2Only));
+        when(priceRepository.findFirstByInstrumentIdOrderByAsOfDescIdDesc(instrumentId)).thenReturn(Optional.of(latest));
+
+        service().updateHistoricalPrices(new es.triana.company.investments.model.api.HistoricalPriceBatchUpdateRequestDTO(
+                instrumentId, null, List.of(
+                        new es.triana.company.investments.model.api.HistoricalPriceBatchUpdateRequestDTO.Item(d1, new BigDecimal("365")),
+                        new es.triana.company.investments.model.api.HistoricalPriceBatchUpdateRequestDTO.Item(d2, new BigDecimal("366")))));
+
+        assertThat(d1First.getPrice()).isEqualByComparingTo("365");
+        assertThat(d1Last.getPrice()).isEqualByComparingTo("365");
+        assertThat(d2Only.getPrice()).isEqualByComparingTo("366");
+    }
+
+    @Test
     void historicalPriceEnteredInEurIsStoredInInstrumentCurrency() {
         Long instrumentId = 4L;
         LocalDate date = LocalDate.of(2026, 10, 10);

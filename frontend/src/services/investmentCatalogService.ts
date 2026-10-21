@@ -234,6 +234,18 @@ export async function updateInstrumentHistoryPrice(
   return res.data.data;
 }
 
+export async function updateInstrumentHistoryPrices(
+  token: string,
+  payload: { instrumentId: number; currency?: string; prices: { date: string; price: number }[] },
+): Promise<PriceRefreshResult> {
+  const res = await axios.put<ApiResponse<PriceRefreshResult>>(
+    `${INVESTMENTS_BASE}/prices/history/batch`,
+    payload,
+    { headers: headers(token) },
+  );
+  return res.data.data;
+}
+
 export async function fetchInstrumentHistory(
   token: string,
   instrumentId: number,

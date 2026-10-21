@@ -21,6 +21,7 @@ import es.triana.company.investments.client.MarketPriceClient;
 import es.triana.company.investments.model.api.PriceRefreshResultDTO;
 import es.triana.company.investments.model.api.PriceQuotePreviewDTO;
 import es.triana.company.investments.model.api.PriceUpdateRequestDTO;
+import es.triana.company.investments.model.api.HistoricalPriceBatchUpdateRequestDTO;
 import es.triana.company.investments.model.api.HistoricalPriceUpdateRequestDTO;
 import java.time.LocalDate;
 import es.triana.company.investments.model.db.Investment;
@@ -167,6 +168,15 @@ public class PriceRefreshService {
             snapshot.setSource("MANUAL_UI");
             snapshot.setCurrency(instrumentCurrency);
             investmentPriceRepository.save(snapshot);
+            // Refreshes archive duplicate rows for the same instant; keep them in sync with the edit.
+            for (InvestmentPrice sameDay : dayPrices) {
+                if (sameDay != snapshot) {
+                    sameDay.setPrice(price);
+                    sameDay.setSource("MANUAL_UI");
+                    sameDay.setCurrency(instrumentCurrency);
+                    investmentPriceRepository.save(sameDay);
+                }
+            }
 
             int recalculatedPositions = 0;
             if (isCurrentSnapshot) {
@@ -185,6 +195,26 @@ public class PriceRefreshService {
                 .mode("history-edit")
                 .build();
             }
+
+    @Transactional
+    public PriceRefreshResultDTO updateHistoricalPrices(HistoricalPriceBatchUpdateRequestDTO batch) {
+        if (batch == null || batch.prices() == null || batch.prices().isEmpty()) {
+            throw new InvestmentValidationException("at least one price is required");
+        }
+
+        int recalculatedPositions = 0;
+        for (HistoricalPriceBatchUpdateRequestDTO.Item item : batch.prices()) {
+            recalculatedPositions += updateHistoricalPrice(new HistoricalPriceUpdateRequestDTO(
+                    batch.instrumentId(), item.date(), item.price(), batch.currency())).getRecalculatedPositions();
+        }
+
+        return PriceRefreshResultDTO.builder()
+                .updatedInstruments(1)
+                .recalculatedPositions(recalculatedPositions)
+                .instrumentIds(List.of(batch.instrumentId()))
+                .mode("history-edit")
+                .build();
+    }
 
     @Transactional
     public PriceRefreshResultDTO refreshPricesAutomaticallyNow() {

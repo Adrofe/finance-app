@@ -39,7 +39,7 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  const load = useCallback((silent = false) => {
     if (!token) {
       setSummary(null);
       setPositions([]);
@@ -47,7 +47,7 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
       return;
     }
 
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
 
     Promise.all([fetchInvestmentSummary(token), fetchInvestmentPositions(token), fetchInstruments(token)])
@@ -72,7 +72,7 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
 
   useEffect(() => {
     const handleInvestmentsUpdated = () => {
-      load();
+      load(true);
     };
 
     window.addEventListener(FINANCE_EVENTS.INVESTMENTS_UPDATED, handleInvestmentsUpdated);
@@ -80,6 +80,9 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
       window.removeEventListener(FINANCE_EVENTS.INVESTMENTS_UPDATED, handleInvestmentsUpdated);
     };
   }, [load]);
+
+  // Silent reload keeps open modals mounted instead of flashing the loading state.
+  const reload = useCallback(() => load(true), [load]);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -143,6 +146,6 @@ export function useInvestmentsOverview(token: string, onUnauthorized?: (message:
     loading,
     error,
     clearError,
-    reload: load,
+    reload,
   };
 }
