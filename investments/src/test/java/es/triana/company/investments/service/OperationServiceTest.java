@@ -163,8 +163,8 @@ class OperationServiceTest {
 
             // quantity: 0 → 10
             assertThat(updated.getQuantity()).isEqualByComparingTo("10");
-            // invested_amount: 0 → 1505
-            assertThat(updated.getInvestedAmount()).isEqualByComparingTo("1505.00");
+            // invested_amount (EUR): 0 → 1505 / 1.08
+            assertThat(updated.getInvestedAmount()).isEqualByComparingTo("1393.52");
         }
 
         @Test
@@ -178,7 +178,7 @@ class OperationServiceTest {
 
             // Simulate investment state after BUY1 (investment is the same object, mutated)
             assertThat(investment.getQuantity()).isEqualByComparingTo("10");
-            assertThat(investment.getInvestedAmount()).isEqualByComparingTo("1505.00");
+            assertThat(investment.getInvestedAmount()).isEqualByComparingTo("1393.52");
 
             // BUY 2
             stubEurRate("USD", DATE_BUY2, "1.09");
@@ -188,8 +188,8 @@ class OperationServiceTest {
 
             // quantity: 10 → 15
             assertThat(investment.getQuantity()).isEqualByComparingTo("15");
-            // invested_amount: 1505 + 803 = 2308
-            assertThat(investment.getInvestedAmount()).isEqualByComparingTo("2308.00");
+            // invested_amount (EUR): 1393.52 + 736.6972
+            assertThat(investment.getInvestedAmount()).isEqualByComparingTo("2130.22");
         }
 
         @Test

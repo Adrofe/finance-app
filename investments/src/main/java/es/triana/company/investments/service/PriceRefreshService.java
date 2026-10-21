@@ -42,16 +42,18 @@ public class PriceRefreshService {
     private final InvestmentRepository investmentRepository;
     private final InvestmentTypeCatalogRepository investmentTypeCatalogRepository;
     private final MarketPriceClient marketPriceClient;
+    private final EurConversionService eurConversionService;
 
     @Value("${investments.prices.auto-refresh-excluded-type-codes:FUND,ETF}")
     private String autoRefreshExcludedTypeCodes;
 
-    public PriceRefreshService(InvestmentInstrumentRepository investmentInstrumentRepository, InvestmentPriceRepository investmentPriceRepository,InvestmentRepository investmentRepository, InvestmentTypeCatalogRepository investmentTypeCatalogRepository, MarketPriceClient marketPriceClient) {
+    public PriceRefreshService(InvestmentInstrumentRepository investmentInstrumentRepository, InvestmentPriceRepository investmentPriceRepository,InvestmentRepository investmentRepository, InvestmentTypeCatalogRepository investmentTypeCatalogRepository, MarketPriceClient marketPriceClient, EurConversionService eurConversionService) {
         this.investmentInstrumentRepository = investmentInstrumentRepository;
         this.investmentPriceRepository = investmentPriceRepository;
         this.investmentRepository = investmentRepository;
         this.investmentTypeCatalogRepository = investmentTypeCatalogRepository;
         this.marketPriceClient = marketPriceClient;
+        this.eurConversionService = eurConversionService;
     }
 
     @Transactional
@@ -77,7 +79,7 @@ public class PriceRefreshService {
 
             archivePreviousPrice(instrument, asOf);
             updateCurrentPrice(instrument, update.getPrice(), source, asOf, currency);
-            int affectedPositions = recalculateCurrentValues(instrument.getId(), update.getPrice());
+            int affectedPositions = recalculateCurrentValues(instrument.getId(), update.getPrice(), currency);
             recalculatedPositions += affectedPositions;
             updatedInstrumentIds.add(instrument.getId());
 
@@ -162,7 +164,8 @@ public class PriceRefreshService {
                 instrument.setLastPriceSource("MANUAL_UI");
                 instrument.setLastPriceAt(snapshot.getAsOf());
                 investmentInstrumentRepository.save(instrument);
-                recalculatedPositions = recalculateCurrentValues(instrument.getId(), request.price());
+                recalculatedPositions = recalculateCurrentValues(
+                    instrument.getId(), request.price(), snapshot.getCurrency());
             }
 
             return PriceRefreshResultDTO.builder()
@@ -226,7 +229,7 @@ public class PriceRefreshService {
 
                 archivePreviousPrice(instrument, now);
                 updateCurrentPrice(instrument, nextPrice, source, now, currency);
-                int affectedPositions = recalculateCurrentValues(instrument.getId(), nextPrice);
+                int affectedPositions = recalculateCurrentValues(instrument.getId(), nextPrice, currency);
                 recalculatedPositions += affectedPositions;
                 updatedInstrumentIds.add(instrument.getId());
 
@@ -315,7 +318,8 @@ public class PriceRefreshService {
         investmentInstrumentRepository.save(instrument);
     }
 
-    private int recalculateCurrentValues(Long instrumentId, BigDecimal price) {
+    // Position values are stored in EUR (the base currency), whatever the quote currency is.
+    private int recalculateCurrentValues(Long instrumentId, BigDecimal price, String priceCurrency) {
         List<Investment> positions = investmentRepository.findByInstrumentId(instrumentId);
 
         int updated = 0;
@@ -326,11 +330,12 @@ public class PriceRefreshService {
                 continue;
             }
 
-            BigDecimal calculated = position.getQuantity()
-                    .multiply(price)
+            BigDecimal calculated = eurConversionService
+                    .toEur(position.getQuantity().multiply(price), priceCurrency)
                     .setScale(2, RoundingMode.HALF_UP);
 
             position.setCurrentValueCalculated(calculated);
+            position.setCurrency(EurConversionService.EUR);
             position.setUpdatedAt(now);
             updated++;
         }

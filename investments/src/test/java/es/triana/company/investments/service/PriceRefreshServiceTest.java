@@ -19,6 +19,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import es.triana.company.investments.client.MarketPriceClient;
 import es.triana.company.investments.model.api.HistoricalPriceUpdateRequestDTO;
 import es.triana.company.investments.model.api.PriceQuotePreviewDTO;
+import es.triana.company.investments.model.api.PriceUpdateRequestDTO;
+import es.triana.company.investments.model.db.Investment;
 import es.triana.company.investments.model.db.InvestmentInstrument;
 import es.triana.company.investments.model.db.InvestmentPrice;
 import es.triana.company.investments.repository.InvestmentInstrumentRepository;
@@ -34,6 +36,7 @@ class PriceRefreshServiceTest {
     @Mock private InvestmentRepository investmentRepository;
     @Mock private InvestmentTypeCatalogRepository typeCatalogRepository;
     @Mock private MarketPriceClient marketPriceClient;
+    @Mock private EurConversionService eurConversionService;
 
     @Test
     void updateHistoricalPriceDoesNotChangeCurrentPriceForOlderDate() {
@@ -102,9 +105,26 @@ class PriceRefreshServiceTest {
         verify(instrumentRepository, never()).save(instrument);
     }
 
+    @Test
+    void updatingUsdPriceStoresPositionValueInEur() {
+        Long instrumentId = 4L;
+        InvestmentInstrument instrument = InvestmentInstrument.builder().id(instrumentId).currency("USD").build();
+        Investment position = Investment.builder().quantity(new BigDecimal("2")).currency("USD").build();
+        when(instrumentRepository.findById(instrumentId)).thenReturn(Optional.of(instrument));
+        when(investmentRepository.findByInstrumentId(instrumentId)).thenReturn(List.of(position));
+        when(eurConversionService.toEur(new BigDecimal("797.78"), "USD")).thenReturn(new BigDecimal("700"));
+
+        service().refreshPricesOnDemand(List.of(PriceUpdateRequestDTO.builder()
+                .instrumentId(instrumentId).price(new BigDecimal("398.89")).currency("USD").build()));
+
+        assertThat(position.getCurrentValueCalculated()).isEqualByComparingTo("700.00");
+        assertThat(position.getCurrency()).isEqualTo("EUR");
+    }
+
     private PriceRefreshService service() {
         return new PriceRefreshService(
-                instrumentRepository, priceRepository, investmentRepository, typeCatalogRepository, marketPriceClient);
+                instrumentRepository, priceRepository, investmentRepository, typeCatalogRepository,
+                marketPriceClient, eurConversionService);
     }
 
     private InvestmentInstrument instrument(Long id) {

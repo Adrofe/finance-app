@@ -106,7 +106,7 @@ public class OperationService {
             lots = applyFifo(op, investment);
         }
 
-        updateInvestmentPosition(investment, req.getType(), req.getQuantity(), totalAmount);
+        updateInvestmentPosition(investment, req.getType(), req.getQuantity(), totalAmountEur);
 
         return operationMapper.toDto(op, lots);
     }
@@ -561,11 +561,12 @@ public class OperationService {
     // Position update
     // -------------------------------------------------------------------------
 
-    private void updateInvestmentPosition(Investment inv, OperationType type, BigDecimal quantity, BigDecimal totalAmount) {
+    private void updateInvestmentPosition(Investment inv, OperationType type, BigDecimal quantity, BigDecimal totalAmountEur) {
+        inv.setCurrency(EUR);
         if (OperationType.BUY.equals(type)) {
             BigDecimal newQty = (inv.getQuantity() != null ? inv.getQuantity() : BigDecimal.ZERO).add(quantity);
             BigDecimal newInvested = (inv.getInvestedAmount() != null ? inv.getInvestedAmount() : BigDecimal.ZERO)
-                    .add(totalAmount).setScale(2, RoundingMode.HALF_UP);
+                    .add(totalAmountEur).setScale(2, RoundingMode.HALF_UP);
             inv.setQuantity(newQty);
             inv.setInvestedAmount(newInvested);
         } else {
@@ -619,7 +620,7 @@ public class OperationService {
         for (InvestmentOperation operation : operations) {
             if (OperationType.BUY.equals(operation.getType())) {
                 quantity = quantity.add(operation.getQuantity());
-                investedAmount = investedAmount.add(operation.getTotalAmount());
+                investedAmount = investedAmount.add(operation.getTotalAmountEur());
             } else if (OperationType.SELL.equals(operation.getType())) {
                 // Average cost method: reduce investedAmount proportionally before reducing quantity
                 if (quantity.compareTo(BigDecimal.ZERO) > 0) {
@@ -636,6 +637,7 @@ public class OperationService {
 
         investment.setQuantity(quantity);
         investment.setInvestedAmount(investedAmount.setScale(2, RoundingMode.HALF_UP));
+        investment.setCurrency(EUR);
 
         // Also recompute currentValueCalculated so P&L reflects the updated quantity.
         // Without this, a position that had sells would still show the old calculated
@@ -644,10 +646,22 @@ public class OperationService {
             InvestmentInstrument instrument = investmentInstrumentRepository
                     .findById(investment.getInstrumentId()).orElse(null);
             if (instrument != null && instrument.getLastPrice() != null) {
-                BigDecimal recalculated = quantity
-                        .multiply(instrument.getLastPrice())
-                        .setScale(2, RoundingMode.HALF_UP);
-                investment.setCurrentValueCalculated(recalculated);
+                BigDecimal nativeValue = quantity.multiply(instrument.getLastPrice());
+                BigDecimal rate = isEur(instrument.getCurrency())
+                        ? BigDecimal.ONE
+                        : exchangeRateRepository
+                                .findFirstByFromCurrencyAndToCurrencyOrderByAsOfDesc(EUR, instrument.getCurrency().toUpperCase())
+                                .map(r -> r.getRate())
+                                .filter(r -> r.signum() > 0)
+                                .orElse(null);
+                if (rate == null) {
+                    LOG.warn("No EUR/{} rate; current value of investment {} left unchanged",
+                            instrument.getCurrency(), investment.getId());
+                } else {
+                    investment.setCurrentValueCalculated(
+                            nativeValue.divide(rate, 2, RoundingMode.HALF_UP));
+                    investment.setCurrency(EUR);
+                }
             } else if (quantity.compareTo(BigDecimal.ZERO) == 0) {
                 investment.setCurrentValueCalculated(BigDecimal.ZERO);
             }
@@ -784,7 +798,7 @@ public class OperationService {
                 .name(buildPositionName(req, instrument, platformId))
                 .instrumentId(instrument.getId())
                 .platformId(platformId)
-                .currency(instrument.getCurrency())
+                .currency(EUR)
                 .investedAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP))
                 .quantity(BigDecimal.ZERO)
                 .openedAt(req.getOperationDate())
