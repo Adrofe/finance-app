@@ -6,7 +6,7 @@ import {
   INVESTMENT_MARKET_OPTIONS,
   INVESTMENT_PRICE_SOURCE_OPTIONS,
 } from '../constants/visualConfig';
-import type { CatalogOption, ExposureSuggestion, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType } from '../types/investments';
+import type { CatalogOption, ExposureSuggestion, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType, PriceQuotePreview } from '../types/investments';
 import './investment-catalog.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -86,6 +86,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
     refreshPrices,
+    previewPrice,
     refreshExposures,
     addManualPrice,
     addPlatform, editPlatform, removePlatform,
@@ -116,6 +117,13 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [deleting, setDeleting]           = useState(false);
   const [refreshingPrices, setRefreshingPrices] = useState(false);
   const [refreshMessage, setRefreshMessage]     = useState<string | null>(null);
+  const [quotePreview, setQuotePreview] = useState<{
+    instrument: InvestmentInstrument;
+    loading: boolean;
+    saving?: boolean;
+    quote?: PriceQuotePreview;
+    error?: string;
+  } | null>(null);
   const [showManualPrice, setShowManualPrice]   = useState(false);
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [manualError, setManualError]           = useState<string | null>(null);
@@ -601,6 +609,52 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
     }
   };
 
+  const handlePreviewPrice = async (instrument: InvestmentInstrument) => {
+    setQuotePreview({ instrument, loading: true });
+    try {
+      const quote = await previewPrice(instrument.id);
+      setQuotePreview({ instrument, loading: false, quote });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setQuotePreview({
+        instrument,
+        loading: false,
+        error: e?.response?.data?.message || e?.message || 'No se pudo obtener una cotización.',
+      });
+    }
+  };
+
+  const handleApplyPreviewPrice = async () => {
+    if (!quotePreview?.quote || !Number.isFinite(quotePreview.quote.price) || quotePreview.quote.price <= 0) {
+      return;
+    }
+
+    const { instrument, quote } = quotePreview;
+    setQuotePreview(current => current ? { ...current, saving: true, error: undefined } : current);
+    try {
+      const result = await addManualPrice({
+        instrumentId: instrument.id,
+        price: quote.price,
+        source: quote.source,
+        currency: quote.currency,
+        asOf: quote.retrievedAt,
+      });
+      setRefreshMessage(
+        result.updatedInstruments > 0
+          ? `Precio de ${quote.source} guardado para ${instrument.symbol}.`
+          : `No se pudo guardar el precio de ${instrument.symbol}.`,
+      );
+      setQuotePreview(null);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setQuotePreview(current => current ? {
+        ...current,
+        saving: false,
+        error: e?.response?.data?.message || e?.message || 'Error guardando el precio detectado.',
+      } : current);
+    }
+  };
+
   const handleRefreshExposures = async () => {
     setRefreshMessage(null);
     setRefreshingPrices(true);
@@ -881,6 +935,54 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
         <div className="ict-toast-info" role="status">
           <span>{refreshMessage}</span>
           <button type="button" onClick={() => setRefreshMessage(null)}>Cerrar</button>
+        </div>
+      )}
+
+      {quotePreview && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ict-quote-title">
+          <section className="modal ict-quote-modal">
+            <div className="modal-header">
+              <div>
+                <span className="ict-quote-eyebrow">Consulta sin guardar</span>
+                <h4 id="ict-quote-title">Precio detectado · {quotePreview.instrument.symbol}</h4>
+              </div>
+              <button className="modal-close" type="button" onClick={() => setQuotePreview(null)} aria-label="Cerrar">✕</button>
+            </div>
+            <div className="modal-body">
+              {quotePreview.loading ? (
+                <p className="ict-quote-state">Consultando fuentes de precio…</p>
+              ) : quotePreview.quote ? (
+                <>
+                  <div className="ict-quote-value">
+                    <span>Precio encontrado</span>
+                    <strong>{quotePreview.quote.price.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 8 })} {quotePreview.quote.currency}</strong>
+                  </div>
+                  <dl className="ict-quote-details">
+                    <div><dt>Fuente</dt><dd>{quotePreview.quote.source}</dd></div>
+                    <div><dt>Precio guardado</dt><dd>{fmtPrice(quotePreview.instrument.lastPrice)} {quotePreview.instrument.currency}</dd></div>
+                    <div><dt>Consultado</dt><dd>{new Date(quotePreview.quote.retrievedAt).toLocaleString('es-ES')}</dd></div>
+                  </dl>
+                  <p className="ict-quote-note">Al aplicarlo se guardará este precio y se recalculará el valor de las posiciones afectadas.</p>
+                  {quotePreview.error && <div className="ict-quote-error" role="alert">{quotePreview.error}</div>}
+                </>
+              ) : quotePreview.error ? (
+                <div className="ict-quote-error" role="alert">{quotePreview.error}</div>
+              ) : null}
+              <div className="modal-actions">
+                {quotePreview.quote && (
+                  <button
+                    className="at-btn-primary"
+                    type="button"
+                    disabled={quotePreview.saving || !Number.isFinite(quotePreview.quote.price) || quotePreview.quote.price <= 0}
+                    onClick={() => void handleApplyPreviewPrice()}
+                  >
+                    {quotePreview.saving ? 'Guardando…' : 'Aplicar y guardar'}
+                  </button>
+                )}
+                <button className="at-btn-secondary" type="button" disabled={quotePreview.saving} onClick={() => setQuotePreview(null)}>Cerrar</button>
+              </div>
+            </div>
+          </section>
         </div>
       )}
 
@@ -1679,6 +1781,14 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                     </td>
                     <td className="ict-td">
                       <div className="ict-actions">
+                        <button
+                          type="button"
+                          className="ict-btn-icon"
+                          title="Probar precio del scraper sin guardar"
+                          aria-label={`Probar precio de ${instr.symbol}`}
+                          disabled={quotePreview?.instrument.id === instr.id && quotePreview.loading}
+                          onClick={() => void handlePreviewPrice(instr)}
+                        >{quotePreview?.instrument.id === instr.id && quotePreview.loading ? '…' : '↻'}</button>
                         <button
                           type="button"
                           className="ict-btn-icon"

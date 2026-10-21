@@ -657,6 +657,19 @@
 
 .ict-btn-icon:hover           { background: var(--pill);    color: var(--brand); border-color: #aac8e8; }
 .ict-btn-icon--danger:hover   { background: #fff1f2;        color: #991b1b;       border-color: #fecdd3; }
+.ict-btn-icon:disabled { opacity: 0.5; cursor: wait; }
+
+.ict-quote-modal { width: min(100%, 520px); }
+.ict-quote-eyebrow { display: block; margin-bottom: 4px; color: #0f766e; font-size: 10px; font-weight: 750; text-transform: uppercase; }
+.ict-quote-state { padding: 18px 0; color: var(--muted); text-align: center; }
+.ict-quote-value { display: grid; gap: 5px; padding: 14px; border: 1px solid #cce9e1; border-radius: 7px; background: #f0fdfa; }
+.ict-quote-value span, .ict-quote-details dt { color: var(--muted); font-size: 11px; }
+.ict-quote-value strong { color: #115e59; font-size: 24px; }
+.ict-quote-details { display: grid; gap: 10px; margin: 14px 0 0; }
+.ict-quote-details div { display: flex; justify-content: space-between; gap: 16px; }
+.ict-quote-details dd { margin: 0; color: var(--ink); font-size: 12px; font-weight: 650; text-align: right; }
+.ict-quote-note { margin: 14px 0 0; color: var(--muted); font-size: 11px; }
+.ict-quote-error { padding: 12px; border: 1px solid #fecaca; border-radius: 6px; background: #fff1f2; color: #991b1b; font-size: 13px; }
 
 /* ─── Empty state ─────────────────────────────────────────────────────────── */
 
