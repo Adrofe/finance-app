@@ -77,4 +77,18 @@ class FinectPriceClientTest {
         assertThat(quote.price()).isEqualByComparingTo(new BigDecimal("8.74"));
         assertThat(quote.source()).isEqualTo("FINECT");
     }
+
+    @Test
+    void parseQuote_readsUsdMarketPriceFromFinectEtfSummary() {
+        FinectPriceClient client = new FinectPriceClient();
+        InvestmentInstrument instrument = InvestmentInstrument.builder().currency("EUR").build();
+        String html = "<div>398,89$Datos a <time>19/10/2026</time></div>"
+                + "<span>Valores liquidativos en USD</span>";
+
+        MarketPriceClient.MarketQuote quote = client.parseQuote(html, instrument).orElseThrow();
+
+        assertThat(quote.price()).isEqualByComparingTo(new BigDecimal("398.89"));
+        assertThat(quote.currency()).isEqualTo("USD");
+        assertThat(quote.source()).isEqualTo("FINECT");
+    }
 }

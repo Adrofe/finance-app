@@ -24,7 +24,9 @@ public class FinectPriceClient {
     private static final Logger LOG = LoggerFactory.getLogger(FinectPriceClient.class);
     private static final String SOURCE_FINECT = "FINECT";
         private static final Pattern DISPLAYED_NAV_PATTERN = Pattern.compile(
-            "(?is)class=[\"'][^\"']*StyledPercentLabel[^\"']*[\"'][^>]*>.*?<span[^>]*>\\s*([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]+|[0-9]+(?:[.,][0-9]+)?)\\s*</span>\\s*<span[^>]*>\\s*€\\s*</span>");
+            "(?is)class=[\"'][^\"']*StyledPercentLabel[^\"']*[\"'][^>]*>.*?<span[^>]*>\\s*([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]+|[0-9]+(?:[.,][0-9]+)?)\\s*</span>\\s*<span[^>]*>\\s*([$€£])\\s*</span>");
+        private static final Pattern DISPLAYED_MARKET_PRICE_PATTERN = Pattern.compile(
+            "(?i)([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]+|[0-9]+(?:[.,][0-9]+)?)\\s*(\\$|€|£|USD|EUR|GBP)\\s*Datos\\s+a");
     private static final Pattern NAV_PATTERN = Pattern.compile(
             "(?i)([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]+|[0-9]+(?:\\.[0-9]+)?)\\s*(?:€|EUR)\\s*Fecha\\s+(?:de\\s+)?(?:actualizaci[oó]n\\s+)?valor\\s+liquidativo");
 
@@ -62,12 +64,20 @@ public class FinectPriceClient {
         Matcher displayedNav = DISPLAYED_NAV_PATTERN.matcher(html);
         if (displayedNav.find()) {
             BigDecimal price = parseSpanishPrice(displayedNav.group(1));
-            return Optional.of(new MarketPriceClient.MarketQuote(price, SOURCE_FINECT, instrument.getCurrency()));
+            return Optional.of(new MarketPriceClient.MarketQuote(
+                price, SOURCE_FINECT, resolveCurrency(displayedNav.group(2), instrument.getCurrency())));
         }
 
         String text = html.replaceAll("(?is)<[^>]+>", " ")
                 .replace("&nbsp;", " ")
                 .replaceAll("\\s+", " ");
+        Matcher displayedMarketPrice = DISPLAYED_MARKET_PRICE_PATTERN.matcher(text);
+        if (displayedMarketPrice.find()) {
+            BigDecimal price = parseSpanishPrice(displayedMarketPrice.group(1));
+            return Optional.of(new MarketPriceClient.MarketQuote(
+                price, SOURCE_FINECT, resolveCurrency(displayedMarketPrice.group(2), instrument.getCurrency())));
+        }
+
         Matcher matcher = NAV_PATTERN.matcher(text);
         if (!matcher.find()) {
             return Optional.empty();
@@ -83,6 +93,15 @@ public class FinectPriceClient {
             normalized = normalized.replace(".", "").replace(',', '.');
         }
         return new BigDecimal(normalized);
+    }
+
+    private String resolveCurrency(String value, String fallback) {
+        return switch (value.trim().toUpperCase()) {
+            case "$", "USD" -> "USD";
+            case "€", "EUR" -> "EUR";
+            case "£", "GBP" -> "GBP";
+            default -> fallback;
+        };
     }
 
     private String doGetText(String url) throws IOException, InterruptedException {
