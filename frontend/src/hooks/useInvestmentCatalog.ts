@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import type { CatalogOption, ExposureRefreshResult, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType, PriceRefreshResult, PriceUpdateDraft } from '../types/investments';
+import type { CatalogOption, ExposureRefreshResult, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType, PriceQuotePreview, PriceRefreshResult, PriceUpdateDraft } from '../types/investments';
 import {
   fetchInvestmentTypes,
   fetchCountryCatalog,
@@ -29,6 +29,7 @@ import {
   fetchPlatforms, createPlatform, updatePlatform, deletePlatform,
   fetchInstrumentExposures, createInstrumentExposure, updateInstrumentExposure, deleteInstrumentExposure,
   refreshInstrumentPrices,
+  previewInstrumentPrice as fetchInstrumentPricePreview,
   refreshCompoundExposures,
   addManualInstrumentPrice,
 } from '../services/investmentCatalogService';
@@ -124,6 +125,18 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
       const updatedInstruments = await fetchInstruments(token);
       setInstruments(updatedInstruments);
       return result;
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        onUnauthorized?.('Session expired or invalid token. Please login again.');
+      }
+      throw err;
+    }
+  }, [token, onUnauthorized]);
+
+  const previewPrice = useCallback(async (instrumentId: number): Promise<PriceQuotePreview> => {
+    try {
+      setError(null);
+      return await fetchInstrumentPricePreview(token, instrumentId);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         onUnauthorized?.('Session expired or invalid token. Please login again.');
@@ -326,6 +339,7 @@ export function useInvestmentCatalog(token: string, onUnauthorized?: (message: s
     loading, error, clearError,
     addInstrument, editInstrument, removeInstrument,
     refreshPrices,
+    previewPrice,
     refreshExposures,
     addManualPrice,
     exposuresByInstrument,

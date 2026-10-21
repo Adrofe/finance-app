@@ -234,6 +234,15 @@ export type PriceUpdateDraft = {
   currency?: string;
 };
 
+export type PriceQuotePreview = {
+  instrumentId: number;
+  symbol: string;
+  price: number;
+  source: string;
+  currency: string;
+  retrievedAt: string;
+};
+
 export type InstrumentHistoryPoint = {
   date: string;
   price: number;

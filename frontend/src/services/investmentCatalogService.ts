@@ -9,6 +9,7 @@ import type {
   PriceRefreshResult,
   ExposureRefreshResult,
   PriceUpdateDraft,
+  PriceQuotePreview,
   InstrumentHistory,
   PortfolioHistory,
 } from '../types/investments';
@@ -197,6 +198,14 @@ export async function refreshInstrumentPrices(token: string): Promise<PriceRefre
     instrumentIds: [],
     mode: 'background-started',
   };
+}
+
+export async function previewInstrumentPrice(token: string, instrumentId: number): Promise<PriceQuotePreview> {
+  const res = await axios.get<ApiResponse<PriceQuotePreview>>(
+    `${INVESTMENTS_BASE}/prices/preview/${instrumentId}`,
+    { headers: headers(token) },
+  );
+  return res.data.data;
 }
 
 export async function refreshCompoundExposures(token: string): Promise<ExposureRefreshResult> {
