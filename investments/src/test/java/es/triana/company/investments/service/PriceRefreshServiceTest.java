@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import es.triana.company.investments.client.MarketPriceClient;
 import es.triana.company.investments.model.api.HistoricalPriceUpdateRequestDTO;
+import es.triana.company.investments.model.api.PriceQuotePreviewDTO;
 import es.triana.company.investments.model.db.InvestmentInstrument;
 import es.triana.company.investments.model.db.InvestmentPrice;
 import es.triana.company.investments.repository.InvestmentInstrumentRepository;
@@ -81,6 +82,24 @@ class PriceRefreshServiceTest {
         assertThat(result.getRecalculatedPositions()).isZero();
         verify(instrumentRepository).save(instrument);
         verify(investmentRepository).findByInstrumentId(instrumentId);
+    }
+
+    @Test
+    void previewInstrumentPriceReturnsQuoteWithoutPersistingIt() {
+        Long instrumentId = 4L;
+        InvestmentInstrument instrument = instrument(instrumentId);
+        MarketPriceClient.MarketQuote quote = new MarketPriceClient.MarketQuote(
+                new BigDecimal("8.74"), "FINECT", "EUR");
+        when(instrumentRepository.findById(instrumentId)).thenReturn(Optional.of(instrument));
+        when(marketPriceClient.fetchLatestQuote(instrument)).thenReturn(Optional.of(quote));
+
+        PriceQuotePreviewDTO result = service().previewInstrumentPrice(instrumentId);
+
+        assertThat(result.price()).isEqualByComparingTo("8.74");
+        assertThat(result.source()).isEqualTo("FINECT");
+        assertThat(result.currency()).isEqualTo("EUR");
+        verify(priceRepository, never()).save(org.mockito.ArgumentMatchers.any());
+        verify(instrumentRepository, never()).save(instrument);
     }
 
     private PriceRefreshService service() {

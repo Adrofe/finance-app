@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -21,6 +23,7 @@ import es.triana.company.investments.model.api.ExchangeRateUpsertRequestDTO;
 import es.triana.company.investments.model.api.HistoricalPriceUpdateRequestDTO;
 import org.springframework.web.bind.annotation.PutMapping;
 import es.triana.company.investments.model.api.PriceRefreshResultDTO;
+import es.triana.company.investments.model.api.PriceQuotePreviewDTO;
 import es.triana.company.investments.model.api.PriceUpdateRequestDTO;
 import es.triana.company.investments.service.ExchangeRateRefreshService;
 import es.triana.company.investments.service.ExchangeRateService;
@@ -47,6 +50,13 @@ public class PriceController {
     public ResponseEntity<ApiResponse<PriceRefreshResultDTO>> refreshPricesOnDemand(@RequestBody List<@Valid PriceUpdateRequestDTO> updates) {
         PriceRefreshResultDTO result = priceRefreshService.refreshPricesOnDemand(updates);
         return ResponseEntity.ok(new ApiResponse<>(200, "Prices refreshed on demand", result));
+    }
+
+    @GetMapping("/prices/preview/{instrumentId}")
+    public ResponseEntity<ApiResponse<PriceQuotePreviewDTO>> previewInstrumentPrice(
+            @PathVariable("instrumentId") Long instrumentId) {
+        PriceQuotePreviewDTO result = priceRefreshService.previewInstrumentPrice(instrumentId);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Instrument price preview retrieved", result));
     }
 
     @PutMapping("/prices/history")

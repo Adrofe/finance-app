@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import es.triana.company.investments.client.MarketPriceClient;
 import es.triana.company.investments.model.api.PriceRefreshResultDTO;
+import es.triana.company.investments.model.api.PriceQuotePreviewDTO;
 import es.triana.company.investments.model.api.PriceUpdateRequestDTO;
 import es.triana.company.investments.model.api.HistoricalPriceUpdateRequestDTO;
 import java.time.LocalDate;
@@ -101,6 +102,27 @@ public class PriceRefreshService {
                 .mode("on-demand")
                 .build();
     }
+
+            @Transactional(readOnly = true)
+            public PriceQuotePreviewDTO previewInstrumentPrice(Long instrumentId) {
+            if (instrumentId == null || instrumentId <= 0) {
+                throw new InvestmentValidationException("instrumentId is required and must be > 0");
+            }
+
+            InvestmentInstrument instrument = investmentInstrumentRepository.findById(instrumentId)
+                .orElseThrow(() -> new InvestmentValidationException("Unknown instrumentId: " + instrumentId));
+            MarketPriceClient.MarketQuote quote = marketPriceClient.fetchLatestQuote(instrument)
+                .orElseThrow(() -> new InvestmentValidationException(
+                    "No price quote could be retrieved for " + instrument.getSymbol()));
+
+            return new PriceQuotePreviewDTO(
+                instrument.getId(),
+                instrument.getSymbol(),
+                quote.price(),
+                quote.source(),
+                normalizeCurrency(quote.currency(), instrument.getCurrency()),
+                LocalDateTime.now());
+            }
 
             @Transactional
             public PriceRefreshResultDTO updateHistoricalPrice(HistoricalPriceUpdateRequestDTO request) {
