@@ -86,6 +86,7 @@ public class OperationService {
         // persisted and no external calls are made if stock is insufficient.
         if (OperationType.SELL.equals(req.getType())) {
             validateFifoCoverage(req.getQuantity(), investment);
+            ensureSufficientPositionStock(req.getQuantity(), investment, null);
         }
 
         BigDecimal fees = req.getFees() != null ? req.getFees() : BigDecimal.ZERO;
@@ -119,6 +120,10 @@ public class OperationService {
         InvestmentOperation existing = findOperation(operationId, req.getTenantId());
         Investment previousInvestment = findAndLockInvestment(existing.getInvestmentId(), req.getTenantId());
     Investment targetInvestment = resolveTargetInvestmentForUpdate(req, previousInvestment);
+
+        if (OperationType.SELL.equals(req.getType())) {
+            ensureSufficientPositionStock(req.getQuantity(), targetInvestment, existing);
+        }
 
         Long previousInstrumentId = previousInvestment.getInstrumentId();
         Long targetInstrumentId = targetInvestment.getInstrumentId();
@@ -555,6 +560,21 @@ public class OperationService {
                         "Insufficient stock: trying to sell " + requestedQty.stripTrailingZeros().toPlainString()
                                         + " units but only " + availableQty.stripTrailingZeros().toPlainString()
                                         + " are available for instrument " + instrumentId + ".");
+    }
+
+    private void ensureSufficientPositionStock(BigDecimal requestedQty, Investment investment, InvestmentOperation existing) {
+        BigDecimal available = investment.getQuantity() != null ? investment.getQuantity() : BigDecimal.ZERO;
+        if (existing != null && investment.getId().equals(existing.getInvestmentId())) {
+            available = OperationType.SELL.equals(existing.getType())
+                    ? available.add(existing.getQuantity())
+                    : available.subtract(existing.getQuantity());
+        }
+        available = available.max(BigDecimal.ZERO);
+        if (requestedQty.compareTo(available) > 0) {
+            throw new InvestmentValidationException(
+                    "Insufficient stock in position: trying to sell " + requestedQty.stripTrailingZeros().toPlainString()
+                            + " units but only " + available.stripTrailingZeros().toPlainString() + " are available.");
+        }
     }
 
     // -------------------------------------------------------------------------

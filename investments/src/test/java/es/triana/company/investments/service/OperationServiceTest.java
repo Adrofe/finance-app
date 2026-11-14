@@ -253,6 +253,52 @@ class OperationServiceTest {
         }
 
         @Test
+        @DisplayName("SELL cannot exceed the selected position even when other FIFO lots exist")
+        void sell_rejectsMoreThanPositionQuantity() {
+            investment.setQuantity(bd("5"));
+            when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID))
+                    .thenReturn(List.of(buy1, buy2));
+            when(fifoLotRepository.findByBuyOperationIdIn(any())).thenReturn(List.of());
+
+            assertThatThrownBy(() -> operationService.registerOperation(sell(DATE_SELL, "8", "180", "4")))
+                    .isInstanceOf(InvestmentValidationException.class)
+                    .hasMessageContaining("only 5 are available");
+            verify(operationRepository, times(0)).save(any());
+            verify(investmentRepository, times(0)).save(any());
+        }
+
+        @Test
+        @DisplayName("Editing a sale includes the original quantity in the position limit")
+        void editSale_allowsOriginalQuantityAndRejectsExcess() {
+            investment.setQuantity(bd("3"));
+            InvestmentOperation existing = savedOp(3L, OperationType.SELL, DATE_SELL, bd("2"), bd("180"), bd("4"),
+                    bd("356.0000"), "USD", bd("1.12"), bd("317.8571"));
+            when(operationRepository.findByIdAndTenantId(3L, TENANT_ID)).thenReturn(Optional.of(existing));
+
+            assertThatThrownBy(() -> operationService.updateOperation(3L, sell(DATE_SELL, "6", "180", "4")))
+                    .isInstanceOf(InvestmentValidationException.class)
+                    .hasMessageContaining("only 5 are available");
+            verify(fifoLotRepository, times(0)).deleteBySellOperationId(3L);
+
+            stubEurRate("USD", DATE_SELL, "1.12");
+            when(operationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+            operationService.updateOperation(3L, sell(DATE_SELL, "5", "180", "4"));
+            verify(operationRepository).save(any());
+        }
+
+        @Test
+        @DisplayName("Changing a BUY to a SELL cannot count the original purchase as available")
+        void editBuyToSale_excludesOriginalBuyQuantity() {
+            investment.setQuantity(bd("5"));
+            when(operationRepository.findByIdAndTenantId(1L, TENANT_ID)).thenReturn(Optional.of(buy1));
+
+            assertThatThrownBy(() -> operationService.updateOperation(1L, sell(DATE_SELL, "1", "180", "4")))
+                    .isInstanceOf(InvestmentValidationException.class)
+                    .hasMessageContaining("only 0 are available");
+            verify(operationRepository, times(0)).save(any());
+        }
+
+        @Test
         @DisplayName("SELL inserts a row in investment_operations with correct totals (gross - fees)")
         void sell_insertsOperationWithCorrectAmounts() {
             stubEurRate("USD", DATE_SELL, "1.12");

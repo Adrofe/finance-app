@@ -268,6 +268,10 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     setForm((current) => ({ ...current, [key]: value }));
   };
 
+  const findPosition = (instrumentId: number | null, platformId: number | null) =>
+    investments.find((investment) => investment.instrumentId === instrumentId
+      && (investment.platformId ?? null) === platformId);
+
   const onInstrumentChange = (instrumentIdRaw: string) => {
     const instrumentId = Number(instrumentIdRaw);
     const matchedInstrument = Number.isFinite(instrumentId)
@@ -278,8 +282,34 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
       ...current,
       instrumentId: instrumentIdRaw,
       currency: matchedInstrument?.currency || current.currency,
+      quantity: current.type === 'SELL' && !editingId
+        ? String(findPosition(matchedInstrument?.id ?? null, current.platformId ? Number(current.platformId) : null)?.quantity || '')
+        : current.quantity,
+      unitPrice: current.type === 'SELL' && !editingId
+        ? (matchedInstrument?.lastPrice && matchedInstrument.lastPrice > 0 ? String(matchedInstrument.lastPrice) : '')
+        : current.unitPrice,
     }));
   };
+
+  const selectedInstrumentId = form.instrumentId ? Number(form.instrumentId) : null;
+  const selectedPlatformId = form.platformId ? Number(form.platformId) : null;
+  const selectedInstrument = selectedInstrumentId
+    ? instruments.find((instrument) => instrument.id === selectedInstrumentId)
+    : undefined;
+  const selectedInstrumentType = selectedInstrument
+    ? investmentTypes.find((type) => type.id === selectedInstrument.typeId)
+    : undefined;
+  const selectedPlatform = selectedPlatformId
+    ? platforms.find((platform) => platform.id === selectedPlatformId)
+    : undefined;
+  const selectedInvestment = selectedInstrumentId
+    ? findPosition(selectedInstrumentId, selectedPlatformId)
+    : undefined;
+  const editedOperation = editingId != null ? operations.find((operation) => operation.id === editingId) : undefined;
+  const originalQuantity = editedOperation && editedOperation.investmentId === selectedInvestment?.id
+    ? (editedOperation.type === 'SELL' ? editedOperation.quantity : -editedOperation.quantity)
+    : 0;
+  const availableQuantity = Math.max(0, Number((safeNumber(selectedInvestment?.quantity) + originalQuantity).toFixed(8)));
 
   const getOperationDraft = (link?: { linkedAccountId?: number; linkedTransactionId?: number }): { payload?: InvestmentOperationDraft; error?: string } => {
     const instrumentId = Number(form.instrumentId);
@@ -299,8 +329,16 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
       return { error: 'La cantidad debe ser mayor que cero.' };
     }
 
+    if (form.type === 'SELL' && (!selectedInvestment || quantity > availableQuantity)) {
+      return { error: `La cantidad disponible para vender es ${fmtNumber(availableQuantity)}.` };
+    }
+
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
       return { error: 'El precio unitario debe ser mayor que cero.' };
+    }
+
+    if (!Number.isFinite(fees) || fees < 0) {
+      return { error: 'Las comisiones no pueden ser negativas.' };
     }
 
     if (!form.currency || form.currency.trim().length !== 3) {
@@ -346,7 +384,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
       return rawAmount / integratedEurRate;
     }
     return rawAmount;
-  }, [form, integratedEurRate]);
+  }, [form, integratedEurRate, selectedInvestment, availableQuantity]);
 
   const openIntegratedTransactionModal = async () => {
     if (editingId) return;
@@ -424,18 +462,6 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     }
   };
 
-  const selectedInstrumentId = form.instrumentId ? Number(form.instrumentId) : null;
-  const selectedPlatformId = form.platformId ? Number(form.platformId) : null;
-  const selectedInstrument = selectedInstrumentId
-    ? instruments.find((instrument) => instrument.id === selectedInstrumentId)
-    : undefined;
-  const selectedInstrumentType = selectedInstrument
-    ? investmentTypes.find((type) => type.id === selectedInstrument.typeId)
-    : undefined;
-  const selectedPlatform = selectedPlatformId
-    ? platforms.find((platform) => platform.id === selectedPlatformId)
-    : undefined;
-
   const integratedCategoryId = useMemo(() => {
     if (transactionCategories.length === 0) return undefined;
 
@@ -473,13 +499,6 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
     }
     return baseDesc;
   }, [form.positionName, form.type, form.currency, selectedInstrument, integratedEurRate]);
-
-  const selectedInvestment = selectedInstrumentId
-    ? investments.find((investment) => {
-      const investmentPlatformId = investment.platformId ?? null;
-      return investment.instrumentId === selectedInstrumentId && investmentPlatformId === selectedPlatformId;
-    })
-    : undefined;
 
   const confirmDeleteOperation = async () => {
     if (!confirmDelete) return;
@@ -681,9 +700,10 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
             <form className="modal-body iot-form" onSubmit={submit}>
               <div className="iot-form-row iot-form-row--pair">
                 <div className="modal-row">
-                  <label>Instrumento</label>
+                  <label htmlFor="iot-instrument">Instrumento</label>
                   <div className="iot-instrument-combo" ref={instrumentComboRef}>
                     <input
+                      id="iot-instrument"
                       type="text"
                       className="iot-select iot-instrument-input"
                       placeholder="Buscar por nombre o símbolo…"
@@ -723,8 +743,17 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
                 </div>
 
                 <div className="modal-row">
-                  <label>Plataforma</label>
-                  <select className="iot-select" value={form.platformId} onChange={(event) => onChange('platformId', event.target.value)}>
+                  <label htmlFor="iot-platform">Plataforma</label>
+                  <select id="iot-platform" className="iot-select" value={form.platformId} onChange={(event) => {
+                    const platformId = event.target.value;
+                    setForm((current) => ({
+                      ...current,
+                      platformId,
+                      quantity: current.type === 'SELL' && !editingId
+                        ? String(findPosition(current.instrumentId ? Number(current.instrumentId) : null, platformId ? Number(platformId) : null)?.quantity || '')
+                        : current.quantity,
+                    }));
+                  }}>
                     <option value="">Sin plataforma</option>
                     {platforms.map((platform) => (
                       <option key={platform.id} value={platform.id}>{platform.name}</option>
@@ -749,8 +778,11 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
 
               <div className="iot-form-row iot-form-row--triple">
                 <div className="modal-row">
-                  <label>Divisa</label>
-                  <select className="iot-select" value={form.currency} onChange={(event) => onChange('currency', event.target.value)}>
+                  <label htmlFor="iot-currency">Divisa</label>
+                  <select id="iot-currency" className="iot-select" value={form.currency} onChange={(event) => {
+                    const currency = event.target.value;
+                    setForm((current) => ({ ...current, currency, unitPrice: current.type === 'SELL' && currency !== current.currency ? '' : current.unitPrice }));
+                  }}>
                     {INVESTMENT_CURRENCY_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
@@ -768,7 +800,14 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
                     <button type="button" className={`iot-type-btn${form.type === 'BUY' ? ' active buy' : ''}`} onClick={() => onChange('type', 'BUY')}>
                       Compra
                     </button>
-                    <button type="button" className={`iot-type-btn${form.type === 'SELL' ? ' active sell' : ''}`} onClick={() => onChange('type', 'SELL')}>
+                    <button type="button" className={`iot-type-btn${form.type === 'SELL' ? ' active sell' : ''}`} onClick={() => setForm((current) => ({
+                      ...current,
+                      type: 'SELL',
+                      quantity: !editingId && current.type !== 'SELL' && selectedInstrument
+                        ? String(availableQuantity || '') : current.quantity,
+                      unitPrice: !editingId && current.type !== 'SELL' && selectedInstrument?.currency === current.currency && selectedInstrument.lastPrice && selectedInstrument.lastPrice > 0
+                        ? String(selectedInstrument.lastPrice) : current.unitPrice,
+                    }))}>
                       Venta
                     </button>
                   </div>
@@ -777,23 +816,35 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
 
               <div className="iot-form-row iot-form-row--triple">
                 <div className="modal-row">
-                  <label>Cantidad</label>
-                  <input className="iot-input" required type="number" min="0.00000001" step="0.00000001" value={form.quantity} onChange={(event) => onChange('quantity', event.target.value)} />
+                  <label htmlFor="iot-quantity">Cantidad</label>
+                  <input id="iot-quantity" className="iot-input" required type="number" min="0.00000001" max={form.type === 'SELL' && selectedInstrument ? availableQuantity : undefined} step="0.00000001" value={form.quantity} onChange={(event) => onChange('quantity', event.target.value)} />
+                  {form.type === 'SELL' && selectedInstrument && <small className="iot-sale-hint">Disponible: {fmtNumber(availableQuantity)}</small>}
                 </div>
                 <div className="modal-row">
-                  <label>Precio unitario</label>
-                  <input className="iot-input" required type="number" min="0.00000001" step="0.00000001" value={form.unitPrice} onChange={(event) => onChange('unitPrice', event.target.value)} />
+                  <label htmlFor="iot-unit-price">Precio unitario</label>
+                  <input id="iot-unit-price" className="iot-input" required type="number" min="0.00000001" step="0.00000001" value={form.unitPrice} onChange={(event) => onChange('unitPrice', event.target.value)} />
+                  {form.type === 'SELL' && selectedInstrument && (
+                    <small className="iot-sale-hint">
+                      {selectedInstrument.lastPrice != null && selectedInstrument.lastPrice > 0
+                        ? `Última cotización: ${fmtNumber(selectedInstrument.lastPrice)} ${selectedInstrument.currency}${selectedInstrument.lastPriceAt ? ` (${fmtDate(selectedInstrument.lastPriceAt)})` : ''}`
+                        : 'Sin cotización disponible'}
+                    </small>
+                  )}
                 </div>
                 <div className="modal-row">
-                  <label>Fees</label>
-                  <input className="iot-input" type="number" min="0" step="0.01" value={form.fees} onChange={(event) => onChange('fees', event.target.value)} />
+                  <label htmlFor="iot-fees">Fees</label>
+                  <input id="iot-fees" className="iot-input" type="number" min="0" step="0.01" value={form.fees} onChange={(event) => onChange('fees', event.target.value)} />
                 </div>
               </div>
+
+              {form.type === 'SELL' && Number(form.quantity) > 0 && Number(form.unitPrice) > 0 && (
+                <div className="iot-sale-total">Importe estimado: <strong>{fmtMoney(Number(form.quantity) * Number(form.unitPrice) - (Number(form.fees) || 0), form.currency)}</strong></div>
+              )}
 
               {selectedInstrument && (
                 <div className="iot-selected-investment iot-field--full">
                   <span className="iot-selected-investment-title">
-                    {selectedInvestment ? 'Se usará la posición existente' : 'Se creará una nueva posición automáticamente'}
+                    {selectedInvestment ? 'Se usará la posición existente' : form.type === 'SELL' ? 'No hay una posición disponible para esta plataforma' : 'Se creará una nueva posición automáticamente'}
                   </span>
                   <strong>{selectedInvestment?.name || form.positionName.trim() || selectedInstrument.symbol || selectedInstrument.name}</strong>
                   <span>
