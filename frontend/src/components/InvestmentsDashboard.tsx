@@ -16,6 +16,7 @@ import {
 import { useInvestmentsDashboard } from '../hooks/useInvestmentsDashboard';
 import type { ExposureOverviewBucket } from '../types/investments';
 import './investments-dashboard.css';
+import { InvestmentTypeFilter } from './InvestmentTypeFilter';
 
 type Props = {
   token: string;
@@ -227,32 +228,7 @@ export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized })
         </article>
       </div>
 
-      <div className="idb-filter-section">
-        <span>Filtrar cartera por tipo</span>
-        <div className="idb-filter-chips">
-          <button
-            type="button"
-            className={`idb-chip ${selectedTypeCodes.length === 0 ? 'active' : ''}`}
-            onClick={() => setSelectedTypeCodes([])}
-          >
-            Todos
-          </button>
-          {typeFilters.map((item) => {
-            const active = selectedTypeCodes.includes(item.code);
-            return (
-              <button
-                key={item.code}
-                type="button"
-                className={`idb-chip ${active ? 'active' : ''}`}
-                onClick={() => setSelectedTypeCodes((current) =>
-                  active ? current.filter((code) => code !== item.code) : [...current, item.code])}
-              >
-                {item.name}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <InvestmentTypeFilter options={typeFilters} selected={selectedTypeCodes} onChange={setSelectedTypeCodes} label="Histórico y exposición por tipo" />
 
       <div className="idb-grid">
         <article className="idb-card idb-card--wide">
@@ -266,7 +242,8 @@ export const InvestmentsDashboard: React.FC<Props> = ({ token, onUnauthorized })
                 <button
                   key={item.id}
                   type="button"
-                  className={historyRange === item.id ? 'active' : ''}
+                  className={`investment-type-filter-button${historyRange === item.id ? ' active' : ''}`}
+                  aria-pressed={historyRange === item.id}
                   onClick={() => setHistoryRange(item.id)}
                 >
                   {item.label}

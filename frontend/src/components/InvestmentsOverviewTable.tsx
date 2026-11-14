@@ -5,6 +5,7 @@ import { fetchExchangeRates } from '../services/exchangeRatesService';
 import { getInvestmentTypeVisual } from '../constants/visualConfig';
 import { InstrumentHistoryModal } from './InstrumentHistoryModal';
 import './investments-overview.css';
+import { InvestmentTypeFilter } from './InvestmentTypeFilter';
 
 type SortKey = 'symbol' | 'investedAmount' | 'currentValue' | 'pnl' | 'pnlPct' | 'quantity';
 type SortDir = 'asc' | 'desc';
@@ -38,6 +39,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
   const { summary, positions, byInstrument, loading, error, clearError, reload } = useInvestmentsOverview(token, onUnauthorized);
   const [recalculating, setRecalculating] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedTypeCodes, setSelectedTypeCodes] = useState<string[]>([]);
   const [countryFilter, setCountryFilter] = useState('');
   const [regionFilter, setRegionFilter] = useState('');
   const [sectorFilter, setSectorFilter] = useState('');
@@ -58,6 +60,13 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
     () => [...new Set(byInstrument.map((g) => g.countryCode).filter(Boolean))].sort(),
     [byInstrument],
   );
+  const typeOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    byInstrument.forEach(group => {
+      if (group.typeCode) options.set(group.typeCode, group.typeName || group.typeCode);
+    });
+    return [...options].map(([code, name]) => ({ code, name })).sort((left, right) => left.name.localeCompare(right.name));
+  }, [byInstrument]);
   const regionOptions = useMemo(
     () => [...new Set(byInstrument.map((g) => g.region).filter(Boolean))].sort(),
     [byInstrument],
@@ -150,6 +159,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
       : byInstrument;
 
     const classificationFiltered = filtered.filter((g) => {
+      if (selectedTypeCodes.length > 0 && !selectedTypeCodes.includes(g.typeCode)) return false;
       if (countryFilter && g.countryCode !== countryFilter) return false;
       if (regionFilter && g.region !== regionFilter) return false;
       if (sectorFilter && g.sector !== sectorFilter) return false;
@@ -169,7 +179,18 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
       }
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [byInstrument, search, sortKey, sortDir, normalizeToEur, toEur, countryFilter, regionFilter, sectorFilter, industryFilter]);
+  }, [byInstrument, search, sortKey, sortDir, normalizeToEur, toEur, countryFilter, regionFilter, sectorFilter, industryFilter, selectedTypeCodes]);
+
+  const hasFilters = Boolean(search.trim() || selectedTypeCodes.length || countryFilter || regionFilter || sectorFilter || industryFilter);
+  const filteredSummary = useMemo(() => {
+    const totals = displayRows.reduce((result, group) => ({
+      totalInvested: result.totalInvested + (normalizeToEur ? toEur(group.investedAmount, group.currency) : group.investedAmount),
+      totalCurrentValue: result.totalCurrentValue + (normalizeToEur ? toEur(group.currentValue, group.currency) : group.currentValue),
+      positions: result.positions + group.positions,
+    }), { totalInvested: 0, totalCurrentValue: 0, positions: 0 });
+    const totalPnl = totals.totalCurrentValue - totals.totalInvested;
+    return { ...totals, totalPnl, totalPnlPct: totals.totalInvested > 0 ? totalPnl / totals.totalInvested * 100 : 0 };
+  }, [displayRows, normalizeToEur, toEur]);
 
   if (loading) {
     return <p className="state">Cargando resumen de inversiones…</p>;
@@ -188,7 +209,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
     return <p className="state">No hay resumen disponible todavía.</p>;
   }
 
-  const displaySummary = eurSummary ?? summary;
+  const displaySummary = hasFilters ? filteredSummary : eurSummary ?? summary;
   const pnlPositive = safeNumber(displaySummary.totalPnl) >= 0;
 
   return (
@@ -211,14 +232,14 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
           <span className="io-kpi-icon">💰</span>
           <span className="io-kpi-label">Total invertido</span>
           <strong className="io-kpi-value">{fmtMoney(displaySummary.totalInvested)}</strong>
-          <span className="io-kpi-sub">{normalizeToEur ? 'Normalizado a EUR' : 'Capital desplegado'}</span>
+          <span className="io-kpi-sub">{hasFilters ? 'Resultado filtrado' : normalizeToEur ? 'Normalizado a EUR' : 'Capital desplegado'}</span>
         </article>
 
         <article className="io-kpi io-kpi--current">
           <span className="io-kpi-icon">📈</span>
           <span className="io-kpi-label">Valor actual</span>
           <strong className="io-kpi-value">{fmtMoney(displaySummary.totalCurrentValue)}</strong>
-          <span className="io-kpi-sub">{normalizeToEur ? 'Normalizado a EUR' : 'Manual o por precio'}</span>
+          <span className="io-kpi-sub">{hasFilters ? 'Resultado filtrado' : normalizeToEur ? 'Normalizado a EUR' : 'Manual o por precio'}</span>
         </article>
 
         <article className={`io-kpi ${pnlPositive ? 'io-kpi--gain' : 'io-kpi--loss'}`}>
@@ -235,10 +256,12 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
         <article className="io-kpi io-kpi--positions">
           <span className="io-kpi-icon">🏦</span>
           <span className="io-kpi-label">Posiciones</span>
-          <strong className="io-kpi-value">{summary.positions}</strong>
-          <span className="io-kpi-sub">{byInstrument.length} instrumentos</span>
+          <strong className="io-kpi-value">{hasFilters ? filteredSummary.positions : summary.positions}</strong>
+          <span className="io-kpi-sub">{hasFilters ? displayRows.length : byInstrument.length} instrumentos</span>
         </article>
       </div>
+
+      <InvestmentTypeFilter options={typeOptions} selected={selectedTypeCodes} onChange={setSelectedTypeCodes} />
 
       {/* ── Toolbar ──────────────────────────────────────────────────────── */}
       <div className="io-toolbar">
@@ -257,7 +280,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
         </div>
         <div className="io-toolbar-right">
           <span className="io-count">
-            {displayRows.length} / {byInstrument.length} instrumentos · {positions.length} posiciones
+            {displayRows.length} / {byInstrument.length} instrumentos · {hasFilters ? filteredSummary.positions : positions.length} posiciones
           </span>
           <button
             type="button"
@@ -304,8 +327,10 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
             setRegionFilter('');
             setSectorFilter('');
             setIndustryFilter('');
+            setSearch('');
+            setSelectedTypeCodes([]);
           }}
-          disabled={!countryFilter && !regionFilter && !sectorFilter && !industryFilter}
+          disabled={!hasFilters}
         >
           Limpiar filtros
         </button>
@@ -344,7 +369,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
             {displayRows.length === 0 && (
               <tr>
                 <td colSpan={10} className="io-empty">
-                  {search ? 'No hay instrumentos que coincidan con el filtro.' : 'Todavía no hay inversiones para mostrar.'}
+                  {hasFilters ? 'No hay instrumentos que coincidan con los filtros.' : 'Todavía no hay inversiones para mostrar.'}
                 </td>
               </tr>
             )}

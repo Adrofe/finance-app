@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FINANCE_EVENTS } from '../events/financeEvents';
 import axios from 'axios';
 import type {
@@ -71,6 +71,8 @@ export function useInvestmentsDashboard(
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const exposureRequestId = useRef(0);
+  const historyRequestId = useRef(0);
 
   const loadCore = useCallback(async () => {
     if (!token) {
@@ -132,6 +134,7 @@ export function useInvestmentsDashboard(
   }, [token, selectedYear, onUnauthorized]);
 
   const loadExposureOverview = useCallback(async () => {
+    const requestId = ++exposureRequestId.current;
     if (!token) {
       setExposureOverview(null);
       return;
@@ -139,8 +142,9 @@ export function useInvestmentsDashboard(
 
     try {
       const loaded = await fetchExposureOverview(token, selectedTypeCodes);
-      setExposureOverview(loaded);
+      if (requestId === exposureRequestId.current) setExposureOverview(loaded);
     } catch (err) {
+      if (requestId !== exposureRequestId.current) return;
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         onUnauthorized?.('Session expired or invalid token. Please login again.');
         return;
@@ -153,14 +157,17 @@ export function useInvestmentsDashboard(
   }, [token, selectedTypeCodes, onUnauthorized]);
 
   const loadPortfolioHistory = useCallback(async () => {
+    const requestId = ++historyRequestId.current;
     if (!token) {
       setPortfolioHistory(null);
       return;
     }
 
     try {
-      setPortfolioHistory(await fetchPortfolioHistory(token, selectedTypeCodes, historyFrom, historyTo));
+      const loaded = await fetchPortfolioHistory(token, selectedTypeCodes, historyFrom, historyTo);
+      if (requestId === historyRequestId.current) setPortfolioHistory(loaded);
     } catch (err) {
+      if (requestId !== historyRequestId.current) return;
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         onUnauthorized?.('Session expired or invalid token. Please login again.');
         return;
@@ -187,6 +194,11 @@ export function useInvestmentsDashboard(
   useEffect(() => {
     loadPortfolioHistory();
   }, [loadPortfolioHistory]);
+
+  useEffect(() => () => {
+    exposureRequestId.current += 1;
+    historyRequestId.current += 1;
+  }, []);
 
   useEffect(() => {
     const handleInvestmentsUpdated = () => {

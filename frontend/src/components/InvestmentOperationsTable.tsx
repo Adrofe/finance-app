@@ -19,6 +19,7 @@ import type {
   InvestmentType,
 } from '../types/investments';
 import './investment-operations.css';
+import { InvestmentTypeFilter } from './InvestmentTypeFilter';
 
 type Props = {
   token: string;
@@ -126,7 +127,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
   const [customFromDate, setCustomFromDate] = useState('');
   const [customToDate, setCustomToDate] = useState('');
   const [operationFilter, setOperationFilter] = useState<'ALL' | InvestmentOperationType>('ALL');
-  const [investmentTypeFilter, setInvestmentTypeFilter] = useState<'ALL' | string>('ALL');
+  const [investmentTypeFilter, setInvestmentTypeFilter] = useState<string[]>([]);
   const [instrumentSearch, setInstrumentSearch] = useState('');
   const [instrumentDropdownOpen, setInstrumentDropdownOpen] = useState(false);
   const instrumentComboRef = useRef<HTMLDivElement>(null);
@@ -193,19 +194,20 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
         return false;
       }
 
-      if (investmentTypeFilter !== 'ALL') {
+      if (investmentTypeFilter.length > 0) {
         const relatedInvestment = investmentMap.get(operation.investmentId);
         if (!relatedInvestment) {
           return false;
         }
-        if (String(relatedInvestment.typeId) !== investmentTypeFilter) {
+        const typeCode = relatedInvestment.typeCode || investmentTypes.find(type => type.id === relatedInvestment.typeId)?.code;
+        if (!typeCode || !investmentTypeFilter.includes(typeCode)) {
           return false;
         }
       }
 
       return true;
     });
-  }, [operations, operationFilter, activeDateRange, investmentTypeFilter, investmentMap]);
+  }, [operations, operationFilter, activeDateRange, investmentTypeFilter, investmentMap, investmentTypes]);
 
   const totals = useMemo(() => {
     const buyTotal = filteredOperations
@@ -557,7 +559,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
         {/* ── Fecha ─────────────────────────────────────────────────────── */}
         <div className="iot-filter-group">
           <span className="iot-filter-label">Fecha</span>
-          <div className="iot-pill-row">
+          <div className="iot-pill-row" role="group" aria-label="Fecha">
             {([
               { value: 'ALL',           label: 'Todo' },
               { value: 'THIS_MONTH',    label: 'Este mes' },
@@ -569,7 +571,8 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
               <button
                 key={value}
                 type="button"
-                className={`iot-preset-btn${datePreset === value ? ' active' : ''}`}
+                className={`investment-type-filter-button${datePreset === value ? ' active' : ''}`}
+                aria-pressed={datePreset === value}
                 onClick={() => setDatePreset(value)}
               >
                 {label}
@@ -595,24 +598,27 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
         {/* ── Tipo operación ─────────────────────────────────────────────── */}
         <div className="iot-filter-group">
           <span className="iot-filter-label">Operación</span>
-          <div className="iot-pill-row">
+          <div className="iot-pill-row" role="group" aria-label="Operación">
             <button
               type="button"
-              className={`iot-preset-btn${operationFilter === 'ALL' ? ' active' : ''}`}
+              className={`investment-type-filter-button${operationFilter === 'ALL' ? ' active' : ''}`}
+              aria-pressed={operationFilter === 'ALL'}
               onClick={() => setOperationFilter('ALL')}
             >
               📊 Todas
             </button>
             <button
               type="button"
-              className={`iot-preset-btn iot-preset-btn--buy${operationFilter === 'BUY' ? ' active' : ''}`}
+              className={`investment-type-filter-button${operationFilter === 'BUY' ? ' active' : ''}`}
+              aria-pressed={operationFilter === 'BUY'}
               onClick={() => setOperationFilter('BUY')}
             >
               🔴 Compra
             </button>
             <button
               type="button"
-              className={`iot-preset-btn iot-preset-btn--sell${operationFilter === 'SELL' ? ' active' : ''}`}
+              className={`investment-type-filter-button${operationFilter === 'SELL' ? ' active' : ''}`}
+              aria-pressed={operationFilter === 'SELL'}
               onClick={() => setOperationFilter('SELL')}
             >
               🟢 Venta
@@ -621,33 +627,7 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
         </div>
 
         {/* ── Tipo inversión ─────────────────────────────────────────────── */}
-        <div className="iot-filter-group">
-          <span className="iot-filter-label">Instrumento</span>
-          <div className="iot-pill-row">
-            <button
-              type="button"
-              className={`iot-preset-btn${investmentTypeFilter === 'ALL' ? ' active' : ''}`}
-              onClick={() => setInvestmentTypeFilter('ALL')}
-            >
-              ✨ Todos
-            </button>
-            {investmentTypes.map((type) => {
-              const visual = getInvestmentTypeVisual(type.code, type.name);
-              const isActive = investmentTypeFilter === String(type.id);
-              return (
-                <button
-                  key={type.id}
-                  type="button"
-                  className={`iot-preset-btn iot-preset-btn--type${isActive ? ' active' : ''}`}
-                  style={isActive ? { background: visual.background, color: visual.color, borderColor: visual.color } : undefined}
-                  onClick={() => setInvestmentTypeFilter(isActive ? 'ALL' : String(type.id))}
-                >
-                  {visual.emoji} {type.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <InvestmentTypeFilter options={investmentTypes} selected={investmentTypeFilter} onChange={setInvestmentTypeFilter} />
 
         {/* ── Limpiar ────────────────────────────────────────────────────── */}
         <button
@@ -658,10 +638,10 @@ export const InvestmentOperationsTable: React.FC<Props> = ({ token, onUnauthoriz
             setCustomFromDate('');
             setCustomToDate('');
             setOperationFilter('ALL');
-            setInvestmentTypeFilter('ALL');
+            setInvestmentTypeFilter([]);
           }}
         >
-          ✕ Limpiar
+          Limpiar filtros
         </button>
       </div>
 

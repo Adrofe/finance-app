@@ -83,46 +83,6 @@
   gap: 6px;
 }
 
-.iot-preset-btn {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--pill, #f0f4f8);
-  color: #30506a;
-  padding: 5px 14px;
-  font: inherit;
-  font-size: 0.84rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
-  white-space: nowrap;
-}
-
-.iot-preset-btn:hover {
-  background: #dceeff;
-  border-color: #aac8e8;
-}
-
-.iot-preset-btn.active {
-  background: var(--brand, #0f6bb4);
-  border-color: var(--brand, #0f6bb4);
-  color: #fff;
-  box-shadow: 0 3px 10px rgba(15, 107, 180, 0.25);
-}
-
-/* BUY variant – active = red */
-.iot-preset-btn--buy.active {
-  background: #b91c1c;
-  border-color: #b91c1c;
-  box-shadow: 0 3px 10px rgba(185, 28, 28, 0.25);
-}
-
-/* SELL variant – active = green */
-.iot-preset-btn--sell.active {
-  background: #166534;
-  border-color: #166534;
-  box-shadow: 0 3px 10px rgba(22, 101, 52, 0.22);
-}
-
 /* Custom date sub-row */
 .iot-custom-dates {
   display: flex;
@@ -733,11 +693,6 @@
 
   .iot-pill-row {
     gap: 4px;
-  }
-
-  .iot-preset-btn {
-    font-size: 0.8rem;
-    padding: 4px 10px;
   }
 
   .iot-btn-add {

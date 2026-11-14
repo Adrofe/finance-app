@@ -8,6 +8,7 @@ import {
 } from '../constants/visualConfig';
 import type { CatalogOption, ExposureSuggestion, InvestmentInstrument, InvestmentInstrumentExposure, InvestmentPlatform, InvestmentType, PriceQuotePreview } from '../types/investments';
 import './investment-catalog.css';
+import { InvestmentTypeFilter } from './InvestmentTypeFilter';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -128,6 +129,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [manualError, setManualError]           = useState<string | null>(null);
   const [searchQuery, setSearchQuery]           = useState('');
+  const [selectedTypeCodes, setSelectedTypeCodes] = useState<string[]>([]);
   const [sortKey, setSortKey]                   = useState<SortColKey>('name');
   const [sortDir, setSortDir]                   = useState<'asc' | 'desc'>('asc');
   const [regionSuggestions, setRegionSuggestions] = useState<ExposureSuggestion[]>([]);
@@ -198,7 +200,8 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
   const filteredInstruments = useMemo(() => {
     const q = searchQuery.toLowerCase();
     const list = instruments.filter(i =>
-      !q ||
+      (selectedTypeCodes.length === 0 || selectedTypeCodes.includes(types.find(t => t.id === i.typeId)?.code ?? '')) &&
+      (!q ||
       i.name.toLowerCase().includes(q) ||
       i.symbol.toLowerCase().includes(q) ||
       i.code.toLowerCase().includes(q) ||
@@ -206,7 +209,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
       (i.regionName ?? i.regionCode ?? '').toLowerCase().includes(q) ||
       (i.sectorName ?? i.sectorCode ?? '').toLowerCase().includes(q) ||
       (i.industryName ?? i.industryCode ?? '').toLowerCase().includes(q) ||
-      (types.find(t => t.id === i.typeId)?.name ?? '').toLowerCase().includes(q)
+      (types.find(t => t.id === i.typeId)?.name ?? '').toLowerCase().includes(q))
     );
     return [...list].sort((a, b) => {
       const av = sortKey === 'symbol'   ? a.symbol
@@ -229,7 +232,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                : b.name;
       return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
     });
-  }, [instruments, searchQuery, sortKey, sortDir, types]);
+  }, [instruments, searchQuery, sortKey, sortDir, types, selectedTypeCodes]);
 
   const filteredPlatforms = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -837,21 +840,9 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
           <span className="ict-kpi-label">Total activos</span>
           <strong className="ict-kpi-value">{instruments.length}</strong>
           <span className="ict-kpi-sub">
-            {searchQuery ? `${filteredInstruments.length} visibles` : 'instrumentos'}
+            {searchQuery || selectedTypeCodes.length ? `${filteredInstruments.length} visibles` : 'instrumentos'}
           </span>
         </article>
-        {types.map(t => {
-          const count = instruments.filter(i => i.typeId === t.id).length;
-          const visual = getInvestmentTypeVisual(t.code, t.name);
-          return (
-            <article key={t.id} className="ict-kpi" style={{ borderLeftColor: visual.color }}>
-              <span className="ict-kpi-icon">{visual.emoji}</span>
-              <span className="ict-kpi-label">{t.name}</span>
-              <strong className="ict-kpi-value">{count}</strong>
-              <span className="ict-kpi-sub">{t.code}</span>
-            </article>
-          );
-        })}
         <article className="ict-kpi ict-kpi--platforms">
           <span className="ict-kpi-icon">🏦</span>
           <span className="ict-kpi-label">Plataformas</span>
@@ -859,6 +850,10 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
           <span className="ict-kpi-sub">brokers / custodios</span>
         </article>
       </div>
+
+      {section === 'instruments' && (
+        <InvestmentTypeFilter options={types.map(type => ({ ...type, count: instruments.filter(instrument => instrument.typeId === type.id).length }))} selected={selectedTypeCodes} onChange={setSelectedTypeCodes} />
+      )}
 
       {/* ── Toolbar ──────────────────────────────────────────────────────── */}
       <div className="ict-toolbar">
@@ -877,6 +872,11 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
           />
         </div>
         <div className="ict-toolbar-actions">
+          {(searchQuery || (section === 'instruments' && selectedTypeCodes.length > 0)) && (
+            <button type="button" className="ict-btn-refresh" onClick={() => { setSearchQuery(''); setSelectedTypeCodes([]); }}>
+              Limpiar filtros
+            </button>
+          )}
           {section === 'instruments' && (
             <button
               type="button"
@@ -1731,7 +1731,7 @@ export const InvestmentCatalogTable: React.FC<Props> = ({ token, onUnauthorized 
                 <tr><td colSpan={16} className="ict-empty">
                   {instruments.length === 0
                     ? 'No hay activos. Añade uno para empezar.'
-                    : 'Ningún activo coincide con la búsqueda.'}
+                    : 'Ningún activo coincide con los filtros.'}
                 </td></tr>
               )}
               {filteredInstruments.map(instr => {

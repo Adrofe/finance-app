@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import type { ExchangeRateEntry } from '../types/investments';
 import {
@@ -31,10 +31,11 @@ const fmtDateDdMmYyyy = (isoDate: string | undefined) => {
 };
 
 export function ExchangeRatesPanel({ token, onUnauthorized }: Props) {
+  const [defaultRange] = useState(() => ({ from: ninetyDaysAgoIso(), to: todayIso() }));
   const [fromCurrency, setFromCurrency] = useState('EUR');
   const [toCurrency, setToCurrency] = useState('USD');
-  const [fromDate, setFromDate] = useState(ninetyDaysAgoIso());
-  const [toDate, setToDate] = useState(todayIso());
+  const [fromDate, setFromDate] = useState(defaultRange.from);
+  const [toDate, setToDate] = useState(defaultRange.to);
 
   const [rows, setRows] = useState<ExchangeRateEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,8 +47,10 @@ export function ExchangeRatesPanel({ token, onUnauthorized }: Props) {
   const [manualSource, setManualSource] = useState('MANUAL');
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const requestId = useRef(0);
 
   const loadRates = useCallback(async () => {
+    const currentRequest = ++requestId.current;
     setLoading(true);
     setError(null);
     try {
@@ -57,8 +60,9 @@ export function ExchangeRatesPanel({ token, onUnauthorized }: Props) {
         from: fromDate,
         to: toDate,
       });
-      setRows(data);
+      if (currentRequest === requestId.current) setRows(data);
     } catch (err: unknown) {
+      if (currentRequest !== requestId.current) return;
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         onUnauthorized?.('Session expired or invalid token. Please login again.');
         return;
@@ -67,13 +71,15 @@ export function ExchangeRatesPanel({ token, onUnauthorized }: Props) {
         || (err as { message?: string })?.message
         || 'Error loading exchange rates');
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
   }, [fromCurrency, toCurrency, fromDate, toDate, token, onUnauthorized]);
 
   useEffect(() => {
     loadRates();
   }, [loadRates]);
+
+  useEffect(() => () => { requestId.current += 1; }, []);
 
   const latest = useMemo(() => rows[0], [rows]);
 
@@ -181,7 +187,7 @@ export function ExchangeRatesPanel({ token, onUnauthorized }: Props) {
           <h4 className="fx-card-title">🔍 Filtro histórico</h4>
           <div className="fx-form-grid">
             <label className="fx-label">
-              <span>From</span>
+              <span>Divisa origen</span>
               <input
                 className="fx-input fx-input--currency"
                 value={fromCurrency}
@@ -190,7 +196,7 @@ export function ExchangeRatesPanel({ token, onUnauthorized }: Props) {
               />
             </label>
             <label className="fx-label">
-              <span>To</span>
+              <span>Divisa destino</span>
               <input
                 className="fx-input fx-input--currency"
                 value={toCurrency}
@@ -207,9 +213,19 @@ export function ExchangeRatesPanel({ token, onUnauthorized }: Props) {
               <input className="fx-input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
             </label>
           </div>
-          <button type="button" className="fx-btn fx-btn--primary" onClick={loadRates} disabled={loading}>
-            {loading ? '⏳ Cargando…' : '↻ Recargar histórico'}
-          </button>
+          <div className="fx-actions">
+            <button type="button" className="fx-btn fx-btn--primary" onClick={loadRates} disabled={loading}>
+              {loading ? '⏳ Cargando…' : '↻ Recargar histórico'}
+            </button>
+            <button type="button" className="fx-btn fx-btn--secondary" disabled={fromCurrency === 'EUR' && toCurrency === 'USD' && fromDate === defaultRange.from && toDate === defaultRange.to} onClick={() => {
+              setFromCurrency('EUR');
+              setToCurrency('USD');
+              setFromDate(defaultRange.from);
+              setToDate(defaultRange.to);
+            }}>
+              Limpiar filtros
+            </button>
+          </div>
         </section>
 
         <section className="fx-card">
