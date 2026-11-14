@@ -2,7 +2,7 @@
 import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import axios from 'axios';
 import type { CreateTransactionRequest, Transaction, TaxType } from '../types/banking';
-import { CatalogService, Account, Tag, Merchant, TransactionCategory, TransactionStatus, TransactionType } from '../services/catalogService';
+import { CatalogService, Account, Tag, Merchant, TransactionCategory, TransactionType } from '../services/catalogService';
 import { getCategoryVisual, getMerchantLogo, getInstitutionLogo, sortCategoryParents } from '../constants/visualConfig';
 import './CreateTransactionModal.css';
 
@@ -37,15 +37,15 @@ export function CreateTransactionModal({
   hideDestinationAccount = false,
   lockAmount = false,
   lockBookingDate = false,
-  lockValueDate = false,
   onSubmitTransaction,
 }: CreateTransactionModalProps) {
   // Form state
+  const [isTransfer, setIsTransfer] = useState(false);
   const [sourceAccountId, setSourceAccountId] = useState<number | undefined>(initialValues?.sourceAccountId);
   const [destinationAccountId, setDestinationAccountId] = useState<number | undefined>(initialValues?.destinationAccountId);
   const [amount, setAmount] = useState<string>(initialValues?.amount != null ? String(initialValues.amount) : '');
   const [bookingDate, setBookingDate] = useState<string>(toInputDate(initialValues?.bookingDate) || new Date().toISOString().split('T')[0]);
-  const [valueDate, setValueDate] = useState<string>(toInputDate(initialValues?.valueDate));
+  const valueDate = toInputDate(initialValues?.valueDate);
   const [description, setDescription] = useState<string>(initialValues?.description || '');
   const [categoryId, setCategoryId] = useState<number | undefined>(initialValues?.categoryId);
   const [merchantId, setMerchantId] = useState<number | undefined>(initialValues?.merchantId);
@@ -55,7 +55,6 @@ export function CreateTransactionModal({
   // Catalogs
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
-  const [statuses, setStatuses] = useState<TransactionStatus[]>([]);
   const [types, setTypes] = useState<TransactionType[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
@@ -69,6 +68,8 @@ export function CreateTransactionModal({
   // Account dropdown state
   const [sourceAccountOpen, setSourceAccountOpen] = useState(false);
   const [destinationAccountOpen, setDestinationAccountOpen] = useState(false);
+  const [sourceAccountSearch, setSourceAccountSearch] = useState('');
+  const [destinationAccountSearch, setDestinationAccountSearch] = useState('');
   const sourceAccountRef = useRef<HTMLDivElement>(null);
   const destinationAccountRef = useRef<HTMLDivElement>(null);
 
@@ -93,6 +94,7 @@ export function CreateTransactionModal({
   const [roundingEnabled, setRoundingEnabled] = useState(false);
   const [roundingAccountId, setRoundingAccountId] = useState<number | undefined>();
   const [roundingAccountOpen, setRoundingAccountOpen] = useState(false);
+  const [roundingAccountSearch, setRoundingAccountSearch] = useState('');
   const roundingAccountRef = useRef<HTMLDivElement>(null);
   // Loading states
   const [loading, setLoading] = useState(false);
@@ -113,7 +115,6 @@ export function CreateTransactionModal({
     ]).then(([accs, cats, stats, typs, tgs, merch, taxTypesData]) => {
       setAccounts(accs);
       setCategories(cats);
-      setStatuses(stats);
       setTypes(typs);
       setTags(tgs);
       setMerchants(merch);
@@ -163,6 +164,12 @@ export function CreateTransactionModal({
   const selectedSourceAccount = accounts.find(a => a.id === sourceAccountId);
   const selectedDestinationAccount = accounts.find(a => a.id === destinationAccountId);
   const currency = selectedSourceAccount?.currency;
+  const filterAccounts = (query: string, excludedId?: number) => {
+    const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const search = normalize(query.trim());
+    return accounts.filter(account => account.id !== excludedId &&
+      normalize(`${account.name} ${account.institutionName || ''}`).includes(search));
+  };
 
   const renderInstitutionLogo = (institutionName?: string) => {
     const logo = getInstitutionLogo(institutionName || '');
@@ -196,6 +203,7 @@ export function CreateTransactionModal({
   }, {});
 
   const selectedCategory = categories.find(c => c.id === categoryId);
+  const internalTransferCategory = categories.find(c => c.name.toLowerCase() === 'internal transfers' || (c.code ?? '').toUpperCase() === 'INT');
 
   const filteredParents = parentCategories.filter(p => {
     if (!categorySearch.trim()) return true;
@@ -278,10 +286,11 @@ export function CreateTransactionModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sourceAccountId || !amount || !bookingDate) return;
+    if (isTransfer && (!destinationAccountId || destinationAccountId === sourceAccountId || !internalTransferCategory || Number(amount) <= 0)) return;
 
     setLoading(true);
     try {
-      const amountNum = parseFloat(amount);
+      const amountNum = isTransfer ? -Math.abs(parseFloat(amount)) : parseFloat(amount);
 
       let typeId: number | undefined;
       if (sourceAccountId && destinationAccountId) {
@@ -297,12 +306,12 @@ export function CreateTransactionModal({
         destinationAccountId,
         amount: amountNum,
         bookingDate: `${bookingDate}T00:00:00`,
-        valueDate: `${(valueDate || bookingDate)}T00:00:00`,
+        valueDate: `${(isTransfer ? bookingDate : valueDate || bookingDate)}T00:00:00`,
         currency,
-        description: description || undefined,
-        merchantId,
-        categoryId,
-        tagIds: selectedTags.length > 0 ? selectedTags : undefined,
+        description: isTransfer ? 'Transferencia Interna' : description || undefined,
+        merchantId: isTransfer ? undefined : merchantId,
+        categoryId: isTransfer ? internalTransferCategory?.id : categoryId,
+        tagIds: !isTransfer && selectedTags.length > 0 ? selectedTags : undefined,
         statusId,
         typeId,
       };
@@ -311,7 +320,7 @@ export function CreateTransactionModal({
       const createdTransaction = await createTransaction(accessToken, transaction);
 
       // Save tax withholding if enabled
-      if (hasTax && createdTransaction.id && taxGross && taxAmount && taxTypeId) {
+      if (!isTransfer && hasTax && createdTransaction.id && taxGross && taxAmount && taxTypeId) {
         await CatalogService.saveTransactionTax(accessToken, createdTransaction.id, {
           grossAmount: parseFloat(taxGross),
           taxAmount: parseFloat(taxAmount),
@@ -321,7 +330,7 @@ export function CreateTransactionModal({
       }
 
       // Rounding transfer
-      if (roundingEnabled && roundingAccountId) {
+      if (!isTransfer && roundingEnabled && roundingAccountId) {
         const absAmount = Math.abs(amountNum);
         const roundUp = parseFloat((Math.ceil(absAmount) - absAmount).toFixed(2));
         if (roundUp >= 0.01) {
@@ -416,6 +425,16 @@ export function CreateTransactionModal({
 
         <form onSubmit={handleSubmit}>
           <div className="transaction-modal-body">
+            {!hideDestinationAccount && (
+              <div className="ctm-mode-switch" role="group" aria-label="Tipo de transacción">
+                <button type="button" className={!isTransfer ? 'active' : ''} aria-pressed={!isTransfer} onClick={() => setIsTransfer(false)}>Transacción</button>
+                <button type="button" className={isTransfer ? 'active' : ''} aria-pressed={isTransfer} onClick={() => {
+                  setIsTransfer(true);
+                  if (destinationAccountId === sourceAccountId) setDestinationAccountId(undefined);
+                  if (amount && Number(amount) < 0) setAmount(String(Math.abs(Number(amount))));
+                }}>Transferencia interna</button>
+              </div>
+            )}
             <div className="form-grid">
 
               {/* Accounts */}
@@ -428,7 +447,8 @@ export function CreateTransactionModal({
                     id="sourceAccount"
                     type="button"
                     className={'form-input account-select-trigger' + (sourceAccountOpen ? ' active' : '')}
-                    onClick={() => setSourceAccountOpen(v => !v)}
+                    aria-expanded={sourceAccountOpen}
+                    onClick={() => { setSourceAccountSearch(''); setSourceAccountOpen(v => !v); }}
                   >
                     {selectedSourceAccount ? (
                       <span className="account-option">
@@ -446,20 +466,22 @@ export function CreateTransactionModal({
 
                   {sourceAccountOpen && (
                     <div className="dropdown-results">
-                      {accounts.map(acc => (
-                        <div
+                      <input className="ctm-account-search" type="search" placeholder="Buscar cuenta o banco..." aria-label="Buscar cuenta de origen" value={sourceAccountSearch} onChange={e => setSourceAccountSearch(e.target.value)} autoFocus />
+                      {filterAccounts(sourceAccountSearch).map(acc => (
+                        <button
+                          type="button"
                           key={acc.id}
                           className={'dropdown-item' + (sourceAccountId === acc.id ? ' selected' : '')}
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => { setSourceAccountId(acc.id); setSourceAccountOpen(false); }}
+                          onClick={() => { setSourceAccountId(acc.id); if (isTransfer && destinationAccountId === acc.id) setDestinationAccountId(undefined); if (roundingAccountId === acc.id) setRoundingAccountId(undefined); setSourceAccountOpen(false); }}
                         >
                           <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
                           <span className="account-info">
                             <span className="account-name">{acc.name}</span>
                             <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
                           </span>
-                        </div>
+                        </button>
                       ))}
+                      {filterAccounts(sourceAccountSearch).length === 0 && <div className="dropdown-no-results">No hay cuentas que coincidan</div>}
                     </div>
                   )}
                 </div>
@@ -467,13 +489,14 @@ export function CreateTransactionModal({
 
               {!hideDestinationAccount && (
                 <div className="form-group">
-                  <label htmlFor="destinationAccount" className="form-label">Cuenta Destino</label>
+                  <label htmlFor="destinationAccount" className="form-label">Cuenta Destino {isTransfer && <span className="required">*</span>}</label>
                   <div className="searchable-dropdown" ref={destinationAccountRef}>
                     <button
                       id="destinationAccount"
                       type="button"
                       className={'form-input account-select-trigger' + (destinationAccountOpen ? ' active' : '')}
-                      onClick={() => setDestinationAccountOpen(v => !v)}
+                      aria-expanded={destinationAccountOpen}
+                      onClick={() => { setDestinationAccountSearch(''); setDestinationAccountOpen(v => !v); }}
                     >
                       {selectedDestinationAccount ? (
                         <span className="account-option">
@@ -491,9 +514,10 @@ export function CreateTransactionModal({
 
                     {destinationAccountOpen && (
                       <div className="dropdown-results">
-                        <div
+                        <input className="ctm-account-search" type="search" placeholder="Buscar cuenta o banco..." aria-label="Buscar cuenta de destino" value={destinationAccountSearch} onChange={e => setDestinationAccountSearch(e.target.value)} autoFocus />
+                        {!isTransfer && !destinationAccountSearch && <button
+                          type="button"
                           className={'dropdown-item' + (!destinationAccountId ? ' selected' : '')}
-                          onMouseDown={e => e.preventDefault()}
                           onClick={() => { setDestinationAccountId(undefined); setDestinationAccountOpen(false); }}
                         >
                           <span className="account-logo">🏦</span>
@@ -501,12 +525,12 @@ export function CreateTransactionModal({
                             <span className="account-name">Sin cuenta destino</span>
                             <span className="account-bank">Opcional</span>
                           </span>
-                        </div>
-                        {accounts.map(acc => (
-                          <div
+                        </button>}
+                        {filterAccounts(destinationAccountSearch, isTransfer ? sourceAccountId : undefined).map(acc => (
+                          <button
+                            type="button"
                             key={acc.id}
                             className={'dropdown-item' + (destinationAccountId === acc.id ? ' selected' : '')}
-                            onMouseDown={e => e.preventDefault()}
                             onClick={() => { setDestinationAccountId(acc.id); setDestinationAccountOpen(false); }}
                           >
                             <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
@@ -514,8 +538,9 @@ export function CreateTransactionModal({
                               <span className="account-name">{acc.name}</span>
                               <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
                             </span>
-                          </div>
+                          </button>
                         ))}
+                        {filterAccounts(destinationAccountSearch, isTransfer ? sourceAccountId : undefined).length === 0 && <div className="dropdown-no-results">No hay cuentas que coincidan</div>}
                       </div>
                     )}
                   </div>
@@ -531,6 +556,7 @@ export function CreateTransactionModal({
                   id="amount"
                   type="number"
                   step="0.01"
+                  min={isTransfer ? '0.01' : undefined}
                   className="form-input"
                   value={amount}
                   onChange={e => {
@@ -545,24 +571,10 @@ export function CreateTransactionModal({
                 {currency && <span className="currency-badge">{currency}</span>}
               </div>
 
-              <div className="form-group">
-                <label htmlFor="status" className="form-label">Estado</label>
-                <select
-                  id="status"
-                  className="form-input"
-                  value={statusId || ''}
-                  onChange={e => setStatusId(Number(e.target.value))}
-                >
-                  {statuses.map(s => (
-                    <option key={s.id} value={s.id}>{s.code}</option>
-                  ))}
-                </select>
-              </div>
-
               {/* Dates */}
               <div className="form-group">
                 <label htmlFor="bookingDate" className="form-label">
-                  Fecha de Reserva <span className="required">*</span>
+                  {isTransfer ? 'Fecha' : 'Fecha de Reserva'} <span className="required">*</span>
                 </label>
                 <input
                   id="bookingDate"
@@ -575,19 +587,7 @@ export function CreateTransactionModal({
                 />
               </div>
 
-              <div className="form-group">
-                <label htmlFor="valueDate" className="form-label">Fecha de Valor</label>
-                <input
-                  id="valueDate"
-                  type="date"
-                  className="form-input"
-                  value={valueDate}
-                  onChange={e => setValueDate(e.target.value)}
-                  disabled={lockValueDate}
-                />
-                <small className="form-hint">Por defecto se usa la fecha de reserva</small>
-              </div>
-
+              {!isTransfer && <>
               {/* Category Picker */}
               <div className="form-group" ref={categoryPickerRef}>
                 <label className="form-label">Categoría</label>
@@ -836,6 +836,7 @@ export function CreateTransactionModal({
                 />
               </div>
 
+              <div className="ctm-options">
               {/* Tax withholding section — inline toggle row */}
               <div className="form-group full-width ctm-toggle-row">
                 <label className="form-label tax-toggle-label">
@@ -940,7 +941,8 @@ export function CreateTransactionModal({
                       <button
                         type="button"
                         className={'form-input account-select-trigger' + (roundingAccountOpen ? ' active' : '')}
-                        onClick={() => setRoundingAccountOpen(v => !v)}
+                        aria-expanded={roundingAccountOpen}
+                        onClick={() => { setRoundingAccountSearch(''); setRoundingAccountOpen(v => !v); }}
                       >
                         {roundingAccountId ? (() => {
                           const acc = accounts.find(a => a.id === roundingAccountId);
@@ -961,11 +963,12 @@ export function CreateTransactionModal({
 
                       {roundingAccountOpen && (
                         <div className="dropdown-results">
-                          {accounts.filter(a => a.id !== sourceAccountId).map(acc => (
-                            <div
+                          <input className="ctm-account-search" type="search" placeholder="Buscar cuenta o banco..." aria-label="Buscar cuenta de redondeo" value={roundingAccountSearch} onChange={e => setRoundingAccountSearch(e.target.value)} autoFocus />
+                          {filterAccounts(roundingAccountSearch, sourceAccountId).map(acc => (
+                            <button
+                              type="button"
                               key={acc.id}
                               className={'dropdown-item' + (roundingAccountId === acc.id ? ' selected' : '')}
-                              onMouseDown={e => e.preventDefault()}
                               onClick={() => { setRoundingAccountId(acc.id); setRoundingAccountOpen(false); }}
                             >
                               <span className="account-logo">{renderInstitutionLogo(acc.institutionName)}</span>
@@ -973,8 +976,9 @@ export function CreateTransactionModal({
                                 <span className="account-name">{acc.name}</span>
                                 <span className="account-bank">{acc.institutionName || 'Sin banco'}</span>
                               </span>
-                            </div>
+                            </button>
                           ))}
+                          {filterAccounts(roundingAccountSearch, sourceAccountId).length === 0 && <div className="dropdown-no-results">No hay cuentas que coincidan</div>}
                         </div>
                       )}
                     </div>
@@ -990,8 +994,11 @@ export function CreateTransactionModal({
                   </div>
                 )}
               </div>
+              </div>
 
+              </>}
             </div>
+            {isTransfer && !internalTransferCategory && <p className="ctm-error" role="alert">No se encuentra la categoría de transferencias internas.</p>}
           </div>
 
           <div className="modal-actions">
@@ -1001,10 +1008,10 @@ export function CreateTransactionModal({
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={loading || !sourceAccountId || !amount || !bookingDate}
+              disabled={loading || !sourceAccountId || !amount || !bookingDate || (isTransfer && (!destinationAccountId || destinationAccountId === sourceAccountId || !internalTransferCategory || Number(amount) <= 0))}
             >
               {loading && <span className="loading-spinner" />}
-              {loading ? 'Creando...' : (submitLabel || 'Crear Transacción')}
+              {loading ? 'Creando...' : (isTransfer ? 'Crear transferencia' : submitLabel || 'Crear Transacción')}
             </button>
           </div>
         </form>

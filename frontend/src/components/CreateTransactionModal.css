@@ -74,6 +74,40 @@
   min-height: 0;
 }
 
+.ctm-mode-switch {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 4px;
+  margin-bottom: 24px;
+  background: #f0f1f5;
+  border-radius: 8px;
+}
+
+.ctm-mode-switch button {
+  border: 0;
+  border-radius: 6px;
+  padding: 9px 14px;
+  background: transparent;
+  color: #555;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ctm-mode-switch button.active {
+  background: white;
+  color: #5142a0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+}
+
+.ctm-error {
+  color: #b42318;
+  font-size: 14px;
+}
+
+.transaction-modal .form-grid > .form-group {
+  margin-bottom: 0;
+}
+
 /* Make the form a flex column so the body can grow and scroll */
 .transaction-modal form {
   display: flex;
@@ -279,6 +313,32 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+button.dropdown-item {
+  width: 100%;
+  border: 0;
+  background: white;
+  text-align: left;
+  font: inherit;
+}
+
+.ctm-account-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid #e0e0e0;
+  background: white;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.ctm-account-search:focus {
+  outline: 2px solid #667eea;
+  outline-offset: -2px;
 }
 
 .dropdown-item:hover {
@@ -788,8 +848,21 @@
 /* ── Inline toggle rows ──────────────────────────────────────────────────── */
 .ctm-toggle-row {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.ctm-options {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.ctm-options > .ctm-toggle-row {
+  grid-column: auto;
 }
 
 .ctm-rounding-toggle-label {
@@ -824,6 +897,9 @@
 }
 
 @media (max-width: 768px) {
+  .ctm-options {
+    grid-template-columns: 1fr;
+  }
   .ctm-toggle-row {
     flex-direction: column;
     align-items: stretch;
