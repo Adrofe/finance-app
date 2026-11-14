@@ -160,6 +160,14 @@ export function CreateTransactionModal({
     return () => document.removeEventListener('mousedown', handle);
   }, []);
 
+  useEffect(() => {
+    const accountRef = sourceAccountOpen ? sourceAccountRef
+      : destinationAccountOpen ? destinationAccountRef
+      : roundingAccountOpen ? roundingAccountRef
+      : null;
+    accountRef?.current?.querySelector('.ctm-account-results')?.scrollIntoView({ block: 'nearest' });
+  }, [sourceAccountOpen, destinationAccountOpen, roundingAccountOpen]);
+
   // Currency from source account
   const selectedSourceAccount = accounts.find(a => a.id === sourceAccountId);
   const selectedDestinationAccount = accounts.find(a => a.id === destinationAccountId);
@@ -465,7 +473,7 @@ export function CreateTransactionModal({
                   </button>
 
                   {sourceAccountOpen && (
-                    <div className="dropdown-results">
+                    <div className="dropdown-results ctm-account-results">
                       <input className="ctm-account-search" type="search" placeholder="Buscar cuenta o banco..." aria-label="Buscar cuenta de origen" value={sourceAccountSearch} onChange={e => setSourceAccountSearch(e.target.value)} autoFocus />
                       {filterAccounts(sourceAccountSearch).map(acc => (
                         <button
@@ -513,7 +521,7 @@ export function CreateTransactionModal({
                     </button>
 
                     {destinationAccountOpen && (
-                      <div className="dropdown-results">
+                      <div className="dropdown-results ctm-account-results">
                         <input className="ctm-account-search" type="search" placeholder="Buscar cuenta o banco..." aria-label="Buscar cuenta de destino" value={destinationAccountSearch} onChange={e => setDestinationAccountSearch(e.target.value)} autoFocus />
                         {!isTransfer && !destinationAccountSearch && <button
                           type="button"
@@ -962,7 +970,7 @@ export function CreateTransactionModal({
                       </button>
 
                       {roundingAccountOpen && (
-                        <div className="dropdown-results">
+                        <div className="dropdown-results ctm-account-results">
                           <input className="ctm-account-search" type="search" placeholder="Buscar cuenta o banco..." aria-label="Buscar cuenta de redondeo" value={roundingAccountSearch} onChange={e => setRoundingAccountSearch(e.target.value)} autoFocus />
                           {filterAccounts(roundingAccountSearch, sourceAccountId).map(acc => (
                             <button
