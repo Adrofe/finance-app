@@ -36,10 +36,12 @@ function App() {
   const [bankingSubTab, setBankingSubTab] = useState<BankingSubTab>('dashboard');
   const [investmentsSubTab, setInvestmentsSubTab] = useState<InvestmentsSubTab>('dashboard');
   const [highlightTransactionId, setHighlightTransactionId] = useState<number | undefined>(undefined);
+  const [transactionAccountId, setTransactionAccountId] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     return addFinanceEventListener(FINANCE_EVENTS.NAVIGATE_TO_TRANSACTION, (e) => {
       const id = (e as CustomEvent<{ transactionId: number }>).detail.transactionId;
+      setTransactionAccountId(undefined);
       setActiveTab('banking');
       setBankingSubTab('transactions');
       setHighlightTransactionId(id);
@@ -68,7 +70,7 @@ function App() {
           </div>
         </div>
       )}
-      <AppHeader activeTab={activeTab} onSelectTab={setActiveTab} onLogout={() => logout('Logged out successfully.')} />
+      <AppHeader activeTab={activeTab} onSelectTab={(tab) => { setActiveTab(tab); if (tab !== 'banking') setTransactionAccountId(undefined); }} onLogout={() => logout('Logged out successfully.')} />
 
       {activeTab === 'banking' && (
         <section className="panel" aria-label="Banking tab">
@@ -77,7 +79,7 @@ function App() {
             <p>Review balance, accounts and transactions in one place.</p>
           </div>
 
-          <BankingSubTabs activeTab={bankingSubTab} onSelectTab={setBankingSubTab} />
+          <BankingSubTabs activeTab={bankingSubTab} onSelectTab={(tab) => { setBankingSubTab(tab); if (tab !== 'transactions') setTransactionAccountId(undefined); }} />
 
           {bankingSubTab === 'dashboard' && (
             <Dashboard
@@ -90,7 +92,11 @@ function App() {
           {bankingSubTab === 'accounts' && (
             <article className="sheet">
               <h3>Accounts</h3>
-              <AccountsTable token={accessToken} />
+              <AccountsTable token={accessToken} onViewTransactions={(accountId) => {
+                setHighlightTransactionId(undefined);
+                setTransactionAccountId(accountId);
+                setBankingSubTab('transactions');
+              }} />
             </article>
           )}
 
@@ -102,7 +108,7 @@ function App() {
               </div>
               {loading && items.length === 0 && <p className="state">Loading transactions...</p>}
               {error && <p className="state error">{error}</p>}
-              {(items.length > 0 || (!loading && !error)) && <TransactionsTable items={items} accessToken={accessToken} onRefresh={refresh} highlightTransactionId={highlightTransactionId} onClearHighlight={() => setHighlightTransactionId(undefined)} />}
+              {(items.length > 0 || (!loading && !error)) && <TransactionsTable items={items} accessToken={accessToken} onRefresh={refresh} initialAccountId={transactionAccountId} highlightTransactionId={highlightTransactionId} onClearHighlight={() => setHighlightTransactionId(undefined)} />}
             </article>
           )}
 

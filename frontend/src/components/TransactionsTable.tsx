@@ -20,6 +20,7 @@ type TransactionsTableProps = {
   items: Transaction[];
   accessToken: string;
   onRefresh?: () => void;
+  initialAccountId?: number;
   highlightTransactionId?: number;
   onClearHighlight?: () => void;
 };
@@ -141,7 +142,7 @@ function buildSearchRequest(
   };
 }
 
-export function TransactionsTable({ items, accessToken, onRefresh, highlightTransactionId, onClearHighlight }: TransactionsTableProps) {
+export function TransactionsTable({ items, accessToken, onRefresh, initialAccountId, highlightTransactionId, onClearHighlight }: TransactionsTableProps) {
   const {
     statusMap,
     typeMap,
@@ -163,8 +164,10 @@ export function TransactionsTable({ items, accessToken, onRefresh, highlightTran
   const [selected,        setSelected]          = useState<Set<number>>(new Set());
   const [confirm,         setConfirm]           = useState<ConfirmState | null>(null);
   const [deleting,        setDeleting]          = useState(false);
-  const [showFilters,     setShowFilters]       = useState(false);
-  const [filters,         setFilters]           = useState<TransactionFilters>(EMPTY_FILTERS);
+  const [showFilters,     setShowFilters]       = useState(initialAccountId != null);
+  const [filters,         setFilters]           = useState<TransactionFilters>(() => initialAccountId != null
+    ? { ...EMPTY_FILTERS, sourceAccountIds: [initialAccountId] }
+    : EMPTY_FILTERS);
   const [editingId,       setEditingId]         = useState<number | null>(null);
   const [editingTaxId,    setEditingTaxId]      = useState<number | null>(null);
   const [page,            setPage]              = useState(0);

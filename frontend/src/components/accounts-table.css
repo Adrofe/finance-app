@@ -248,6 +248,24 @@
   color: #111827;
 }
 
+.at-acc-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #2563eb;
+  text-align: left;
+  cursor: pointer;
+}
+
+.at-acc-link:hover {
+  text-decoration: underline;
+}
+
+.at-acc-link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
 /* ─── IBAN ────────────────────────────────────────────────────────────────── */
 
 .at-iban {

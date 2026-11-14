@@ -112,6 +112,7 @@ const AccountTypeDropdown: React.FC<AccountTypeDropdownProps> = ({ types, value,
 
 interface AccountsTableProps {
   token: string;
+  onViewTransactions: (accountId: number) => void;
 }
 
 type AccountSortField = 'institution' | 'name' | 'iban' | 'type' | 'realBalance' | 'availableBalance';
@@ -119,7 +120,7 @@ type AccountSortField = 'institution' | 'name' | 'iban' | 'type' | 'realBalance'
 const fmtBalance = (n: number, currency = 'EUR') =>
   n.toLocaleString('es-ES', { style: 'currency', currency, minimumFractionDigits: 2 });
 
-export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
+export const AccountsTable: React.FC<AccountsTableProps> = ({ token, onViewTransactions }) => {
   const { accounts, institutions, accountTypes, loading, error, createAccount, updateAccount, deleteAccount, clearError } = useAccounts(token);
   const [showForm, setShowForm] = React.useState(false);
   const [editingId, setEditingId] = React.useState<number | null>(null);
@@ -336,7 +337,7 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token }) => {
 
                 {/* Account name */}
                 <td className="at-td">
-                  <span className="at-acc-name">{acc.name}</span>
+                  <button type="button" className="at-acc-name at-acc-link" title="Ver transacciones de esta cuenta" onClick={() => onViewTransactions(acc.id)}>{acc.name}</button>
                 </td>
 
                 {/* IBAN */}
