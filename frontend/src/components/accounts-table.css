@@ -266,6 +266,19 @@
   outline-offset: 3px;
 }
 
+.at-account-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #475569;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.at-account-status input {
+  accent-color: #2563eb;
+}
+
 /* ─── IBAN ────────────────────────────────────────────────────────────────── */
 
 .at-iban {

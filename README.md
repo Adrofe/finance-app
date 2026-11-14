@@ -16,6 +16,8 @@ finance-app is a modular personal finance application built with Java Spring Boo
 - Environment variable management via .env files
 - Automated test configuration with H2 in-memory database
 
+Closed accounts can be deactivated and reactivated from the accounts table. Their transaction history remains available, but inactive accounts are excluded from current account totals and from new transaction and import selectors. Existing snapshots are not modified.
+
 ## How to Start All Systems
 
 1. **Prerequisites:**
@@ -78,7 +80,11 @@ Default local ports with this overlay:
 
 ## Testing
 
-WIP
+Run frontend tests with `npm --prefix frontend test`. Run the account service and history integration tests with:
+
+```bash
+mvn -pl banking -Dtest=AccountsServiceTest,AccountActivityIntegrationTest test
+```
 
 ## Production HTTPS Deployment (Recommended)
 

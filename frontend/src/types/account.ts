@@ -11,4 +11,7 @@ export interface Account {
   currency: string;
   lastBalanceReal?: number;
   lastBalanceAvailable?: number;
+  isActive?: boolean | null;
 }
+
+export const isAccountActive = (account: { isActive?: boolean | null }) => account.isActive !== false;

@@ -2,6 +2,7 @@
 import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import axios from 'axios';
 import type { CreateTransactionRequest, Transaction, TaxType } from '../types/banking';
+import { isAccountActive } from '../types/account';
 import { CatalogService, Account, Tag, Merchant, TransactionCategory, TransactionType } from '../services/catalogService';
 import { getCategoryVisual, getMerchantLogo, getInstitutionLogo, sortCategoryParents } from '../constants/visualConfig';
 import './CreateTransactionModal.css';
@@ -113,7 +114,7 @@ export function CreateTransactionModal({
       CatalogService.fetchMerchants(accessToken),
       CatalogService.fetchTaxTypes(accessToken),
     ]).then(([accs, cats, stats, typs, tgs, merch, taxTypesData]) => {
-      setAccounts(accs);
+      setAccounts(accs.filter(isAccountActive));
       setCategories(cats);
       setTypes(typs);
       setTags(tgs);

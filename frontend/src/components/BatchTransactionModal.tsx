@@ -11,6 +11,7 @@ import { createTransaction } from '../services/transactionsService';
 import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import { getInstitutionLogo, getCategoryVisual, getMerchantLogo, sortCategoryParents } from '../constants/visualConfig';
 import type { TaxType } from '../types/banking';
+import { isAccountActive } from '../types/account';
 import axios from 'axios';
 import './BatchTransactionModal.css';
 
@@ -191,7 +192,7 @@ export function BatchTransactionModal({ accessToken, onClose }: BatchTransaction
           CatalogService.fetchTags(accessToken),
           CatalogService.fetchMerchants(accessToken),
         ]);
-        setAccounts(accs);
+        setAccounts(accs.filter(isAccountActive));
         setCategories(cats);
         setTaxTypes(txts);
         setTxnTypes(typs);

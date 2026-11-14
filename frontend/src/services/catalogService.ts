@@ -18,6 +18,7 @@ export type Account = {
   currency?: string; 
   institutionName?: string; 
   institutionId?: number;
+  isActive?: boolean | null;
 };
 export type Tag = { id: number; name: string; description?: string };
 export type Merchant = { id: number; name: string; description?: string };

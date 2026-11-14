@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Account } from '../types/account';
+import { isAccountActive } from '../types/account';
 import { BankFormat, CsvImportResult, ImportError } from '../types/banking';
 import { fetchAccounts } from '../services/accountsService';
 import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
@@ -37,8 +38,9 @@ export const BankImportPanel: React.FC<BankImportPanelProps> = ({ token, onUnaut
     if (!token) return;
     fetchAccounts(token)
       .then((accs) => {
-        setAccounts(accs);
-        if (accs.length > 0) setAccountId(String(accs[0].id));
+        const activeAccounts = accs.filter(isAccountActive);
+        setAccounts(activeAccounts);
+        if (activeAccounts.length > 0) setAccountId(String(activeAccounts[0].id));
       })
       .catch((err) => {
         if (err?.response?.status === 401) onUnauthorized?.('Sesión expirada');

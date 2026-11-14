@@ -146,7 +146,9 @@ public class AccountsService {
         // Do not allow clients to set balances on update. Balances are computed
         // and maintained server-side via transactions. Ignore any balance fields
         // present in the incoming DTO to avoid inconsistencies.
-        existingAccount.setIsActive(updatedAccount.getIsActive());
+        if (updatedAccount.getIsActive() != null) {
+            existingAccount.setIsActive(updatedAccount.getIsActive());
+        }
     }
 
     private AccountType resolveAccountType(Long accountTypeId) {

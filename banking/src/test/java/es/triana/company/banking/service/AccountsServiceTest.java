@@ -12,12 +12,14 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import tools.jackson.databind.json.JsonMapper;
 
 import es.triana.company.banking.model.api.AccountDTO;
 import es.triana.company.banking.model.db.Account;
 import es.triana.company.banking.model.db.AccountType;
 import es.triana.company.banking.repository.AccountTypeRepository;
 import es.triana.company.banking.repository.AccountsRepository;
+import es.triana.company.banking.repository.TransactionRepository;
 import es.triana.company.banking.service.exception.AccountTypeNotFoundException;
 import es.triana.company.banking.service.exception.AccountNotFoundException;
 import es.triana.company.banking.service.exception.AccountValidationException;
@@ -35,6 +37,9 @@ class AccountsServiceTest {
 
     @Mock
     private AccountMapper accountMapper;
+
+    @Mock
+    private TransactionRepository transactionRepository;
 
     @InjectMocks
     private AccountsService accountsService;
@@ -200,6 +205,37 @@ class AccountsServiceTest {
         assertEquals(1L, result.getId());
         assertEquals(accountType, existingAccount.getAccountType());
         verify(accountsRepository, times(1)).save(existingAccount);
+    }
+
+    @Test
+    void testDeactivateReactivateAndEditAccountWithoutDeletingTransactions() {
+        Account account = Account.builder().id(1L).tenantId(1L).isActive(true).build();
+        AccountDTO update = AccountDTO.builder().id(1L).name("Account").currency("EUR").isActive(false).build();
+        when(accountsRepository.findById(1L)).thenReturn(Optional.of(account));
+        when(accountsRepository.save(account)).thenReturn(account);
+
+        accountsService.updateAccount(update, 1L);
+        assertEquals(Boolean.FALSE, account.getIsActive());
+
+        update.setIsActive(null);
+        accountsService.updateAccount(update, 1L);
+        assertEquals(Boolean.FALSE, account.getIsActive());
+
+        update.setIsActive(true);
+        accountsService.updateAccount(update, 1L);
+        assertEquals(Boolean.TRUE, account.getIsActive());
+        verifyNoInteractions(transactionRepository);
+        verify(accountsRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void testAccountActivityJsonRoundTrip() {
+        JsonMapper mapper = new JsonMapper();
+        AccountDTO account = AccountDTO.builder().id(1L).isActive(false).build();
+
+        String json = mapper.writeValueAsString(account);
+        assertTrue(json.contains("\"isActive\":false"));
+        assertEquals(Boolean.FALSE, mapper.readValue(json, AccountDTO.class).getIsActive());
     }
 
     @Test

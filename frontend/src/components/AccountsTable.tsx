@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAccounts } from '../hooks/useAccounts';
 import type { Account } from '../types/account';
+import { isAccountActive } from '../types/account';
 import type { Institution } from '../types/institution';
 import type { AccountType } from '../types/accountType';
 import { getInstitutionLogo } from '../constants/visualConfig';
@@ -125,6 +126,7 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token, onViewTrans
   const [showForm, setShowForm] = React.useState(false);
   const [editingId, setEditingId] = React.useState<number | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
+  const [updatingAccountId, setUpdatingAccountId] = React.useState<number | null>(null);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = React.useState<number | null>(null);
   const [confirmDeleteName, setConfirmDeleteName] = React.useState<string | null>(null);
@@ -171,8 +173,20 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token, onViewTrans
     }
   };
 
-  const totalReal  = accounts.reduce((s, a) => s + (typeof a.lastBalanceReal      === 'number' ? a.lastBalanceReal      : 0), 0);
-  const totalAvail  = accounts.reduce((s, a) => s + (typeof a.lastBalanceAvailable === 'number' ? a.lastBalanceAvailable : 0), 0);
+  const activeAccounts = accounts.filter(isAccountActive);
+  const totalReal  = activeAccounts.reduce((s, a) => s + (typeof a.lastBalanceReal      === 'number' ? a.lastBalanceReal      : 0), 0);
+  const totalAvail  = activeAccounts.reduce((s, a) => s + (typeof a.lastBalanceAvailable === 'number' ? a.lastBalanceAvailable : 0), 0);
+
+  const toggleAccountActive = async (account: Account) => {
+    setUpdatingAccountId(account.id);
+    try {
+      await updateAccount(account.id, { ...account, isActive: !isAccountActive(account) });
+    } catch {
+      return;
+    } finally {
+      setUpdatingAccountId(null);
+    }
+  };
 
   const sortedAccounts = React.useMemo(() => {
     if (!sortField) return accounts;
@@ -220,8 +234,8 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token, onViewTrans
       <div className="at-summary-bar">
         <div className="at-summary-stats">
           <div className="at-stat">
-            <span className="at-stat-label">Cuentas</span>
-            <span className="at-stat-value">{accounts.length}</span>
+            <span className="at-stat-label">Cuentas activas</span>
+            <span className="at-stat-value">{activeAccounts.length}</span>
           </div>
           <div className="at-stat at-stat--balance">
             <span className="at-stat-label">Balance real</span>
@@ -315,6 +329,7 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token, onViewTrans
               <th className="at-th" aria-sort={sortField === 'name' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn" onClick={() => toggleSort('name')}>Cuenta <span>{sortIndicator('name')}</span></button></th>
               <th className="at-th" aria-sort={sortField === 'iban' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn" onClick={() => toggleSort('iban')}>IBAN <span>{sortIndicator('iban')}</span></button></th>
               <th className="at-th" aria-sort={sortField === 'type' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn" onClick={() => toggleSort('type')}>Tipo <span>{sortIndicator('type')}</span></button></th>
+              <th className="at-th">Estado</th>
               <th className="at-th at-th--right" aria-sort={sortField === 'realBalance' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn at-sort-btn--right" onClick={() => toggleSort('realBalance')}>Balance real <span>{sortIndicator('realBalance')}</span></button></th>
               <th className="at-th at-th--right" aria-sort={sortField === 'availableBalance' ? `${sortDirection}ending` : 'none'}><button type="button" className="at-sort-btn at-sort-btn--right" onClick={() => toggleSort('availableBalance')}>Disponible <span>{sortIndicator('availableBalance')}</span></button></th>
               <th className="at-th at-th--actions" aria-label="Acciones"></th>
@@ -350,6 +365,20 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token, onViewTrans
                   {acc.accountTypeName
                     ? <span className="at-type-badge">{acc.accountTypeName}</span>
                     : <span className="at-empty">—</span>}
+                </td>
+
+                <td className="at-td">
+                  <label className="at-account-status">
+                    <input
+                      type="checkbox"
+                      checked={isAccountActive(acc)}
+                      disabled={updatingAccountId !== null}
+                      onChange={() => toggleAccountActive(acc)}
+                      aria-label={`${isAccountActive(acc) ? 'Desactivar' : 'Reactivar'} ${acc.name}`}
+                      title={isAccountActive(acc) ? 'Desactivar cuenta' : 'Reactivar cuenta'}
+                    />
+                    <span>{isAccountActive(acc) ? 'Activa' : 'Cerrada'}</span>
+                  </label>
                 </td>
 
                 {/* Balance real */}
@@ -418,7 +447,7 @@ export const AccountsTable: React.FC<AccountsTableProps> = ({ token, onViewTrans
             ))}
             {accounts.length === 0 && (
               <tr className="at-empty-row">
-                <td colSpan={7}>No hay cuentas registradas</td>
+                <td colSpan={8}>No hay cuentas registradas</td>
               </tr>
             )}
           </tbody>
