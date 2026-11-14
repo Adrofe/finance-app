@@ -452,13 +452,13 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                 >
                   <input
                     type="checkbox"
-                    hidden
+                    className="ttf-visually-hidden"
                     checked={isOn}
                     onChange={() => onChange({ ...filters, sourceAccountIds: toggle(filters.sourceAccountIds, acc.id) })}
                   />
                   {logoSrc.startsWith('/')
                     ? <img src={logoSrc} className="ttf-acc-logo" alt="" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    : <span className="ttf-acc-emoji">{logoSrc}</span>
+                    : <span className="ttf-acc-emoji" aria-hidden="true">{logoSrc}</span>
                   }
                   {acc.name}
                 </label>
@@ -482,7 +482,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                 >
                   <input
                     type="checkbox"
-                    hidden
+                    className="ttf-visually-hidden"
                     checked={isOn}
                     onChange={() => onChange({ ...filters, statusIds: toggle(filters.statusIds, s.id) })}
                   />
@@ -509,7 +509,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                 >
                   <input
                     type="checkbox"
-                    hidden
+                    className="ttf-visually-hidden"
                     checked={isOn}
                     onChange={() => onChange({ ...filters, typeIds: toggle(filters.typeIds, t.id) })}
                   />
@@ -535,7 +535,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                 >
                   <input
                     type="checkbox"
-                    hidden
+                    className="ttf-visually-hidden"
                     checked={filters.tagIds.includes(tag.id)}
                     onChange={() => onChange({ ...filters, tagIds: toggle(filters.tagIds, tag.id) })}
                   />

@@ -1,0 +1,60 @@
+:root {
+  --control-radius: 6px;
+  --control-focus: #2563eb;
+  --filter-padding: 7px 11px;
+  --filter-font-size: 13px;
+}
+
+button,
+.ttf-chip,
+.ttf-status-chip,
+.ttf-type-chip {
+  border-radius: var(--control-radius) !important;
+}
+
+.ttf-input,
+.twr-filter-select,
+.io-filter-select,
+.fx-controls .fx-input,
+.iot-custom-dates input,
+.idb-history-custom-dates input {
+  border-radius: var(--control-radius);
+}
+
+.db-preset-btn,
+.bdg-preset-btn,
+.ttf-year-pill,
+.ttf-chip,
+.ttf-status-chip,
+.ttf-type-chip {
+  padding: var(--filter-padding);
+  border-width: 1px;
+  font-size: var(--filter-font-size);
+}
+
+.w-chart-mode-toggle,
+.iot-type-toggle,
+.ict-section-toggle,
+.ttf-date-tabs,
+.db-view-toggle,
+.btm-mode-tabs,
+.tp-pie-toggle {
+  border-radius: 8px;
+}
+
+button:focus-visible,
+.ttf-chip:has(input:focus-visible),
+.ttf-status-chip:has(input:focus-visible),
+.ttf-type-chip:has(input:focus-visible) {
+  outline: 2px solid var(--control-focus);
+  outline-offset: 2px;
+}
+
+.ttf-chip,
+.ttf-status-chip,
+.ttf-type-chip {
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
