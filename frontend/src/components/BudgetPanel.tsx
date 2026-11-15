@@ -17,6 +17,7 @@ import { getCategoryVisual } from '../constants/visualConfig';
 import type {
   BudgetLineType,
   BudgetPeriod,
+  BudgetLinePeriod,
   BudgetPlanDTO,
   BudgetPlanLineRequest,
   BudgetPlanRequest,
@@ -93,6 +94,7 @@ const emptyLine = (lineType: BudgetLineType = 'EXPENSE'): BudgetPlanLineRequest 
   categoryCode: '',
   categoryName: '',
   budgetAmount: 0,
+  linePeriod: 'MONTHLY',
   lineType,
 });
 
@@ -110,6 +112,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
           categoryCode: line.categoryCode,
           categoryName: line.categoryName,
           budgetAmount: line.budgetAmount,
+          linePeriod: line.linePeriod ?? null,
           lineType: line.lineType,
         }))
       : [emptyLine('EXPENSE')]
@@ -176,7 +179,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
     setCategorySearch('');
   };
 
-  const updateLine = (i: number, field: keyof BudgetPlanLineRequest, value: string | number) => {
+  const updateLine = (i: number, field: keyof BudgetPlanLineRequest, value: string | number | null) => {
     setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [field]: value } : l));
   };
 
@@ -223,15 +226,21 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
                 onChange={e => setName(e.target.value)}
               />
             </div>
-            <div className="bdg-form-field">
-              <label>Periodicidad</label>
+            {initialPlan?.lines.some(line => !line.linePeriod) ? <div className="bdg-form-field">
+              <label>Periodicidad de partidas anteriores</label>
               <select className="bdg-input" value={period} onChange={e => setPeriod(e.target.value as BudgetPeriod)}>
                 <option value="MONTHLY">Mensual</option>
                 <option value="QUARTERLY">Trimestral</option>
                 <option value="ANNUAL">Anual</option>
                 <option value="CUSTOM">Personalizado</option>
               </select>
-            </div>
+            </div> : <div className="bdg-form-field">
+              <label htmlFor="budget-plan-validity">Vigencia del plan</label>
+              <select id="budget-plan-validity" className="bdg-input" value={period === 'CUSTOM' ? 'CUSTOM' : 'RECURRING'} onChange={event => setPeriod(event.target.value === 'CUSTOM' ? 'CUSTOM' : 'MONTHLY')}>
+                <option value="RECURRING">Sin fechas de fin</option>
+                <option value="CUSTOM">Fechas personalizadas</option>
+              </select>
+            </div>}
             <div className="bdg-form-field" style={{ gridColumn: '1 / -1' }}>
               <label>Descripción</label>
               <input
@@ -283,6 +292,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
             <div className="bdg-lines-row bdg-lines-head">
               <span>Categoría</span>
               <span>{lineTab === 'INCOME' ? 'Ingreso esperado' : 'Importe'}</span>
+              <span>Periodicidad</span>
               <span />
             </div>
             {visibleLines.length === 0 && (
@@ -331,6 +341,10 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
                     value={line.budgetAmount || ''}
                     onChange={e => updateLine(line._idx, 'budgetAmount', parseFloat(e.target.value) || 0)}
                   />
+                  <select className="bdg-input small" aria-label={`Periodicidad de ${selectedCat?.name || `partida ${line._idx + 1}`}`} value={line.linePeriod ?? ''} onChange={e => updateLine(line._idx, 'linePeriod', e.target.value || null)}>
+                    {(!line.linePeriod || initialPlan?.lines.some(original => original.categoryId === line.categoryId && original.lineType === line.lineType && !original.linePeriod)) && <option value="">Según plan</option>}
+                    {Object.entries(LINE_PERIOD_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
                   <button
                     type="button"
                     className="btn icon-btn danger"
