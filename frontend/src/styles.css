@@ -1586,6 +1586,8 @@ body {
 .bdg-month-warning { color: #b91c1c; font-weight: 600; }
 .bdg-period-note { display: block; margin-top: 4px; }
 .bdg-category-options { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.bdg-category-filter { display: inline-flex; align-items: center; gap: 7px; }
+.category-visual-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 26px; width: 26px; height: 26px; border-radius: 4px; font-size: 15px; }
 .bdg-category-selection { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; font-size: 0.9rem; }
 .bdg-monthly { margin: 20px 0; }
 .bdg-monthly h4 { margin: 0 0 12px; font-size: 1rem; }
@@ -1596,8 +1598,9 @@ body {
 .bdg-month-row[open] summary::before { content: '▾'; }
 .bdg-month-row summary strong { flex: 1 1 120px; text-transform: capitalize; }
 .bdg-month-row summary span { font-size: 0.85rem; }
-.bdg-month-lines .bdg-snap-line { border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; background: transparent; }
-.bdg-month-line-heading { display: block; padding: 10px 18px; color: var(--muted); font-size: 0.8rem; }
+.bdg-month-lines { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 12px; padding: 4px 0 16px; }
+.bdg-month-lines .bdg-snap-line { border-radius: 8px; box-shadow: none; }
+.bdg-month-line-heading { grid-column: 1 / -1; display: block; padding: 8px 0 0; color: var(--muted); font-size: 0.8rem; }
 
 /* ── Budget chart section ────────────────────────────────────────────────── */
 .bdg-chart-section {
@@ -1697,11 +1700,12 @@ body {
 
 /* ── Snapshot lines ─────────────────────────────────────────────────────── */
 .bdg-snap-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 12px;
 }
 .bdg-snap-line {
+  min-width: 0;
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -1724,9 +1728,10 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 .bdg-cat-icon { font-size: 1.3rem; }
-.bdg-cat-name { font-weight: 600; color: var(--ink); font-size: 0.95rem; }
+.bdg-cat-name { font-weight: 600; color: var(--ink); font-size: 0.95rem; overflow-wrap: anywhere; }
 .bdg-snap-line-amounts {
   display: flex;
   align-items: center;
@@ -1739,6 +1744,8 @@ body {
 .bdg-snap-line-footer {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
   font-size: 0.8rem;
 }
 .bdg-pct      { color: var(--muted); }

@@ -425,6 +425,12 @@ input[type="number"].ttf-input {
 
 /* Category emoji */
 .ttf-cat-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
   font-size: 15px;
   line-height: 1;
   flex-shrink: 0;

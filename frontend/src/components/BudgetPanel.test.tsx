@@ -6,6 +6,7 @@ import { Dashboard } from './Dashboard';
 import { fetchBudgetPlans, refreshBudgetSnapshot, setPrimaryBudgetPlan } from '../services/budgetService';
 import { fetchDashboardSummary, fetchSpendingByCategory, fetchTimeSeries } from '../services/dashboardService';
 import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
+import { getCategoryVisual } from '../constants/visualConfig';
 import type { BudgetPlanDTO, BudgetSnapshotDTO, BudgetSnapshotLineDTO } from '../types/budget';
 
 vi.mock('../services/budgetService', () => ({ fetchBudgetPlans: vi.fn(), refreshBudgetSnapshot: vi.fn(), setPrimaryBudgetPlan: vi.fn(), createBudgetPlan: vi.fn(), deleteBudgetPlan: vi.fn() }));
@@ -71,6 +72,13 @@ describe('budget detail', () => {
     expect(screen.getByText(/diciembre de 2025/i)).toBeTruthy();
     expect(screen.getByText(/enero de 2026/i)).toBeTruthy();
     expect(screen.getByText('1 mes excedido')).toBeTruthy();
+    const categoryButton = within(screen.getByRole('group', { name: 'Filtrar por categoría' })).getByRole('button', { name: 'Food' });
+    const visual = getCategoryVisual('FOOD.SHOP');
+    const icon = categoryButton.querySelector<HTMLElement>('.category-visual-icon')!;
+    const expectedColor = document.createElement('span');
+    expectedColor.style.color = visual.color;
+    expect(icon.textContent).toBe(visual.emoji);
+    expect(icon.style.color).toBe(expectedColor.style.color);
     fireEvent.change(screen.getByRole('combobox', { name: 'Año' }), { target: { value: '2025' } });
     expect(screen.queryByText(/enero de 2026/i)).toBeNull();
     expect(screen.getByText('170,00 €')).toBeTruthy();
@@ -90,6 +98,11 @@ describe('budget detail', () => {
     expect(region.getByText('320,00 €')).toBeTruthy();
     expect(region.getByText('280,00 €')).toBeTruthy();
     expect(region.getByText('40,00 €')).toBeTruthy();
+    const budget = screen.getByRole('region', { name: 'Presupuesto principal' });
+    const charts = screen.getByRole('heading', { name: 'Gastos por categoría' }).closest('.db-charts-grid')!;
+    const transactions = screen.getByRole('heading', { name: 'Últimas transacciones del periodo' });
+    expect(charts.compareDocumentPosition(budget) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(budget.compareDocumentPosition(transactions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(region.getByRole('button', { name: 'Ver presupuesto' }));
     expect(open).toHaveBeenCalledWith(1);
   });

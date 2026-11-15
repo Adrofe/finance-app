@@ -1,10 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { EMPTY_FILTERS, TransactionsFiltersPanel } from './TransactionsFiltersPanel';
+import { getCategoryVisual } from '../constants/visualConfig';
 
 afterEach(cleanup);
 
 describe('transaction filter controls', () => {
+  it('shows the corresponding visuals for parent and child categories', () => {
+    render(<TransactionsFiltersPanel filters={EMPTY_FILTERS} onChange={vi.fn()} accounts={[]} statuses={[]} types={[]} tags={[]} categories={[
+      { id: 1, name: 'Food', code: 'FOOD' },
+      { id: 2, name: 'Supermarket', code: 'FOOD.SUP', parentId: 1 },
+    ]} />);
+    for (const [name, code] of [['Food', 'FOOD'], ['Supermarket', 'FOOD.SUP']]) {
+      const icon = screen.getByRole('checkbox', { name: new RegExp(name) }).closest('label')!.querySelector<HTMLElement>('.ttf-cat-emoji')!;
+      const expected = document.createElement('span');
+      expected.style.color = getCategoryVisual(code).color;
+      expect(icon.textContent).toBe(getCategoryVisual(code).emoji);
+      expect(icon.style.color).toBe(expected.style.color);
+    }
+  });
   it('keeps account, status, type and tag filters keyboard-accessible', () => {
     const onChange = vi.fn();
     render(<TransactionsFiltersPanel

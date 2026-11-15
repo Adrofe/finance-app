@@ -382,7 +382,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
               const isParentSel = filters.parentCategoryIds.includes(parent.id);
               const selectedChildCount = children.filter(c => filters.categoryIds.includes(c.id)).length;
               const isIndeterminate = !isParentSel && selectedChildCount > 0;
-              const parentEmoji = getCategoryVisual(parent.code || parent.name).emoji;
+              const parentVisual = getCategoryVisual(parent.code || parent.name);
 
               return (
                 <div key={parent.id} className="ttf-cat-group">
@@ -394,13 +394,13 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                       ref={el => { if (el) el.indeterminate = isIndeterminate; }}
                       onChange={() => toggleParentCat(parent.id)}
                     />
-                    <span className="ttf-cat-emoji">{parentEmoji}</span>
+                    <span className="ttf-cat-emoji" style={{ color: parentVisual.color, background: `${parentVisual.color}22` }} aria-hidden="true">{parentVisual.emoji}</span>
                     <span className="ttf-cat-parent-name">{parent.name}</span>
                     <span className="ttf-cat-count">({children.length})</span>
                   </label>
                   <div className="ttf-cat-children">
                     {children.map(child => {
-                      const childEmoji = getCategoryVisual(child.code || child.name).emoji;
+                      const childVisual = getCategoryVisual(child.code || child.name);
                       return (
                         <label key={child.id} className="ttf-cat-child">
                           <input
@@ -409,7 +409,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                             checked={isParentSel || filters.categoryIds.includes(child.id)}
                             onChange={() => toggleChildCat(child.id, parent.id)}
                           />
-                          <span className="ttf-cat-emoji ttf-cat-emoji--child">{childEmoji}</span>
+                          <span className="ttf-cat-emoji ttf-cat-emoji--child" style={{ color: childVisual.color, background: `${childVisual.color}22` }} aria-hidden="true">{childVisual.emoji}</span>
                           <span>{child.name}</span>
                         </label>
                       );
@@ -420,7 +420,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
             })}
 
             {standaloneCategories.map(cat => {
-              const catEmoji = getCategoryVisual(cat.code || cat.name).emoji;
+              const visual = getCategoryVisual(cat.code || cat.name);
               return (
                 <label key={cat.id} className="ttf-cat-standalone">
                   <input
@@ -429,7 +429,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                     checked={filters.categoryIds.includes(cat.id) || filters.parentCategoryIds.includes(cat.id)}
                     onChange={() => onChange({ ...filters, categoryIds: toggle(filters.categoryIds, cat.id) })}
                   />
-                  <span className="ttf-cat-emoji">{catEmoji}</span>
+                  <span className="ttf-cat-emoji" style={{ color: visual.color, background: `${visual.color}22` }} aria-hidden="true">{visual.emoji}</span>
                   <span>{cat.name}</span>
                 </label>
               );

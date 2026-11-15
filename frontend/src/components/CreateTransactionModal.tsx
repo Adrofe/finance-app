@@ -212,6 +212,7 @@ export function CreateTransactionModal({
   }, {});
 
   const selectedCategory = categories.find(c => c.id === categoryId);
+  const selectedCategoryVisual = selectedCategory ? getCategoryVisual(selectedCategory.code || selectedCategory.name) : undefined;
   const internalTransferCategory = categories.find(c => c.name.toLowerCase() === 'internal transfers' || (c.code ?? '').toUpperCase() === 'INT');
 
   const filteredParents = parentCategories.filter(p => {
@@ -608,7 +609,7 @@ export function CreateTransactionModal({
                 >
                   {selectedCategory ? (
                     <span className="category-trigger-value">
-                      <span>{getCategoryVisual(selectedCategory.code || selectedCategory.name).emoji}</span>
+                      {selectedCategoryVisual && <span className="category-visual-icon" style={{ color: selectedCategoryVisual.color, background: `${selectedCategoryVisual.color}22` }} aria-hidden="true">{selectedCategoryVisual.emoji}</span>}
                       <span>
                         {selectedCategory.parentName
                           ? selectedCategory.parentName + ' › ' + selectedCategory.name
@@ -677,7 +678,7 @@ export function CreateTransactionModal({
                                 className={'category-parent-row' + (categoryId === parent.id ? ' selected' : '')}
                                 onClick={() => pickCategory(parent.id)}
                               >
-                                <span className="cat-emoji">{pv.emoji}</span>
+                                <span className="cat-emoji" style={{ color: pv.color, background: `${pv.color}22`, borderRadius: 4 }} aria-hidden="true">{pv.emoji}</span>
                                 <span className="cat-name">{parent.name}</span>
                                 {totalChildren > 0 && (
                                   <span className="cat-count">{totalChildren}</span>
@@ -691,7 +692,7 @@ export function CreateTransactionModal({
                                     className={'category-child-row' + (categoryId === child.id ? ' selected' : '')}
                                     onClick={() => pickCategory(child.id)}
                                   >
-                                    <span className="cat-emoji">{cv.emoji}</span>
+                                    <span className="cat-emoji" style={{ color: cv.color, background: `${cv.color}22`, borderRadius: 4 }} aria-hidden="true">{cv.emoji}</span>
                                     <span className="cat-name">{child.name}</span>
                                   </div>
                                 );

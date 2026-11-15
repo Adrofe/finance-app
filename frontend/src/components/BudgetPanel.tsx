@@ -39,25 +39,6 @@ const PERIOD_LABELS: Record<BudgetPeriod, string> = {
   CUSTOM: 'Personalizado',
 };
 
-const CATEGORY_EMOJIS: Record<string, string> = {
-  FOOD: '🍽️',
-  TRANS: '🚗',
-  HOUSE: '🏠',
-  HEALTH: '💊',
-  LEISURE: '🎬',
-  CLOTHES: '👗',
-  EDUCATION: '📚',
-  TECH: '💻',
-  TRAVEL: '✈️',
-  SAVINGS: '💰',
-  OTHER: '📦',
-};
-
-const getCategoryEmoji = (code: string): string => {
-  const prefix = code.split('.')[0].toUpperCase();
-  return CATEGORY_EMOJIS[prefix] ?? '📂';
-};
-
 const toISO = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 function today(): string {
@@ -311,6 +292,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
             )}
             {visibleLines.map((line) => {
               const selectedCat = categories.find(c => c.id === line.categoryId);
+              const selectedVisual = selectedCat ? getCategoryVisual(selectedCat.code || selectedCat.name) : undefined;
               const isPickerOpen = activePickerIdx === line._idx;
               return (
                 <div key={line._idx} className="bdg-lines-row">
@@ -325,7 +307,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
                   >
                     {selectedCat ? (
                       <span className="category-trigger-value">
-                        <span>{getCategoryVisual(selectedCat.code || selectedCat.name).emoji}</span>
+                        {selectedVisual && <span className="category-visual-icon" style={{ color: selectedVisual.color, background: `${selectedVisual.color}22` }} aria-hidden="true">{selectedVisual.emoji}</span>}
                         <span>
                           {selectedCat.parentName
                             ? selectedCat.parentName + ' › ' + selectedCat.name
@@ -413,7 +395,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
                             className={'category-parent-row' + (lines[activePickerIdx]?.categoryId === parent.id ? ' selected' : '')}
                             onClick={() => pickCategory(activePickerIdx, parent)}
                           >
-                            <span className="cat-emoji">{pv.emoji}</span>
+                            <span className="cat-emoji" style={{ color: pv.color, background: `${pv.color}22`, borderRadius: 4 }} aria-hidden="true">{pv.emoji}</span>
                             <span className="cat-name">{parent.name}</span>
                             {totalChildren > 0 && (
                               <span className="cat-count">{totalChildren}</span>
@@ -427,7 +409,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
                                 className={'category-child-row' + (lines[activePickerIdx]?.categoryId === child.id ? ' selected' : '')}
                                 onClick={() => pickCategory(activePickerIdx, child)}
                               >
-                                <span className="cat-emoji">{cv.emoji}</span>
+                                <span className="cat-emoji" style={{ color: cv.color, background: `${cv.color}22`, borderRadius: 4 }} aria-hidden="true">{cv.emoji}</span>
                                 <span className="cat-name">{child.name}</span>
                               </div>
                             );
@@ -464,6 +446,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
 /* ── Snapshot compliance line ────────────────────────────────────────────── */
 function SnapshotLine({ line, currency }: { line: BudgetSnapshotLineDTO; currency: string }) {
   const isIncome = line.lineType === 'INCOME';
+  const visual = getCategoryVisual(line.categoryCode);
   const progress = pct(line.spentAmount, line.budgetAmount);
   const over = isIncome
     ? line.spentAmount > line.budgetAmount   // income over = surplus (good)
@@ -473,7 +456,7 @@ function SnapshotLine({ line, currency }: { line: BudgetSnapshotLineDTO; currenc
     <div className="bdg-snap-line">
       <div className="bdg-snap-line-header">
         <div className="bdg-snap-line-cat">
-          <span className="bdg-cat-icon">{getCategoryEmoji(line.categoryCode)}</span>
+          <span className="category-visual-icon" style={{ color: visual.color, background: `${visual.color}22` }} aria-hidden="true">{visual.emoji}</span>
           <span className="bdg-cat-name">{line.categoryName || line.categoryCode}</span>
           {isIncome && <span className="bdg-type-tag income">ingreso</span>}
         </div>
@@ -628,12 +611,12 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
     const expenseLines = yearLines.filter(l => l.lineType !== 'INCOME');
     if (chartView === 'subcategory') {
       return expenseLines.map(l => ({
-        name: l.categoryName || l.categoryCode, key: String(l.categoryId ?? l.categoryCode),
+        name: l.categoryName || l.categoryCode, key: String(l.categoryId ?? l.categoryCode), code: l.categoryCode,
         Presupuesto: Number(l.budgetAmount) || 0,
         Gastado: Number(l.spentAmount) || 0,
       }));
     }
-    const map = new Map<string, { name: string; key: string; Presupuesto: number; Gastado: number }>();
+    const map = new Map<string, { name: string; key: string; code: string; Presupuesto: number; Gastado: number }>();
     for (const l of expenseLines) {
       const parent = l.categoryCode ? l.categoryCode.split('.')[0] : (l.categoryName || 'OTRO');
       const existing = map.get(parent);
@@ -642,8 +625,9 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
         existing.Gastado += Number(l.spentAmount) || 0;
       } else {
         map.set(parent, {
-          name: getCategoryEmoji(parent) + ' ' + parent,
+          name: parent,
           key: parent,
+          code: parent,
           Presupuesto: Number(l.budgetAmount) || 0,
           Gastado: Number(l.spentAmount) || 0,
         });
@@ -816,9 +800,15 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
                 </div>
               </div>
               <div className="bdg-category-options" role="group" aria-label="Filtrar por categoría">
-                {expenseChartData.map(item => (
-                  <button type="button" key={item.key} className={`investment-type-filter-button${selectedCategory?.key === item.key ? ' active' : ''}`} aria-pressed={selectedCategory?.key === item.key} onClick={() => setSelectedCategory(current => current?.key === item.key ? null : { key: item.key, label: item.name })}>{item.name}</button>
-                ))}
+                {expenseChartData.map(item => {
+                  const visual = getCategoryVisual(item.code);
+                  return (
+                    <button type="button" key={item.key} className={`investment-type-filter-button bdg-category-filter${selectedCategory?.key === item.key ? ' active' : ''}`} aria-pressed={selectedCategory?.key === item.key} onClick={() => setSelectedCategory(current => current?.key === item.key ? null : { key: item.key, label: item.name })}>
+                      <span className="category-visual-icon" style={{ color: visual.color, background: `${visual.color}22` }} aria-hidden="true">{visual.emoji}</span>
+                      <span>{item.name}</span>
+                    </button>
+                  );
+                })}
               </div>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={expenseChartData} margin={{ top: 8, right: 16, left: 16, bottom: 60 }}>

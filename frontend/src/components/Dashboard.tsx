@@ -507,25 +507,6 @@ export function Dashboard({ token, transactions, onUnauthorized, onOpenBudget }:
         </button>
       </div>
 
-      {budgetError && <p className="state error">{budgetError}</p>}
-      {primaryBudget && budgetSnapshot && (
-        <section className="db-budget" aria-label="Presupuesto principal">
-          <div className="db-budget-header">
-            <div><h3>Presupuesto principal</h3><span>{primaryBudget.name} · {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span></div>
-            {onOpenBudget && <button type="button" className="db-budget-open" onClick={() => onOpenBudget(primaryBudget.id)}>Ver presupuesto</button>}
-          </div>
-          <div className="db-budget-values">
-            <div><span>Presupuesto</span><strong>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.totalBudget)}</strong></div>
-            <div><span>Gastado</span><strong>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.totalSpent)}</strong></div>
-            <div><span>Restante</span><strong className={budgetSnapshot.variance < 0 ? 'negative' : 'positive'}>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.variance)}</strong></div>
-            <div><span>Estado</span><strong className={budgetSnapshot.compliant ? 'positive' : 'negative'}>{budgetSnapshot.compliant ? 'Dentro del presupuesto' : 'Presupuesto superado'}</strong></div>
-          </div>
-          <div className="db-budget-progress" role="progressbar" aria-label="Presupuesto utilizado" aria-valuemin={0} aria-valuemax={100} aria-valuenow={budgetSnapshot.totalBudget > 0 ? Math.min(100, Math.round(budgetSnapshot.totalSpent / budgetSnapshot.totalBudget * 100)) : budgetSnapshot.totalSpent > 0 ? 100 : 0}>
-            <span className={budgetSnapshot.compliant ? '' : 'over'} style={{ width: `${budgetSnapshot.totalBudget > 0 ? Math.min(100, Math.max(0, budgetSnapshot.totalSpent / budgetSnapshot.totalBudget * 100)) : budgetSnapshot.totalSpent > 0 ? 100 : 0}%` }} />
-          </div>
-        </section>
-      )}
-
       {/* ── Loading / error ──────────────────────────────────────────────── */}
       {loading && <p className="state">Cargando dashboard...</p>}
       {!loading && fetchError && <p className="state error">{fetchError}</p>}
@@ -753,8 +734,29 @@ export function Dashboard({ token, transactions, onUnauthorized, onOpenBudget }:
               )}
             </article>
           </div>
+        </>
+      )}
 
-          {/* ── Recent transactions ─────────────────────────────────────── */}
+      {budgetError && <p className="state error">{budgetError}</p>}
+      {primaryBudget && budgetSnapshot && (
+        <section className="db-budget" aria-label="Presupuesto principal">
+          <div className="db-budget-header">
+            <div><h3>Presupuesto principal</h3><span>{primaryBudget.name} · {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span></div>
+            {onOpenBudget && <button type="button" className="db-budget-open" onClick={() => onOpenBudget(primaryBudget.id)}>Ver presupuesto</button>}
+          </div>
+          <div className="db-budget-values">
+            <div><span>Presupuesto</span><strong>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.totalBudget)}</strong></div>
+            <div><span>Gastado</span><strong>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.totalSpent)}</strong></div>
+            <div><span>Restante</span><strong className={budgetSnapshot.variance < 0 ? 'negative' : 'positive'}>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.variance)}</strong></div>
+            <div><span>Estado</span><strong className={budgetSnapshot.compliant ? 'positive' : 'negative'}>{budgetSnapshot.compliant ? 'Dentro del presupuesto' : 'Presupuesto superado'}</strong></div>
+          </div>
+          <div className="db-budget-progress" role="progressbar" aria-label="Presupuesto utilizado" aria-valuemin={0} aria-valuemax={100} aria-valuenow={budgetSnapshot.totalBudget > 0 ? Math.min(100, Math.round(budgetSnapshot.totalSpent / budgetSnapshot.totalBudget * 100)) : budgetSnapshot.totalSpent > 0 ? 100 : 0}>
+            <span className={budgetSnapshot.compliant ? '' : 'over'} style={{ width: `${budgetSnapshot.totalBudget > 0 ? Math.min(100, Math.max(0, budgetSnapshot.totalSpent / budgetSnapshot.totalBudget * 100)) : budgetSnapshot.totalSpent > 0 ? 100 : 0}%` }} />
+          </div>
+        </section>
+      )}
+
+      {!loading && !fetchError && summary && (
           <article className="db-chart-card">
             <div className="db-recent-header">
               <div className="db-recent-headline">
@@ -812,7 +814,6 @@ export function Dashboard({ token, transactions, onUnauthorized, onOpenBudget }:
               </>
             )}
           </article>
-        </>
       )}
     </div>
   );
