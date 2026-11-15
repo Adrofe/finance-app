@@ -10,13 +10,16 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import es.triana.company.budget.model.api.ApiResponse;
 import es.triana.company.budget.model.api.BudgetPlanDTO;
@@ -65,6 +68,12 @@ public class BudgetController {
         Long tenantId = tenantContext.getCurrentTenantId();
         budgetService.deletePlan(tenantId, id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/plans/{id}/primary")
+    public ResponseEntity<ApiResponse<BudgetPlanDTO>> setPrimaryPlan(@PathVariable("id") Long id) {
+        BudgetPlanDTO plan = budgetService.setPrimaryPlan(tenantContext.getCurrentTenantId(), id);
+        return ResponseEntity.ok(new ApiResponse<>(200, "Primary budget plan updated", plan));
     }
 
     @PostMapping("/plans/{id}/snapshots/refresh")

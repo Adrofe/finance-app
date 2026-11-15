@@ -102,6 +102,17 @@ public class BudgetService {
     }
 
     @Transactional
+    public BudgetPlanDTO setPrimaryPlan(Long tenantId, Long id) {
+        validateTenantId(tenantId);
+        BudgetPlan plan = planRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Budget plan not found"));
+        planRepository.clearOtherPrimaryPlans(tenantId, id);
+        plan.setPrimary(true);
+        plan.setUpdatedAt(LocalDateTime.now());
+        return budgetMapper.toPlanDto(planRepository.save(plan));
+    }
+
+    @Transactional
     public void deletePlan(Long tenantId, Long id) {
         validateTenantId(tenantId);
         BudgetPlan plan = planRepository.findByIdAndTenantId(id, tenantId)
@@ -245,7 +256,7 @@ public class BudgetService {
 
     private BudgetPlan loadOrCreatePlan(Long tenantId, BudgetPlanRequestDTO request, LocalDateTime now) {
         if (request.getId() != null) {
-            return planRepository.findByIdAndTenantId(request.getId(), tenantId)
+            return planRepository.findByIdAndTenantIdForUpdate(request.getId(), tenantId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Budget plan not found"));
         }
 
