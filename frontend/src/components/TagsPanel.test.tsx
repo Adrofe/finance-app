@@ -50,7 +50,7 @@ async function openTag(name = 'Vacaciones') {
 
 function selectCategory(section: ReturnType<typeof within>, name: string) {
   fireEvent.click(section.getByRole('button', { name: /Filtrar transacciones por categoría:/ }));
-  const menu = within(section.getByRole('group', { name: 'Categorías de transacciones' }));
+  const menu = within(screen.getByRole('group', { name: 'Categorías de transacciones' }));
   fireEvent.click(menu.getByRole('button', { name }));
 }
 
@@ -147,7 +147,7 @@ describe('tag transactions', () => {
     const section = await openTag();
     const trigger = section.getByRole('button', { name: /Filtrar transacciones por categoría:/ });
     fireEvent.keyDown(trigger, { key: 'ArrowDown' });
-    const menu = section.getByRole('group', { name: 'Categorías de transacciones' });
+    const menu = screen.getByRole('group', { name: 'Categorías de transacciones' });
     expect(document.activeElement).toBe(within(menu).getByRole('button', { name: 'Todas las categorías' }));
     const travel = within(menu).getByRole('button', { name: 'Viajes' });
     const icon = travel.querySelector<HTMLElement>('.tp-category-icon')!;
@@ -169,13 +169,38 @@ describe('tag transactions', () => {
     const section = await openTag();
     const trigger = section.getByRole('button', { name: /Filtrar transacciones por categoría:/ });
     fireEvent.click(trigger);
-    const menu = section.getByRole('group', { name: 'Categorías de transacciones' });
+    const menu = screen.getByRole('group', { name: 'Categorías de transacciones' });
     expect(within(menu).getAllByRole('button').map(button => button.textContent?.trim().replace(/^[^\p{L}]+/u, ''))).toEqual([
       'Todas las categorías', 'Hogar', 'Sin categoría', 'Viajes',
     ]);
     fireEvent.mouseDown(document.body);
-    expect(section.queryByRole('group', { name: 'Categorías de transacciones' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Categorías de transacciones' })).toBeNull();
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('renders the menu outside the table layout and repositions it on scroll', async () => {
+    const section = await openTag();
+    const trigger = section.getByRole('button', { name: /Filtrar transacciones por categoría:/ });
+    let top = window.innerHeight - 68;
+    vi.spyOn(trigger, 'getBoundingClientRect').mockImplementation(() => ({
+      x: 100, y: top, left: 100, right: 250, top, bottom: top + 36, width: 150, height: 36, toJSON: () => ({}),
+    }));
+
+    fireEvent.click(trigger);
+    const menu = screen.getByRole('group', { name: 'Categorías de transacciones' });
+    expect(menu.parentElement).toBe(document.body);
+    expect(menu.style.bottom).toBe('72px');
+    expect(menu.style.width).toBe('150px');
+    top -= 50;
+    fireEvent.scroll(window);
+    expect(menu.style.bottom).toBe('122px');
+
+    const option = within(menu).getByRole('button', { name: 'Viajes' });
+    fireEvent.mouseDown(option);
+    expect(screen.getByRole('group', { name: 'Categorías de transacciones' })).toBeTruthy();
+    fireEvent.click(option);
+    expect(section.getByText('Cena')).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Categorías de transacciones' })).toBeNull();
   });
 
   it('paginates transactions and returns to the first page when searching', async () => {

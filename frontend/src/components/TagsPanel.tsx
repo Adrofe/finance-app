@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useLayoutEffect, useCallback, useRef, useId } from 'react';
+import { createPortal } from 'react-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -116,8 +117,11 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
   const [transactionSearch, setTransactionSearch] = useState('');
   const [transactionPage, setTransactionPage] = useState(0);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const [categoryMenuPosition, setCategoryMenuPosition] = useState<{ left: number; width: number; maxHeight: number; top?: number; bottom?: number } | null>(null);
   const categoryDropdownRef = useRef<HTMLDetailsElement>(null);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
   const categoryFocusRef = useRef<'first' | 'last' | null>(null);
+  const categoryMenuId = useId();
 
   // ── Data loading ─────────────────────────────────────────────────────────
 
@@ -153,20 +157,59 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
   useEffect(() => {
     const closeOutside = (event: MouseEvent) => {
       const dropdown = categoryDropdownRef.current;
-      if (dropdown && !dropdown.contains(event.target as Node)) setCategoryDropdownOpen(false);
+      const target = event.target as Node;
+      if (dropdown && !dropdown.contains(target) && !categoryMenuRef.current?.contains(target)) setCategoryDropdownOpen(false);
     };
     document.addEventListener('mousedown', closeOutside);
     return () => document.removeEventListener('mousedown', closeOutside);
   }, []);
 
-  useEffect(() => {
+  const updateCategoryMenuPosition = useCallback(() => {
+    const trigger = categoryDropdownRef.current?.querySelector('summary');
+    if (!trigger) return;
+    const bounds = trigger.getBoundingClientRect();
+    if (bounds.bottom < 0 || bounds.top > window.innerHeight) {
+      setCategoryDropdownOpen(false);
+      return;
+    }
+    const width = Math.min(bounds.width, Math.max(0, window.innerWidth - 16));
+    const left = Math.max(8, Math.min(bounds.left, window.innerWidth - width - 8));
+    const below = Math.max(0, window.innerHeight - bounds.bottom - 12);
+    const above = Math.max(0, bounds.top - 12);
+    const openAbove = below < 160 && above > below;
+    const position = {
+      left,
+      width,
+      maxHeight: Math.min(240, openAbove ? above : below),
+      top: openAbove ? undefined : bounds.bottom + 4,
+      bottom: openAbove ? window.innerHeight - bounds.top + 4 : undefined,
+    };
+    setCategoryMenuPosition(current => current && current.left === position.left && current.width === position.width
+      && current.maxHeight === position.maxHeight && current.top === position.top && current.bottom === position.bottom
+      ? current : position);
+  }, []);
+
+  useLayoutEffect(() => {
     if (!categoryDropdownOpen) return;
-    categoryDropdownRef.current?.querySelector<HTMLElement>('.tp-category-menu')?.scrollIntoView?.({ block: 'nearest' });
-    if (!categoryFocusRef.current) return;
-    const options = categoryDropdownRef.current?.querySelectorAll<HTMLButtonElement>('.tp-category-option');
+    updateCategoryMenuPosition();
+    window.addEventListener('resize', updateCategoryMenuPosition);
+    window.addEventListener('scroll', updateCategoryMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateCategoryMenuPosition);
+      window.removeEventListener('scroll', updateCategoryMenuPosition, true);
+    };
+  }, [categoryDropdownOpen, updateCategoryMenuPosition]);
+
+  useLayoutEffect(() => {
+    if (!categoryDropdownOpen || !categoryMenuPosition || !categoryFocusRef.current) return;
+    const options = categoryMenuRef.current?.querySelectorAll<HTMLButtonElement>('.tp-category-option');
     if (options?.length) options[categoryFocusRef.current === 'first' ? 0 : options.length - 1].focus();
     categoryFocusRef.current = null;
-  }, [categoryDropdownOpen]);
+  }, [categoryDropdownOpen, categoryMenuPosition]);
+
+  useEffect(() => {
+    setCategoryDropdownOpen(false);
+  }, [selectedTagId, pieMode]);
 
   // ── Derived data ─────────────────────────────────────────────────────────
 
@@ -318,7 +361,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
         setCategoryDropdownOpen(true);
         return;
       }
-      const options = [...dropdown.querySelectorAll<HTMLButtonElement>('.tp-category-option')];
+      const options = [...(categoryMenuRef.current?.querySelectorAll<HTMLButtonElement>('.tp-category-option') ?? [])];
       const current = options.indexOf(document.activeElement as HTMLButtonElement);
       const next = current === -1 ? (event.key === 'ArrowDown' ? 0 : options.length - 1)
         : (current + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
@@ -750,7 +793,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
                   <div className="tp-transactions-controls">
                     <input type="search" value={transactionSearch} onChange={event => setTransactionSearch(event.target.value)} placeholder="Buscar transacciones..." aria-label="Buscar transacciones de la tag" />
                     <details className="tp-category-dropdown" ref={categoryDropdownRef} open={categoryDropdownOpen} onKeyDown={handleCategoryDropdownKey}>
-                      <summary role="button" aria-expanded={categoryDropdownOpen} aria-label={`Filtrar transacciones por categoría: ${selectedCategory?.name ?? 'Todas las categorías'}`} title={selectedCategory?.name ?? 'Todas las categorías'} onClick={event => { event.preventDefault(); setCategoryDropdownOpen(current => !current); }}>
+                      <summary role="button" aria-expanded={categoryDropdownOpen} aria-controls={categoryMenuId} aria-label={`Filtrar transacciones por categoría: ${selectedCategory?.name ?? 'Todas las categorías'}`} title={selectedCategory?.name ?? 'Todas las categorías'} onClick={event => { event.preventDefault(); setCategoryDropdownOpen(current => !current); }}>
                         {selectedCategory && (() => {
                           const visual = categoryVisual(selectedCategory.id);
                           return <span className="tp-category-icon" style={{ color: visual.color, background: `${visual.color}22` }} aria-hidden="true">{visual.emoji}</span>;
@@ -758,7 +801,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
                         <span className="tp-category-selected" style={selectedCategory ? { color: categoryVisual(selectedCategory.id).color } : undefined}>{selectedCategory?.name ?? 'Todas las categorías'}</span>
                         <span className="tp-category-arrow" aria-hidden="true">▾</span>
                       </summary>
-                      {categoryDropdownOpen && <div className="tp-category-menu" role="group" aria-label="Categorías de transacciones">
+                      {categoryDropdownOpen && categoryMenuPosition && createPortal(<div id={categoryMenuId} ref={categoryMenuRef} className="tp-category-menu" style={categoryMenuPosition} role="group" aria-label="Categorías de transacciones">
                         <button type="button" className="tp-category-option" aria-pressed={selectedCategoryId === undefined} onClick={() => selectTransactionCategory(undefined)}>Todas las categorías</button>
                         {transactionCategoryOptions.map(option => {
                           const visual = categoryVisual(option.id);
@@ -769,7 +812,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
                             </button>
                           );
                         })}
-                      </div>}
+                      </div>, document.body)}
                     </details>
                     {selectedCategoryId !== undefined && <button type="button" className="tp-clear-category" onClick={() => setSelectedCategoryId(undefined)}>Todas las categorías</button>}
                   </div>
