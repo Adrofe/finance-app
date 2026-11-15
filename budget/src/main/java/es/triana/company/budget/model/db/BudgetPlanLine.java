@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import es.triana.company.budget.model.BudgetLineType;
+import es.triana.company.budget.model.BudgetLinePeriod;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -48,6 +49,10 @@ public class BudgetPlanLine {
 
     @Column(name = "budget_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal budgetAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "line_period", length = 16)
+    private BudgetLinePeriod linePeriod;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "line_type", nullable = false, length = 10)

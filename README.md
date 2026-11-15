@@ -20,7 +20,9 @@ Closed accounts can be deactivated and reactivated from the accounts table. Thei
 
 Budget plans can be marked as primary per tenant; the banking dashboard shows the primary plan for the current month. Existing plans are treated as monthly because earlier versions did not persist their period. Existing snapshots gain a monthly breakdown when recalculated.
 
-Budget amounts are allocated by calendar month. Monthly plans use the full monthly amount even for a partial month. Quarterly, annual, and custom-period amounts are split across their months, with rounding differences assigned to the final month; custom plans are limited to their configured dates. The budget service rejects matching transactions in another currency because automatic currency conversion is not yet available.
+Each new budget line can have a monthly, quarterly, semiannual, or annual period. Longer periods follow calendar boundaries and compare the full period budget with spending from the start of that period through the selected end date. Monthly totals exclude longer-period lines; their monthly transactions are shown separately. The dashboard's annual forecast converts each recurring line to its yearly equivalent and compares it with year-to-date spending. Custom plans are limited to their configured dates and are excluded from that forecast. Recalculation uses the current plan configuration for historical dates.
+
+Existing lines keep their former plan-level behavior until a line period is explicitly selected: quarterly, annual, and custom amounts are split across calendar months, with rounding differences assigned to the final month. Monthly lines use the full monthly amount even for a partial month. The budget service rejects matching transactions in another currency because automatic currency conversion is not yet available.
 
 ## How to Start All Systems
 

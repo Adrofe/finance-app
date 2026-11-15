@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { BudgetPanel } from './BudgetPanel';
 import { Dashboard } from './Dashboard';
-import { fetchBudgetPlans, refreshBudgetSnapshot, setPrimaryBudgetPlan } from '../services/budgetService';
+import { createBudgetPlan, fetchBudgetPlans, refreshBudgetSnapshot, setPrimaryBudgetPlan } from '../services/budgetService';
+import { CatalogService } from '../services/catalogService';
 import { fetchDashboardSummary, fetchSpendingByCategory, fetchTimeSeries } from '../services/dashboardService';
 import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
 import { getCategoryVisual } from '../constants/visualConfig';
@@ -56,6 +57,41 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe('budget detail', () => {
+  it('saves an individual period while preserving legacy lines', async () => {
+    vi.spyOn(CatalogService, 'fetchCategories').mockResolvedValue([{ id: 10, code: 'FOOD.SHOP', name: 'Food' }, { id: 20, code: 'TRAVEL.AIR', name: 'Travel' }]);
+    vi.mocked(createBudgetPlan).mockResolvedValue(plan);
+    render(<BudgetPanel token="test" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar plan' }));
+    const foodPeriod = await screen.findByRole('combobox', { name: 'Periodicidad de Food' });
+    const travelPeriod = screen.getByRole('combobox', { name: 'Periodicidad de Travel' });
+    expect((foodPeriod as HTMLSelectElement).value).toBe('');
+    fireEvent.change(foodPeriod, { target: { value: 'QUARTERLY' } });
+    fireEvent.change(foodPeriod, { target: { value: '' } });
+    fireEvent.change(travelPeriod, { target: { value: 'SEMIANNUAL' } });
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/ }));
+    await waitFor(() => expect(createBudgetPlan).toHaveBeenCalledWith('test', expect.objectContaining({
+      lines: [expect.objectContaining({ categoryId: 10, linePeriod: null }), expect.objectContaining({ categoryId: 20, linePeriod: 'SEMIANNUAL' })],
+    })));
+    vi.restoreAllMocks();
+  });
+
+  it('shows annual spending against its annual limit without marking the month exceeded', async () => {
+    const annual: BudgetSnapshotLineDTO = { ...makeLine(8, 20, 'Travel', 'TRAVEL.AIR', 1800, 1200), linePeriod: 'ANNUAL', linePeriodStart: '2026-01-01', linePeriodEnd: '2026-12-31', lineObservedUntil: '2026-06-15' };
+    const monthlyExpense = makeLine(9, 10, 'Food', 'FOOD.SHOP', 400, 100);
+    const monthlyTravel = { ...annual, id: 10, budgetAmount: 0, spentAmount: 400, compliant: false };
+    vi.mocked(refreshBudgetSnapshot).mockResolvedValue({ ...snapshot, periodStart: '2026-06-01', periodEnd: '2026-06-15', totalBudget: 400, totalSpent: 100, variance: 300,
+      lines: [monthlyExpense], periodicLines: [annual], months: [{ monthStart: '2026-06-01', totalBudget: 400, totalSpent: 100, variance: 300, compliant: true, totalExpectedIncome: 0, totalIncome: 0, lines: [monthlyExpense, monthlyTravel] }] });
+    render(<BudgetPanel token="test" initialPlanId={1} />);
+    const periodic = within(await screen.findByRole('region', { name: 'Seguimiento por periodo' }));
+    expect(periodic.getByText('1200,00 €')).toBeTruthy();
+    expect(periodic.getByText('1800,00 €')).toBeTruthy();
+    expect(periodic.getByText('+600,00 € restante')).toBeTruthy();
+    const month = within(screen.getByRole('region', { name: 'Seguimiento mensual' }));
+    expect(month.getByText('Dentro del presupuesto')).toBeTruthy();
+    fireEvent.click(month.getByText(/junio de 2026/i));
+    expect(month.getByText('Anual · Gastado en el mes')).toBeTruthy();
+    expect(month.queryByText('Superado')).toBeNull();
+  });
   it('marks a plan as primary', async () => {
     vi.mocked(fetchBudgetPlans).mockResolvedValue([{ ...plan, primary: false }]);
     render(<BudgetPanel token="test" />);
@@ -96,7 +132,7 @@ describe('budget detail', () => {
     render(<Dashboard token="test" transactions={[]} onUnauthorized={vi.fn()} onOpenBudget={open} />);
     const region = within(await screen.findByRole('region', { name: 'Presupuesto principal' }));
     expect(region.getByText('320,00 €')).toBeTruthy();
-    expect(region.getByText('280,00 €')).toBeTruthy();
+    expect(region.getAllByText('280,00 €')).toHaveLength(2);
     expect(region.getByText('40,00 €')).toBeTruthy();
     const budget = screen.getByRole('region', { name: 'Presupuesto principal' });
     const charts = screen.getByRole('heading', { name: 'Gastos por categoría' }).closest('.db-charts-grid')!;
@@ -105,6 +141,24 @@ describe('budget detail', () => {
     expect(budget.compareDocumentPosition(transactions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(region.getByRole('button', { name: 'Ver presupuesto' }));
     expect(open).toHaveBeenCalledWith(1);
+  });
+
+  it('combines monthly and calendar-period spending in the annual dashboard forecast', async () => {
+    vi.mocked(fetchBudgetPlans).mockResolvedValue([{ ...plan, lines: [
+      { ...plan.lines[0], budgetAmount: 400, linePeriod: 'MONTHLY' },
+      { ...plan.lines[1], budgetAmount: 1800, linePeriod: 'ANNUAL' },
+      { ...plan.lines[1], id: 3, categoryId: 30, budgetAmount: 300, linePeriod: 'QUARTERLY' },
+      { ...plan.lines[1], id: 4, categoryId: 40, budgetAmount: 600, linePeriod: 'SEMIANNUAL' },
+    ] }]);
+    const annual = { ...makeLine(8, 20, 'Travel', 'TRAVEL.AIR', 1800, 1200), linePeriod: 'ANNUAL' as const, linePeriodStart: '2026-01-01', linePeriodEnd: '2026-12-31', lineObservedUntil: '2026-11-15' };
+    vi.mocked(refreshBudgetSnapshot).mockResolvedValueOnce({ ...snapshot, periodicLines: [annual] }).mockResolvedValueOnce({
+      ...snapshot, totalSpent: 500, periodicLines: [annual, { ...annual, id: 9, spentAmount: 200 }, { ...annual, id: 10, spentAmount: 100 }],
+    });
+    render(<Dashboard token="test" transactions={[]} onUnauthorized={vi.fn()} />);
+    const annualSummary = within(await screen.findByLabelText('Resumen anual'));
+    expect(annualSummary.getByText('9000,00 €')).toBeTruthy();
+    expect(annualSummary.getByText('2000,00 €')).toBeTruthy();
+    expect(annualSummary.getByText('7000,00 €')).toBeTruthy();
   });
 
   it('includes income lines in the monthly detail and resets filters for a custom range', async () => {

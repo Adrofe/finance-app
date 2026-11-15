@@ -17,6 +17,7 @@ import { getCategoryVisual } from '../constants/visualConfig';
 import type {
   BudgetLineType,
   BudgetPeriod,
+  BudgetLinePeriod,
   BudgetPlanDTO,
   BudgetPlanLineRequest,
   BudgetPlanRequest,
@@ -38,6 +39,10 @@ const PERIOD_LABELS: Record<BudgetPeriod, string> = {
   ANNUAL: 'Anual',
   CUSTOM: 'Personalizado',
 };
+const LINE_PERIOD_LABELS: Record<BudgetLinePeriod, string> = {
+  MONTHLY: 'Mensual', QUARTERLY: 'Trimestral', SEMIANNUAL: 'Semestral', ANNUAL: 'Anual',
+};
+const isLongPeriod = (line: BudgetSnapshotLineDTO) => line.linePeriod != null && line.linePeriod !== 'MONTHLY';
 
 const toISO = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
@@ -93,6 +98,7 @@ const emptyLine = (lineType: BudgetLineType = 'EXPENSE'): BudgetPlanLineRequest 
   categoryCode: '',
   categoryName: '',
   budgetAmount: 0,
+  linePeriod: 'MONTHLY',
   lineType,
 });
 
@@ -110,6 +116,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
           categoryCode: line.categoryCode,
           categoryName: line.categoryName,
           budgetAmount: line.budgetAmount,
+          linePeriod: line.linePeriod ?? null,
           lineType: line.lineType,
         }))
       : [emptyLine('EXPENSE')]
@@ -176,7 +183,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
     setCategorySearch('');
   };
 
-  const updateLine = (i: number, field: keyof BudgetPlanLineRequest, value: string | number) => {
+  const updateLine = (i: number, field: keyof BudgetPlanLineRequest, value: string | number | null) => {
     setLines(prev => prev.map((l, idx) => idx === i ? { ...l, [field]: value } : l));
   };
 
@@ -223,15 +230,21 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
                 onChange={e => setName(e.target.value)}
               />
             </div>
-            <div className="bdg-form-field">
-              <label>Periodicidad</label>
+            {initialPlan?.lines.some(line => !line.linePeriod) ? <div className="bdg-form-field">
+              <label>Periodicidad de partidas anteriores</label>
               <select className="bdg-input" value={period} onChange={e => setPeriod(e.target.value as BudgetPeriod)}>
                 <option value="MONTHLY">Mensual</option>
                 <option value="QUARTERLY">Trimestral</option>
                 <option value="ANNUAL">Anual</option>
                 <option value="CUSTOM">Personalizado</option>
               </select>
-            </div>
+            </div> : <div className="bdg-form-field">
+              <label htmlFor="budget-plan-validity">Vigencia del plan</label>
+              <select id="budget-plan-validity" className="bdg-input" value={period === 'CUSTOM' ? 'CUSTOM' : 'RECURRING'} onChange={event => setPeriod(event.target.value === 'CUSTOM' ? 'CUSTOM' : 'MONTHLY')}>
+                <option value="RECURRING">Sin fechas de fin</option>
+                <option value="CUSTOM">Fechas personalizadas</option>
+              </select>
+            </div>}
             <div className="bdg-form-field" style={{ gridColumn: '1 / -1' }}>
               <label>Descripción</label>
               <input
@@ -283,6 +296,7 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
             <div className="bdg-lines-row bdg-lines-head">
               <span>Categoría</span>
               <span>{lineTab === 'INCOME' ? 'Ingreso esperado' : 'Importe'}</span>
+              <span>Periodicidad</span>
               <span />
             </div>
             {visibleLines.length === 0 && (
@@ -331,6 +345,10 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
                     value={line.budgetAmount || ''}
                     onChange={e => updateLine(line._idx, 'budgetAmount', parseFloat(e.target.value) || 0)}
                   />
+                  <select className="bdg-input small" aria-label={`Periodicidad de ${selectedCat?.name || `partida ${line._idx + 1}`}`} value={line.linePeriod ?? ''} onChange={e => updateLine(line._idx, 'linePeriod', e.target.value || null)}>
+                    {(!line.linePeriod || initialPlan?.lines.some(original => original.categoryId === line.categoryId && original.lineType === line.lineType && !original.linePeriod)) && <option value="">Según plan</option>}
+                    {Object.entries(LINE_PERIOD_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
                   <button
                     type="button"
                     className="btn icon-btn danger"
@@ -444,10 +462,11 @@ function CreatePlanModal({ accessToken, onClose, onSave, saving, initialPlan }: 
 }
 
 /* ── Snapshot compliance line ────────────────────────────────────────────── */
-function SnapshotLine({ line, currency }: { line: BudgetSnapshotLineDTO; currency: string }) {
+function SnapshotLine({ line, currency, informational = false }: { line: BudgetSnapshotLineDTO; currency: string; informational?: boolean }) {
   const isIncome = line.lineType === 'INCOME';
   const visual = getCategoryVisual(line.categoryCode);
   const progress = pct(line.spentAmount, line.budgetAmount);
+  const pendingIncome = isIncome && !line.compliant && !!line.lineObservedUntil && !!line.linePeriodEnd && line.lineObservedUntil < line.linePeriodEnd;
   const over = isIncome
     ? line.spentAmount > line.budgetAmount   // income over = surplus (good)
     : line.spentAmount > line.budgetAmount;  // expense over = bad
@@ -461,14 +480,16 @@ function SnapshotLine({ line, currency }: { line: BudgetSnapshotLineDTO; currenc
           {isIncome && <span className="bdg-type-tag income">ingreso</span>}
         </div>
         <div className="bdg-snap-line-amounts">
-          <span className={!isIncome && over ? 'bdg-over' : isIncome && over ? 'bdg-income-surplus' : ''}>
+          <span className={!informational && !isIncome && over ? 'bdg-over' : !informational && isIncome && over ? 'bdg-income-surplus' : ''}>
             {fmt(line.spentAmount, currency)}
           </span>
-          <span className="bdg-sep">/</span>
+          {!informational && <><span className="bdg-sep">/</span>
           <span className="bdg-budget">{fmt(line.budgetAmount, currency)}</span>
-          <span className={`bdg-badge ${line.compliant ? 'ok' : 'ko'}`}>{line.compliant ? '✓' : '✗'}</span>
+          <span className={`bdg-badge ${pendingIncome ? '' : line.compliant ? 'ok' : 'ko'}`}>{pendingIncome ? 'Pendiente' : line.compliant ? '✓' : '✗'}</span></>}
         </div>
       </div>
+      {informational ? <span className="bdg-pct">{line.linePeriod && LINE_PERIOD_LABELS[line.linePeriod]} · {isIncome ? 'Recibido en el mes' : 'Gastado en el mes'}</span> : <>
+      {line.linePeriodStart && <span className="bdg-pct">{line.linePeriod && LINE_PERIOD_LABELS[line.linePeriod]} · {line.linePeriodStart} — {line.linePeriodEnd} · Hasta {line.lineObservedUntil}</span>}
       <div className="bdg-bar-track">
         <div
           className={`bdg-bar-fill ${isIncome ? 'income' : ''} ${over && !isIncome ? 'over' : ''}`}
@@ -485,6 +506,7 @@ function SnapshotLine({ line, currency }: { line: BudgetSnapshotLineDTO; currenc
             : (line.variance >= 0 ? `+${fmt(line.variance, currency)} restante` : `${fmt(line.variance, currency)} excedido`)}
         </span>
       </div>
+      </>}
     </div>
   );
 }
@@ -576,7 +598,7 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
     if (!snapshot) return [];
     if (selectedYear === 'ALL' || months.length === 0) return snapshot.lines;
     const grouped = new Map<string, BudgetSnapshotLineDTO>();
-    shownMonths.flatMap(month => month.lines).forEach(line => {
+    shownMonths.flatMap(month => month.lines).filter(line => !isLongPeriod(line)).forEach(line => {
       const key = `${line.lineType}:${line.categoryId ?? line.categoryCode}`;
       const previous = grouped.get(key);
       if (!previous) grouped.set(key, { ...line });
@@ -602,6 +624,7 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
       incomeVariance: totals.totalIncome - totals.totalExpectedIncome, netBalance: totals.totalIncome - totals.totalSpent };
   }, [snapshot, selectedYear, months, shownMonths]);
   const totalProgress = displayedTotals ? pct(displayedTotals.totalSpent, displayedTotals.totalBudget) : 0;
+  const hasMonthlyExpenses = (snapshot?.lines ?? []).some(line => line.lineType !== 'INCOME');
   const exceededMonths = shownMonths.filter(month => !month.compliant).length;
   const categoryKey = (line: BudgetSnapshotLineDTO) => chartView === 'parent' ? line.categoryCode.split('.')[0] : String(line.categoryId ?? line.categoryCode);
   const matchesCategory = (line: BudgetSnapshotLineDTO) => !selectedCategory || categoryKey(line) === selectedCategory.key;
@@ -637,7 +660,7 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
   }, [snapshot, chartView, yearLines]);
 
   const trendData = shownMonths.map(month => {
-    const lines = month.lines.filter(line => line.lineType !== 'INCOME' && matchesCategory(line));
+    const lines = month.lines.filter(line => line.lineType !== 'INCOME' && !isLongPeriod(line) && matchesCategory(line));
     return {
       name: new Date(Number(month.monthStart.slice(0, 4)), Number(month.monthStart.slice(5, 7)) - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }),
       Presupuesto: lines.reduce((sum, line) => sum + Number(line.budgetAmount), 0),
@@ -654,7 +677,7 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
           <h3>{plan.name}</h3>
           {plan.description && <p>{plan.description}</p>}
         </div>
-        <span className="bdg-period-pill">{PERIOD_LABELS[plan.period]}</span>
+        <span className="bdg-period-pill">{plan.lines.some(line => line.linePeriod) ? 'Por partida' : PERIOD_LABELS[plan.period]}</span>
       </div>
 
       {/* Period preset buttons + date range + refresh */}
@@ -716,13 +739,13 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
       )}
       {snapshot && displayedTotals && (
         <>
-          <div className="bdg-snap-summary">
+          {hasMonthlyExpenses && <div className="bdg-snap-summary">
             <div className="bdg-snap-kpi">
-              <span className="bdg-kpi-label">Presupuesto total</span>
+              <span className="bdg-kpi-label">Presupuesto mensual</span>
               <span className="bdg-kpi-value">{fmt(displayedTotals.totalBudget, plan.currency)}</span>
             </div>
             <div className="bdg-snap-kpi">
-              <span className="bdg-kpi-label">Gastado</span>
+              <span className="bdg-kpi-label">Gastado en partidas mensuales</span>
               <span className={`bdg-kpi-value ${displayedTotals.totalSpent > displayedTotals.totalBudget ? 'bdg-over' : ''}`}>
                 {fmt(displayedTotals.totalSpent, plan.currency)}
               </span>
@@ -734,13 +757,13 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
               </span>
             </div>
             <div className="bdg-snap-kpi">
-              <span className="bdg-kpi-label">Estado global</span>
+              <span className="bdg-kpi-label">Estado mensual</span>
               <span className={`bdg-badge large ${displayedTotals.compliant ? 'ok' : 'ko'}`}>
                 {displayedTotals.compliant ? '✓ Dentro del presupuesto' : '✗ Presupuesto superado'}
               </span>
               {exceededMonths > 0 && <small className="bdg-month-warning">{exceededMonths} {exceededMonths === 1 ? 'mes excedido' : 'meses excedidos'}</small>}
             </div>
-          </div>
+          </div>}
 
           {/* Income summary KPIs (shown only if there are income lines) */}
           {displayedTotals.totalExpectedIncome != null && displayedTotals.totalExpectedIncome > 0 && (
@@ -756,7 +779,7 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
                 </span>
               </div>
               <div className="bdg-snap-kpi">
-                <span className="bdg-kpi-label">Balance neto</span>
+                <span className="bdg-kpi-label">Balance de partidas mensuales</span>
                 <span className={`bdg-kpi-value ${(displayedTotals.netBalance ?? 0) >= 0 ? 'bdg-ok' : 'bdg-over'}`}>
                   {(displayedTotals.netBalance ?? 0) >= 0 ? '+' : ''}{fmt(displayedTotals.netBalance ?? 0, plan.currency)}
                 </span>
@@ -765,7 +788,7 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
           )}
 
           {/* Global progress bar */}
-          <div className="bdg-global-bar-wrap">
+          {hasMonthlyExpenses && <div className="bdg-global-bar-wrap">
             <div className="bdg-bar-track global">
               <div
                 className={`bdg-bar-fill ${displayedTotals.totalSpent > displayedTotals.totalBudget ? 'over' : ''}`}
@@ -773,7 +796,7 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
               />
             </div>
             <span className="bdg-pct">{totalProgress.toFixed(0)}%</span>
-          </div>
+          </div>}
 
           <div className="bdg-snap-period">
             Período analizado: <strong>{snapshot.periodStart}</strong> — <strong>{snapshot.periodEnd}</strong>
@@ -874,8 +897,9 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
                 </div>
               )}
               {shownMonths.map(month => {
-                const lines = month.lines.filter(line => line.lineType !== 'INCOME' && matchesCategory(line));
-                const incomeLines = selectedCategory ? [] : month.lines.filter(line => line.lineType === 'INCOME');
+                const lines = month.lines.filter(line => line.lineType !== 'INCOME' && !isLongPeriod(line) && matchesCategory(line));
+                const incomeLines = selectedCategory ? [] : month.lines.filter(line => line.lineType === 'INCOME' && !isLongPeriod(line));
+                const periodicMonthLines = month.lines.filter(line => isLongPeriod(line) && (!selectedCategory || matchesCategory(line)) && Number(line.spentAmount) !== 0);
                 const budget = selectedCategory ? lines.reduce((sum, line) => sum + Number(line.budgetAmount), 0) : Number(month.totalBudget);
                 const spent = selectedCategory ? lines.reduce((sum, line) => sum + Number(line.spentAmount), 0) : Number(month.totalSpent);
                 const year = Number(month.monthStart.slice(0, 4));
@@ -884,16 +908,29 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
                 const partial = snapshot.periodStart > month.monthStart || snapshot.periodEnd < toISO(new Date(year, monthNumber, 0));
                 return (
                   <details key={month.monthStart} className="bdg-month-row">
-                    <summary><strong>{label}</strong><span>{fmt(spent, plan.currency)} / {fmt(budget, plan.currency)}</span><span className={`bdg-badge ${spent <= budget ? 'ok' : 'ko'}`}>{spent > budget ? 'Superado' : partial ? 'Dentro del presupuesto' : 'Cumplido'}</span></summary>
+                    <summary><strong>{label}</strong>{(selectedCategory ? lines.length > 0 : hasMonthlyExpenses) && <><span>{fmt(spent, plan.currency)} / {fmt(budget, plan.currency)}</span><span className={`bdg-badge ${spent <= budget ? 'ok' : 'ko'}`}>{spent > budget ? 'Superado' : partial ? 'Dentro del presupuesto' : 'Cumplido'}</span></>}</summary>
                     <div className="bdg-month-lines">
                       {lines.length > 0 && <strong className="bdg-month-line-heading">Gastos</strong>}
                       {lines.map(line => <SnapshotLine key={line.id ?? `${month.monthStart}-${line.categoryCode}`} line={line} currency={plan.currency} />)}
                       {incomeLines.length > 0 && <strong className="bdg-month-line-heading">Ingresos</strong>}
                       {incomeLines.map(line => <SnapshotLine key={line.id ?? `${month.monthStart}-${line.categoryCode}-income`} line={line} currency={plan.currency} />)}
+                      {periodicMonthLines.length > 0 && <strong className="bdg-month-line-heading">Movimientos de otras partidas</strong>}
+                      {periodicMonthLines.map(line => <SnapshotLine key={line.id ?? `${month.monthStart}-${line.categoryCode}-periodic`} line={line} currency={plan.currency} informational />)}
                     </div>
                   </details>
                 );
               })}
+            </section>
+          )}
+
+          {(snapshot.periodicLines ?? []).filter(line => (selectedYear === 'ALL' || line.linePeriodStart?.startsWith(selectedYear)) && (!selectedCategory || matchesCategory(line))).length > 0 && (
+            <section className="bdg-monthly" aria-label="Seguimiento por periodo">
+              <h4>Seguimiento por periodo</h4>
+              <div className="bdg-snap-lines">
+                {(snapshot.periodicLines ?? []).filter(line => (selectedYear === 'ALL' || line.linePeriodStart?.startsWith(selectedYear)) && (!selectedCategory || matchesCategory(line))).map(line => (
+                  <SnapshotLine key={line.id ?? `${line.lineType}-${line.categoryId}-${line.linePeriodStart}`} line={line} currency={plan.currency} />
+                ))}
+              </div>
             </section>
           )}
 
@@ -1018,16 +1055,16 @@ function PlansGrid({ plans, onSelect, onEdit, onDelete, onSetPrimary, onNew }: P
               <div className="bdg-card-name">{plan.name}</div>
               {plan.description && <div className="bdg-card-desc">{plan.description}</div>}
               <div className="bdg-card-meta">
-                <span className="bdg-period-pill small">{PERIOD_LABELS[plan.period]}</span>
+                <span className="bdg-period-pill small">{plan.lines.some(line => line.linePeriod) ? 'Por partida' : PERIOD_LABELS[plan.period]}</span>
                 <span className="bdg-card-currency">{plan.currency}</span>
               </div>
               <div className="bdg-card-stats">
                 <span>💸 {plan.lines.filter(l => l.lineType !== 'INCOME').length} gasto{plan.lines.filter(l => l.lineType !== 'INCOME').length !== 1 ? 's' : ''}
-                  {' · '}{fmt(plan.lines.filter(l => l.lineType !== 'INCOME').reduce((s, l) => s + l.budgetAmount, 0), plan.currency)}
+                  {new Set(plan.lines.filter(l => l.lineType !== 'INCOME').map(l => l.linePeriod ?? plan.period)).size <= 1 && <> · {fmt(plan.lines.filter(l => l.lineType !== 'INCOME').reduce((s, l) => s + l.budgetAmount, 0), plan.currency)}</>}
                 </span>
                 {plan.lines.some(l => l.lineType === 'INCOME') && (
                   <span>💰 {plan.lines.filter(l => l.lineType === 'INCOME').length} ingreso{plan.lines.filter(l => l.lineType === 'INCOME').length !== 1 ? 's' : ''}
-                    {' · '}{fmt(plan.lines.filter(l => l.lineType === 'INCOME').reduce((s, l) => s + l.budgetAmount, 0), plan.currency)}
+                    {new Set(plan.lines.filter(l => l.lineType === 'INCOME').map(l => l.linePeriod ?? plan.period)).size <= 1 && <> · {fmt(plan.lines.filter(l => l.lineType === 'INCOME').reduce((s, l) => s + l.budgetAmount, 0), plan.currency)}</>}
                   </span>
                 )}
               </div>

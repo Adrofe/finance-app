@@ -120,6 +120,7 @@ public class BudgetSnapshotCalculator {
                 .categoryId(planLine.getCategoryId())
                 .categoryCode(planLine.getCategoryCode())
                 .categoryName(planLine.getCategoryName())
+                .linePeriod(planLine.getLinePeriod())
                 .budgetAmount(budgetAmount)
                 .spentAmount(spentAmount)
                 .variance(variance)

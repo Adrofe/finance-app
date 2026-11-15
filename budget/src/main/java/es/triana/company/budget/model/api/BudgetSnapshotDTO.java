@@ -31,4 +31,5 @@ public class BudgetSnapshotDTO {
     private BigDecimal netBalance;
     private List<BudgetSnapshotLineDTO> lines;
     private List<BudgetMonthDTO> months;
+    private List<BudgetSnapshotLineDTO> periodicLines;
 }

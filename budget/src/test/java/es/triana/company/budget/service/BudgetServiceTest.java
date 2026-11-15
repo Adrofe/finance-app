@@ -26,6 +26,7 @@ import es.triana.company.budget.model.api.BudgetMonthDTO;
 import es.triana.company.budget.model.api.BankingCategoryDTO;
 import es.triana.company.budget.model.api.BankingTransactionDTO;
 import es.triana.company.budget.model.BudgetLineType;
+import es.triana.company.budget.model.BudgetLinePeriod;
 import es.triana.company.budget.model.BudgetPeriod;
 import es.triana.company.budget.model.db.BudgetPlan;
 import es.triana.company.budget.model.db.BudgetPlanLine;
@@ -42,6 +43,12 @@ class BudgetServiceTest {
     @Mock private BudgetTransactionMatcher matcher;
     @Mock private BudgetSnapshotCalculator calculator;
     @InjectMocks private BudgetService service;
+
+    @Test
+    void mapsThePeriodOfEachBudgetLine() {
+        BudgetPlanLine line = BudgetPlanLine.builder().linePeriod(BudgetLinePeriod.SEMIANNUAL).build();
+        assertEquals(BudgetLinePeriod.SEMIANNUAL, new BudgetMapper().toPlanLineDto(line).getLinePeriod());
+    }
 
     @Test
     void marksPlanPrimaryWithinItsTenant() {
@@ -91,6 +98,86 @@ class BudgetServiceTest {
         assertEquals(true, months.get(1).getCompliant());
         assertEquals(0, months.get(2).getTotalSpent().compareTo(BigDecimal.ZERO));
         assertEquals(2, result.getLines().size());
+    }
+
+    @Test
+    void evaluatesLongPeriodsFromTheirCalendarStartWithoutChangingMonthlyTotals() {
+        BudgetService realService = new BudgetService(plans, snapshots, banking, new BudgetMapper(), new BudgetTransactionMatcher(), new BudgetSnapshotCalculator());
+        BudgetPlanLine monthly = BudgetPlanLine.builder().id(1L).categoryId(10L).categoryCode("FOOD").categoryName("Food").budgetAmount(new BigDecimal("400.00")).lineType(BudgetLineType.EXPENSE).linePeriod(BudgetLinePeriod.MONTHLY).build();
+        BudgetPlanLine annual = BudgetPlanLine.builder().id(2L).categoryId(20L).categoryCode("TRAVEL").categoryName("Travel").budgetAmount(new BigDecimal("1800.00")).lineType(BudgetLineType.EXPENSE).linePeriod(BudgetLinePeriod.ANNUAL).build();
+        BudgetPlan plan = BudgetPlan.builder().id(5L).tenantId(7L).currency("EUR").period(BudgetPeriod.MONTHLY).lines(List.of(monthly, annual)).build();
+        LocalDate start = LocalDate.of(2026, 6, 1);
+        LocalDate end = LocalDate.of(2026, 6, 15);
+        when(plans.findByIdAndTenantIdForUpdate(5L, 7L)).thenReturn(Optional.of(plan));
+        when(banking.getCategories("token")).thenReturn(List.of(
+                BankingCategoryDTO.builder().id(10L).code("FOOD").name("Food").build(),
+                BankingCategoryDTO.builder().id(20L).code("TRAVEL").name("Travel").build()));
+        when(banking.getTransactions("token", LocalDate.of(2026, 1, 1), end)).thenReturn(List.of(
+                BankingTransactionDTO.builder().categoryId(20L).bookingDate(LocalDate.of(2026, 3, 10).atStartOfDay()).amount(-800.0).currency("EUR").build(),
+                BankingTransactionDTO.builder().categoryId(20L).bookingDate(LocalDate.of(2026, 6, 10).atStartOfDay()).amount(-400.0).currency("EUR").build(),
+                BankingTransactionDTO.builder().categoryId(10L).bookingDate(LocalDate.of(2026, 6, 11).atStartOfDay()).amount(-100.0).currency("EUR").build()));
+        when(snapshots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = realService.refreshSnapshot(7L, "token", 5L, start, end);
+        assertEquals(0, result.getTotalBudget().compareTo(new BigDecimal("400.00")));
+        assertEquals(0, result.getTotalSpent().compareTo(new BigDecimal("100.00")));
+        assertEquals(0, result.getMonths().get(0).getTotalSpent().compareTo(new BigDecimal("100.00")));
+        var annualResult = result.getPeriodicLines().get(0);
+        assertEquals(LocalDate.of(2026, 1, 1), annualResult.getLinePeriodStart());
+        assertEquals(LocalDate.of(2026, 12, 31), annualResult.getLinePeriodEnd());
+        assertEquals(end, annualResult.getLineObservedUntil());
+        assertEquals(0, annualResult.getSpentAmount().compareTo(new BigDecimal("1200.00")));
+        assertEquals(0, annualResult.getVariance().compareTo(new BigDecimal("600.00")));
+        assertEquals(true, annualResult.getCompliant());
+    }
+
+    @Test
+    void startsNewNaturalPeriodsAcrossQuarterSemesterAndYearBoundaries() {
+        BudgetService realService = new BudgetService(plans, snapshots, banking, new BudgetMapper(), new BudgetTransactionMatcher(), new BudgetSnapshotCalculator());
+        BudgetPlanLine quarterly = BudgetPlanLine.builder().id(1L).categoryId(10L).categoryCode("TAX").categoryName("Tax").budgetAmount(new BigDecimal("300.00")).lineType(BudgetLineType.EXPENSE).linePeriod(BudgetLinePeriod.QUARTERLY).build();
+        BudgetPlanLine semester = BudgetPlanLine.builder().id(2L).categoryId(20L).categoryCode("INSURANCE").categoryName("Insurance").budgetAmount(new BigDecimal("600.00")).lineType(BudgetLineType.EXPENSE).linePeriod(BudgetLinePeriod.SEMIANNUAL).build();
+        BudgetPlan plan = BudgetPlan.builder().id(5L).tenantId(7L).currency("EUR").period(BudgetPeriod.MONTHLY).lines(List.of(quarterly, semester)).build();
+        LocalDate start = LocalDate.of(2025, 12, 1);
+        LocalDate end = LocalDate.of(2026, 1, 31);
+        when(plans.findByIdAndTenantIdForUpdate(5L, 7L)).thenReturn(Optional.of(plan));
+        when(banking.getCategories("token")).thenReturn(List.of(
+                BankingCategoryDTO.builder().id(10L).code("TAX").name("Tax").build(),
+                BankingCategoryDTO.builder().id(20L).code("INSURANCE").name("Insurance").build()));
+        when(banking.getTransactions("token", LocalDate.of(2025, 7, 1), end)).thenReturn(List.of());
+        when(snapshots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var lines = realService.refreshSnapshot(7L, "token", 5L, start, end).getPeriodicLines();
+        assertEquals(4, lines.size());
+        assertEquals(LocalDate.of(2025, 10, 1), lines.get(0).getLinePeriodStart());
+        assertEquals(LocalDate.of(2026, 1, 1), lines.get(1).getLinePeriodStart());
+        assertEquals(LocalDate.of(2025, 7, 1), lines.get(2).getLinePeriodStart());
+        assertEquals(LocalDate.of(2026, 1, 1), lines.get(3).getLinePeriodStart());
+        assertEquals(LocalDate.of(2026, 6, 30), lines.get(3).getLinePeriodEnd());
+    }
+
+    @Test
+    void resetsAnnualLinesAndDoesNotCountChildCategoryTransactionsTwice() {
+        BudgetService realService = new BudgetService(plans, snapshots, banking, new BudgetMapper(), new BudgetTransactionMatcher(), new BudgetSnapshotCalculator());
+        BudgetPlanLine parent = BudgetPlanLine.builder().id(1L).categoryId(10L).categoryCode("TRAVEL").categoryName("Travel").budgetAmount(new BigDecimal("1000.00")).lineType(BudgetLineType.EXPENSE).linePeriod(BudgetLinePeriod.ANNUAL).build();
+        BudgetPlanLine child = BudgetPlanLine.builder().id(2L).categoryId(20L).categoryCode("TRAVEL.FLIGHTS").categoryName("Flights").budgetAmount(new BigDecimal("200.00")).lineType(BudgetLineType.EXPENSE).linePeriod(BudgetLinePeriod.MONTHLY).build();
+        BudgetPlan plan = BudgetPlan.builder().id(5L).tenantId(7L).currency("EUR").period(BudgetPeriod.MONTHLY).lines(List.of(parent, child)).build();
+        LocalDate start = LocalDate.of(2026, 12, 1);
+        LocalDate end = LocalDate.of(2027, 1, 31);
+        when(plans.findByIdAndTenantIdForUpdate(5L, 7L)).thenReturn(Optional.of(plan));
+        when(banking.getCategories("token")).thenReturn(List.of(
+                BankingCategoryDTO.builder().id(10L).code("TRAVEL").name("Travel").build(),
+                BankingCategoryDTO.builder().id(20L).code("TRAVEL.FLIGHTS").name("Flights").build()));
+        when(banking.getTransactions("token", LocalDate.of(2026, 1, 1), end)).thenReturn(List.of(
+                BankingTransactionDTO.builder().categoryId(10L).bookingDate(LocalDate.of(2026, 3, 10).atStartOfDay()).amount(-600.0).currency("EUR").build(),
+                BankingTransactionDTO.builder().categoryId(10L).bookingDate(LocalDate.of(2027, 1, 10).atStartOfDay()).amount(-200.0).currency("EUR").build(),
+                BankingTransactionDTO.builder().categoryId(20L).bookingDate(LocalDate.of(2027, 1, 12).atStartOfDay()).amount(-50.0).currency("EUR").build()));
+        when(snapshots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = realService.refreshSnapshot(7L, "token", 5L, start, end);
+        assertEquals(2, result.getPeriodicLines().size());
+        assertEquals(0, result.getPeriodicLines().get(0).getSpentAmount().compareTo(new BigDecimal("600.00")));
+        assertEquals(0, result.getPeriodicLines().get(1).getSpentAmount().compareTo(new BigDecimal("200.00")));
+        assertEquals(0, result.getTotalSpent().compareTo(new BigDecimal("50.00")));
     }
 
     @Test

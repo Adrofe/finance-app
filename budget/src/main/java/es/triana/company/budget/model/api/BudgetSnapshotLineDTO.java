@@ -3,6 +3,8 @@ package es.triana.company.budget.model.api;
 import java.math.BigDecimal;
 
 import es.triana.company.budget.model.BudgetLineType;
+import es.triana.company.budget.model.BudgetLinePeriod;
+import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,6 +21,10 @@ public class BudgetSnapshotLineDTO {
     private String categoryCode;
     private String categoryName;
     private BigDecimal budgetAmount;
+    private BudgetLinePeriod linePeriod;
+    private LocalDate linePeriodStart;
+    private LocalDate linePeriodEnd;
+    private LocalDate lineObservedUntil;
     private BigDecimal spentAmount;
     private BigDecimal variance;
     private Long transactionCount;
