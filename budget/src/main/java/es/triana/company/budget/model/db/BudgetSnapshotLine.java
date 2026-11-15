@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import es.triana.company.budget.model.BudgetLineType;
+import es.triana.company.budget.model.BudgetLinePeriod;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -39,6 +40,19 @@ public class BudgetSnapshotLine {
 
     @Column(name = "month_start")
     private LocalDate monthStart;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "line_period", length = 16)
+    private BudgetLinePeriod linePeriod;
+
+    @Column(name = "line_period_start")
+    private LocalDate linePeriodStart;
+
+    @Column(name = "line_period_end")
+    private LocalDate linePeriodEnd;
+
+    @Column(name = "line_observed_until")
+    private LocalDate lineObservedUntil;
 
     @Column(name = "category_id", nullable = false)
     private Long categoryId;

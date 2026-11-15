@@ -3,6 +3,7 @@ package es.triana.company.budget.model.api;
 import java.math.BigDecimal;
 
 import es.triana.company.budget.model.BudgetLineType;
+import es.triana.company.budget.model.BudgetLinePeriod;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,5 +20,6 @@ public class BudgetPlanLineDTO {
     private String categoryCode;
     private String categoryName;
     private BigDecimal budgetAmount;
+    private BudgetLinePeriod linePeriod;
     private BudgetLineType lineType;
 }

@@ -1,12 +1,14 @@
 export type BudgetLineType = 'EXPENSE' | 'INCOME';
 
 export type BudgetPeriod = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'CUSTOM';
+export type BudgetLinePeriod = 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUAL' | 'ANNUAL';
 
 export type BudgetPlanLineRequest = {
   categoryId?: number;
   categoryCode: string;
   categoryName: string;
   budgetAmount: number;
+  linePeriod?: BudgetLinePeriod | null;
   lineType: BudgetLineType;
 };
 
@@ -27,6 +29,7 @@ export type BudgetPlanLineDTO = {
   categoryCode: string;
   categoryName: string;
   budgetAmount: number;
+  linePeriod?: BudgetLinePeriod | null;
   lineType: BudgetLineType;
 };
 
@@ -49,6 +52,10 @@ export type BudgetSnapshotLineDTO = {
   categoryCode: string;
   categoryName: string;
   budgetAmount: number;
+  linePeriod?: BudgetLinePeriod | null;
+  linePeriodStart?: string | null;
+  linePeriodEnd?: string | null;
+  lineObservedUntil?: string | null;
   spentAmount: number;
   variance: number;
   compliant: boolean;
@@ -83,4 +90,5 @@ export type BudgetSnapshotDTO = {
   netBalance: number;
   lines: BudgetSnapshotLineDTO[];
   months: BudgetMonthDTO[];
+  periodicLines?: BudgetSnapshotLineDTO[];
 };
