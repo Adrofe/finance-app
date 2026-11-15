@@ -1,15 +1,16 @@
 import axios from 'axios';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import {
   createBudgetPlan,
   deleteBudgetPlan,
   fetchBudgetPlans,
-  fetchLatestSnapshot,
   refreshBudgetSnapshot,
+  setPrimaryBudgetPlan,
 } from '../services/budgetService';
+import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import { CatalogService } from '../services/catalogService';
 import type { TransactionCategory } from '../services/catalogService';
 import { getCategoryVisual } from '../constants/visualConfig';
@@ -22,13 +23,14 @@ import type {
   BudgetSnapshotDTO,
   BudgetSnapshotLineDTO,
 } from '../types/budget';
+import './investment-type-filter.css';
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 const fmt = (n: number, currency = 'EUR') =>
   new Intl.NumberFormat('es-ES', { style: 'currency', currency }).format(n);
 
 const pct = (spent: number, budget: number) =>
-  budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+  budget > 0 ? Math.min(Math.max((spent / budget) * 100, 0), 100) : spent > 0 ? 100 : 0;
 
 const PERIOD_LABELS: Record<BudgetPeriod, string> = {
   MONTHLY: 'Mensual',
@@ -56,17 +58,17 @@ const getCategoryEmoji = (code: string): string => {
   return CATEGORY_EMOJIS[prefix] ?? '📂';
 };
 
+const toISO = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toISO(new Date());
 }
 
 function firstDayOfMonth(): string {
   const d = new Date();
   d.setDate(1);
-  return d.toISOString().slice(0, 10);
+  return toISO(d);
 }
-
-const toISO = (d: Date) => d.toISOString().slice(0, 10);
 
 type BudgetPreset = 'this-month' | 'last-month' | '3-months' | '6-months' | 'this-year' | 'custom';
 
@@ -522,51 +524,55 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
   const [startDate, setStartDate] = useState(() => getBudgetPresetDates('this-month').start);
   const [endDate, setEndDate] = useState(() => getBudgetPresetDates('this-month').end);
   const [chartView, setChartView] = useState<'subcategory' | 'parent'>('subcategory');
-
-  const loadSnapshot = useCallback(async () => {
-    try {
-      setLoadingSnap(true);
-      const snap = await fetchLatestSnapshot(token, plan.id);
-      setSnapshot(snap);
-    } catch (err: unknown) {
-      if (axios.isAxiosError(err) && err.response?.status === 401) {
-        onUnauthorized?.('Sesión expirada');
-      }
-    } finally {
-      setLoadingSnap(false);
-    }
-  }, [token, plan.id, onUnauthorized]);
-
-  useEffect(() => { loadSnapshot(); }, [loadSnapshot]);
-
-  // Re-run refresh whenever the plan object is replaced (e.g. after editing)
-  const prevPlanRef = useRef(plan);
-  useEffect(() => {
-    if (prevPlanRef.current !== plan) {
-      prevPlanRef.current = plan;
-      doRefresh(startDate, endDate);
-    }
-  });
+  const [selectedYear, setSelectedYear] = useState('ALL');
+  const [selectedCategory, setSelectedCategory] = useState<{ key: string; label: string } | null>(null);
+  const requestId = useRef(0);
 
   const doRefresh = useCallback(async (start: string, end: string) => {
     setError(null);
     if (!start || !end) { setError('Selecciona un rango de fechas'); return; }
+    if (start > end) { setError('La fecha inicial debe ser anterior a la fecha final'); return; }
+    const currentRequest = ++requestId.current;
     try {
       setRefreshing(true);
       const snap = await refreshBudgetSnapshot(token, plan.id, start, end);
-      setSnapshot(snap);
+      if (currentRequest === requestId.current) setSnapshot(snap);
     } catch (err: unknown) {
+      if (currentRequest !== requestId.current) return;
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         onUnauthorized?.('Sesión expirada');
       } else {
-        setError('Error calculando el presupuesto');
+        setError(axios.isAxiosError(err) && err.response?.status === 422
+          ? 'Hay transacciones en otra divisa. El presupuesto aún no convierte divisas automáticamente.'
+          : axios.isAxiosError(err) ? err.response?.data?.message || 'Error calculando el presupuesto' : 'Error calculando el presupuesto');
       }
     } finally {
-      setRefreshing(false);
+      if (currentRequest === requestId.current) {
+        setRefreshing(false);
+        setLoadingSnap(false);
+      }
     }
   }, [token, plan.id, onUnauthorized]);
 
-  const handleRefresh = () => doRefresh(startDate, endDate);
+  useEffect(() => {
+    const range = getBudgetPresetDates('this-month');
+    void doRefresh(range.start, range.end);
+    return () => { requestId.current += 1; };
+  }, [doRefresh]);
+
+  const prevPlanRef = useRef(plan);
+  useEffect(() => {
+    if (prevPlanRef.current !== plan) {
+      prevPlanRef.current = plan;
+      void doRefresh(startDate, endDate);
+    }
+  }, [plan, doRefresh, startDate, endDate]);
+
+  const handleRefresh = () => {
+    setSelectedYear('ALL');
+    setSelectedCategory(null);
+    void doRefresh(startDate, endDate);
+  };
 
   const handlePreset = (p: BudgetPreset) => {
     setPreset(p);
@@ -574,23 +580,60 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
       const { start, end } = getBudgetPresetDates(p);
       setStartDate(start);
       setEndDate(end);
+      setSelectedYear('ALL');
+      setSelectedCategory(null);
       doRefresh(start, end);
     }
   };
 
-  const totalProgress = snapshot ? pct(snapshot.totalSpent, snapshot.totalBudget) : 0;
+  const months = snapshot?.months ?? [];
+  const years = [...new Set(months.map(month => month.monthStart.slice(0, 4)))].sort().reverse();
+  const shownMonths = selectedYear === 'ALL' ? months : months.filter(month => month.monthStart.startsWith(selectedYear));
+  const yearLines = useMemo(() => {
+    if (!snapshot) return [];
+    if (selectedYear === 'ALL' || months.length === 0) return snapshot.lines;
+    const grouped = new Map<string, BudgetSnapshotLineDTO>();
+    shownMonths.flatMap(month => month.lines).forEach(line => {
+      const key = `${line.lineType}:${line.categoryId ?? line.categoryCode}`;
+      const previous = grouped.get(key);
+      if (!previous) grouped.set(key, { ...line });
+      else {
+        previous.budgetAmount += Number(line.budgetAmount) || 0;
+        previous.spentAmount += Number(line.spentAmount) || 0;
+        previous.transactionCount += Number(line.transactionCount) || 0;
+      }
+    });
+    return [...grouped.values()].map(line => {
+      const variance = line.lineType === 'INCOME' ? line.spentAmount - line.budgetAmount : line.budgetAmount - line.spentAmount;
+      return { ...line, variance, compliant: variance >= 0 };
+    });
+  }, [snapshot, selectedYear, months, shownMonths]);
+  const displayedTotals = useMemo(() => {
+    if (!snapshot) return null;
+    if (selectedYear === 'ALL' || months.length === 0) return snapshot;
+    const totals = shownMonths.reduce((result, month) => ({
+      totalBudget: result.totalBudget + Number(month.totalBudget), totalSpent: result.totalSpent + Number(month.totalSpent),
+      totalExpectedIncome: result.totalExpectedIncome + Number(month.totalExpectedIncome), totalIncome: result.totalIncome + Number(month.totalIncome),
+    }), { totalBudget: 0, totalSpent: 0, totalExpectedIncome: 0, totalIncome: 0 });
+    return { ...snapshot, ...totals, variance: totals.totalBudget - totals.totalSpent, compliant: totals.totalSpent <= totals.totalBudget,
+      incomeVariance: totals.totalIncome - totals.totalExpectedIncome, netBalance: totals.totalIncome - totals.totalSpent };
+  }, [snapshot, selectedYear, months, shownMonths]);
+  const totalProgress = displayedTotals ? pct(displayedTotals.totalSpent, displayedTotals.totalBudget) : 0;
+  const exceededMonths = shownMonths.filter(month => !month.compliant).length;
+  const categoryKey = (line: BudgetSnapshotLineDTO) => chartView === 'parent' ? line.categoryCode.split('.')[0] : String(line.categoryId ?? line.categoryCode);
+  const matchesCategory = (line: BudgetSnapshotLineDTO) => !selectedCategory || categoryKey(line) === selectedCategory.key;
 
   const expenseChartData = useMemo(() => {
     if (!snapshot) return [];
-    const expenseLines = snapshot.lines.filter(l => l.lineType !== 'INCOME');
+    const expenseLines = yearLines.filter(l => l.lineType !== 'INCOME');
     if (chartView === 'subcategory') {
       return expenseLines.map(l => ({
-        name: l.categoryName || l.categoryCode,
+        name: l.categoryName || l.categoryCode, key: String(l.categoryId ?? l.categoryCode),
         Presupuesto: Number(l.budgetAmount) || 0,
         Gastado: Number(l.spentAmount) || 0,
       }));
     }
-    const map = new Map<string, { name: string; Presupuesto: number; Gastado: number }>();
+    const map = new Map<string, { name: string; key: string; Presupuesto: number; Gastado: number }>();
     for (const l of expenseLines) {
       const parent = l.categoryCode ? l.categoryCode.split('.')[0] : (l.categoryName || 'OTRO');
       const existing = map.get(parent);
@@ -600,13 +643,23 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
       } else {
         map.set(parent, {
           name: getCategoryEmoji(parent) + ' ' + parent,
+          key: parent,
           Presupuesto: Number(l.budgetAmount) || 0,
           Gastado: Number(l.spentAmount) || 0,
         });
       }
     }
     return Array.from(map.values());
-  }, [snapshot, chartView]);
+  }, [snapshot, chartView, yearLines]);
+
+  const trendData = shownMonths.map(month => {
+    const lines = month.lines.filter(line => line.lineType !== 'INCOME' && matchesCategory(line));
+    return {
+      name: new Date(Number(month.monthStart.slice(0, 4)), Number(month.monthStart.slice(5, 7)) - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }),
+      Presupuesto: lines.reduce((sum, line) => sum + Number(line.budgetAmount), 0),
+      Gastado: lines.reduce((sum, line) => sum + Number(line.spentAmount), 0),
+    };
+  });
 
   return (
     <div className="bdg-detail">
@@ -638,12 +691,12 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
         {preset === 'custom' && (
           <>
             <div className="bdg-date-group">
-              <label>Desde</label>
-              <input type="date" className="bdg-input small" value={startDate} onChange={e => setStartDate(e.target.value)} />
+              <label htmlFor="budget-range-start">Desde</label>
+              <input id="budget-range-start" type="date" className="bdg-input small" value={startDate} onChange={e => setStartDate(e.target.value)} />
             </div>
             <div className="bdg-date-group">
-              <label>Hasta</label>
-              <input type="date" className="bdg-input small" value={endDate} onChange={e => setEndDate(e.target.value)} />
+              <label htmlFor="budget-range-end">Hasta</label>
+              <input id="budget-range-end" type="date" className="bdg-input small" value={endDate} onChange={e => setEndDate(e.target.value)} />
             </div>
             <button
               type="button"
@@ -658,6 +711,14 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
         {refreshing && preset !== 'custom' && (
           <span className="bdg-loading-hint">⟳ Calculando…</span>
         )}
+        {years.length > 0 && (
+          <label className="bdg-year-filter">Año
+            <select className="bdg-input small" value={selectedYear} onChange={event => setSelectedYear(event.target.value)}>
+              <option value="ALL">Todos</option>
+              {years.map(year => <option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>
+        )}
       </div>
       {error && <p className="bdg-error">{error}</p>}
 
@@ -669,50 +730,51 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
           <p>Aún no hay análisis. Selecciona un rango y pulsa <strong>Calcular</strong>.</p>
         </div>
       )}
-      {snapshot && (
+      {snapshot && displayedTotals && (
         <>
           <div className="bdg-snap-summary">
             <div className="bdg-snap-kpi">
               <span className="bdg-kpi-label">Presupuesto total</span>
-              <span className="bdg-kpi-value">{fmt(snapshot.totalBudget, plan.currency)}</span>
+              <span className="bdg-kpi-value">{fmt(displayedTotals.totalBudget, plan.currency)}</span>
             </div>
             <div className="bdg-snap-kpi">
               <span className="bdg-kpi-label">Gastado</span>
-              <span className={`bdg-kpi-value ${snapshot.totalSpent > snapshot.totalBudget ? 'bdg-over' : ''}`}>
-                {fmt(snapshot.totalSpent, plan.currency)}
+              <span className={`bdg-kpi-value ${displayedTotals.totalSpent > displayedTotals.totalBudget ? 'bdg-over' : ''}`}>
+                {fmt(displayedTotals.totalSpent, plan.currency)}
               </span>
             </div>
             <div className="bdg-snap-kpi">
               <span className="bdg-kpi-label">Restante</span>
-              <span className={`bdg-kpi-value ${(snapshot.variance ?? 0) < 0 ? 'bdg-over' : 'bdg-ok'}`}>
-                {fmt(snapshot.variance ?? 0, plan.currency)}
+              <span className={`bdg-kpi-value ${(displayedTotals.variance ?? 0) < 0 ? 'bdg-over' : 'bdg-ok'}`}>
+                {fmt(displayedTotals.variance ?? 0, plan.currency)}
               </span>
             </div>
             <div className="bdg-snap-kpi">
               <span className="bdg-kpi-label">Estado global</span>
-              <span className={`bdg-badge large ${snapshot.compliant ? 'ok' : 'ko'}`}>
-                {snapshot.compliant ? '✓ Dentro del presupuesto' : '✗ Presupuesto superado'}
+              <span className={`bdg-badge large ${displayedTotals.compliant ? 'ok' : 'ko'}`}>
+                {displayedTotals.compliant ? '✓ Dentro del presupuesto' : '✗ Presupuesto superado'}
               </span>
+              {exceededMonths > 0 && <small className="bdg-month-warning">{exceededMonths} {exceededMonths === 1 ? 'mes excedido' : 'meses excedidos'}</small>}
             </div>
           </div>
 
           {/* Income summary KPIs (shown only if there are income lines) */}
-          {snapshot.totalExpectedIncome != null && snapshot.totalExpectedIncome > 0 && (
+          {displayedTotals.totalExpectedIncome != null && displayedTotals.totalExpectedIncome > 0 && (
             <div className="bdg-snap-summary income-row">
               <div className="bdg-snap-kpi">
                 <span className="bdg-kpi-label">Ingreso esperado</span>
-                <span className="bdg-kpi-value income">{fmt(snapshot.totalExpectedIncome, plan.currency)}</span>
+                <span className="bdg-kpi-value income">{fmt(displayedTotals.totalExpectedIncome, plan.currency)}</span>
               </div>
               <div className="bdg-snap-kpi">
                 <span className="bdg-kpi-label">Ingreso real</span>
-                <span className={`bdg-kpi-value ${(snapshot.totalIncome ?? 0) >= snapshot.totalExpectedIncome ? 'bdg-ok' : 'bdg-over'}`}>
-                  {fmt(snapshot.totalIncome ?? 0, plan.currency)}
+                <span className={`bdg-kpi-value ${(displayedTotals.totalIncome ?? 0) >= displayedTotals.totalExpectedIncome ? 'bdg-ok' : 'bdg-over'}`}>
+                  {fmt(displayedTotals.totalIncome ?? 0, plan.currency)}
                 </span>
               </div>
               <div className="bdg-snap-kpi">
                 <span className="bdg-kpi-label">Balance neto</span>
-                <span className={`bdg-kpi-value ${(snapshot.netBalance ?? 0) >= 0 ? 'bdg-ok' : 'bdg-over'}`}>
-                  {(snapshot.netBalance ?? 0) >= 0 ? '+' : ''}{fmt(snapshot.netBalance ?? 0, plan.currency)}
+                <span className={`bdg-kpi-value ${(displayedTotals.netBalance ?? 0) >= 0 ? 'bdg-ok' : 'bdg-over'}`}>
+                  {(displayedTotals.netBalance ?? 0) >= 0 ? '+' : ''}{fmt(displayedTotals.netBalance ?? 0, plan.currency)}
                 </span>
               </div>
             </div>
@@ -722,7 +784,7 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
           <div className="bdg-global-bar-wrap">
             <div className="bdg-bar-track global">
               <div
-                className={`bdg-bar-fill ${snapshot.totalSpent > snapshot.totalBudget ? 'over' : ''}`}
+                className={`bdg-bar-fill ${displayedTotals.totalSpent > displayedTotals.totalBudget ? 'over' : ''}`}
                 style={{ width: `${totalProgress}%` }}
               />
             </div>
@@ -730,8 +792,9 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
           </div>
 
           <div className="bdg-snap-period">
-            Período analizado: <strong>{snapshot.startDate}</strong> — <strong>{snapshot.endDate}</strong>
-            &nbsp;·&nbsp; Calculado el {new Date(snapshot.computedAt).toLocaleString('es-ES')}
+            Período analizado: <strong>{snapshot.periodStart}</strong> — <strong>{snapshot.periodEnd}</strong>
+            &nbsp;·&nbsp; Calculado el {snapshot.generatedAt ? new Date(snapshot.generatedAt).toLocaleString('es-ES') : '—'}
+            <span className="bdg-period-note">Los meses parciales se comparan con su presupuesto mensual completo.</span>
           </div>
 
           {/* Budget vs spent chart */}
@@ -743,14 +806,19 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
                   <button
                     type="button"
                     className={`bdg-preset-btn small${chartView === 'subcategory' ? ' active' : ''}`}
-                    onClick={() => setChartView('subcategory')}
+                    onClick={() => { setChartView('subcategory'); setSelectedCategory(null); }}
                   >Subcategoría</button>
                   <button
                     type="button"
                     className={`bdg-preset-btn small${chartView === 'parent' ? ' active' : ''}`}
-                    onClick={() => setChartView('parent')}
+                    onClick={() => { setChartView('parent'); setSelectedCategory(null); }}
                   >Categoría padre</button>
                 </div>
+              </div>
+              <div className="bdg-category-options" role="group" aria-label="Filtrar por categoría">
+                {expenseChartData.map(item => (
+                  <button type="button" key={item.key} className={`investment-type-filter-button${selectedCategory?.key === item.key ? ' active' : ''}`} aria-pressed={selectedCategory?.key === item.key} onClick={() => setSelectedCategory(current => current?.key === item.key ? null : { key: item.key, label: item.name })}>{item.name}</button>
+                ))}
               </div>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={expenseChartData} margin={{ top: 8, right: 16, left: 16, bottom: 60 }}>
@@ -776,23 +844,73 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
                     contentStyle={{ fontSize: '0.85rem', borderRadius: '8px', border: '1px solid var(--line)' }}
                   />
                   <Legend verticalAlign="top" wrapperStyle={{ fontSize: '0.85rem', paddingBottom: '8px' }} />
-                  <Bar dataKey="Presupuesto" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  <Bar dataKey="Presupuesto" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={48} onClick={entry => { const item = entry.payload as { key: string; name: string }; setSelectedCategory({ key: item.key, label: item.name }); }} />
                   <Bar
                     dataKey="Gastado"
                     radius={[4, 4, 0, 0]}
                     maxBarSize={48}
                     fill="#ef4444"
                     label={false}
+                    onClick={entry => { const item = entry.payload as { key: string; name: string }; setSelectedCategory({ key: item.key, label: item.name }); }}
                   />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
 
+          {selectedCategory && (
+            <div className="bdg-category-selection">
+              <span>Categoría: <strong>{selectedCategory.label}</strong></span>
+              <button type="button" className="btn small" onClick={() => setSelectedCategory(null)}>Todas las categorías</button>
+            </div>
+          )}
+
+          {months.length > 0 && (
+            <section className="bdg-monthly" aria-label="Seguimiento mensual">
+              <h4>Seguimiento mensual{selectedCategory ? ` · ${selectedCategory.label}` : ''}</h4>
+              {selectedCategory && trendData.length > 0 && (
+                <div className="bdg-trend-chart">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={trendData} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip formatter={value => typeof value === 'number' ? fmt(value, plan.currency) : String(value)} />
+                      <Legend />
+                      <Line type="monotone" dataKey="Presupuesto" stroke="#3b82f6" />
+                      <Line type="monotone" dataKey="Gastado" stroke="#ef4444" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {shownMonths.map(month => {
+                const lines = month.lines.filter(line => line.lineType !== 'INCOME' && matchesCategory(line));
+                const incomeLines = selectedCategory ? [] : month.lines.filter(line => line.lineType === 'INCOME');
+                const budget = selectedCategory ? lines.reduce((sum, line) => sum + Number(line.budgetAmount), 0) : Number(month.totalBudget);
+                const spent = selectedCategory ? lines.reduce((sum, line) => sum + Number(line.spentAmount), 0) : Number(month.totalSpent);
+                const year = Number(month.monthStart.slice(0, 4));
+                const monthNumber = Number(month.monthStart.slice(5, 7));
+                const label = new Date(year, monthNumber - 1, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+                const partial = snapshot.periodStart > month.monthStart || snapshot.periodEnd < toISO(new Date(year, monthNumber, 0));
+                return (
+                  <details key={month.monthStart} className="bdg-month-row">
+                    <summary><strong>{label}</strong><span>{fmt(spent, plan.currency)} / {fmt(budget, plan.currency)}</span><span className={`bdg-badge ${spent <= budget ? 'ok' : 'ko'}`}>{spent > budget ? 'Superado' : partial ? 'Dentro del presupuesto' : 'Cumplido'}</span></summary>
+                    <div className="bdg-month-lines">
+                      {lines.length > 0 && <strong className="bdg-month-line-heading">Gastos</strong>}
+                      {lines.map(line => <SnapshotLine key={line.id ?? `${month.monthStart}-${line.categoryCode}`} line={line} currency={plan.currency} />)}
+                      {incomeLines.length > 0 && <strong className="bdg-month-line-heading">Ingresos</strong>}
+                      {incomeLines.map(line => <SnapshotLine key={line.id ?? `${month.monthStart}-${line.categoryCode}-income`} line={line} currency={plan.currency} />)}
+                    </div>
+                  </details>
+                );
+              })}
+            </section>
+          )}
+
           {/* Per-category lines split by type */}
           {(() => {
-            const expenseLines = snapshot.lines.filter(l => l.lineType !== 'INCOME');
-            const incomeLines = snapshot.lines.filter(l => l.lineType === 'INCOME');
+            const expenseLines = yearLines.filter(l => l.lineType !== 'INCOME' && matchesCategory(l));
+            const incomeLines = selectedCategory ? [] : yearLines.filter(l => l.lineType === 'INCOME');
             return (
               <>
                 {incomeLines.length > 0 && (
@@ -800,10 +918,10 @@ function PlanDetail({ plan, token, onBack, onEdit, onUnauthorized }: PlanDetailP
                     <div className="bdg-section-divider income">
                       <span>💰 Ingresos</span>
                       <div className="bdg-section-kpis">
-                        <span className="bdg-kpi-inline">Esperado: <strong>{fmt(snapshot.totalExpectedIncome ?? 0, plan.currency)}</strong></span>
-                        <span className="bdg-kpi-inline">Recibido: <strong>{fmt(snapshot.totalIncome ?? 0, plan.currency)}</strong></span>
-                        <span className={`bdg-kpi-inline ${(snapshot.incomeVariance ?? 0) >= 0 ? 'pos' : 'neg'}`}>
-                          Balance ingresos: <strong>{(snapshot.incomeVariance ?? 0) >= 0 ? '+' : ''}{fmt(snapshot.incomeVariance ?? 0, plan.currency)}</strong>
+                        <span className="bdg-kpi-inline">Esperado: <strong>{fmt(displayedTotals.totalExpectedIncome ?? 0, plan.currency)}</strong></span>
+                        <span className="bdg-kpi-inline">Recibido: <strong>{fmt(displayedTotals.totalIncome ?? 0, plan.currency)}</strong></span>
+                        <span className={`bdg-kpi-inline ${(displayedTotals.incomeVariance ?? 0) >= 0 ? 'pos' : 'neg'}`}>
+                          Balance ingresos: <strong>{(displayedTotals.incomeVariance ?? 0) >= 0 ? '+' : ''}{fmt(displayedTotals.incomeVariance ?? 0, plan.currency)}</strong>
                         </span>
                       </div>
                     </div>
