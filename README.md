@@ -18,6 +18,10 @@ finance-app is a modular personal finance application built with Java Spring Boo
 
 Closed accounts can be deactivated and reactivated from the accounts table. Their transaction history remains available, but inactive accounts are excluded from current account totals and from new transaction and import selectors. Existing snapshots are not modified.
 
+Budget plans can be marked as primary per tenant; the banking dashboard shows the primary plan for the current month. Existing plans are treated as monthly because earlier versions did not persist their period. Existing snapshots gain a monthly breakdown when recalculated.
+
+Budget amounts are allocated by calendar month. Monthly plans use the full monthly amount even for a partial month. Quarterly, annual, and custom-period amounts are split across their months, with rounding differences assigned to the final month; custom plans are limited to their configured dates. The budget service rejects matching transactions in another currency because automatic currency conversion is not yet available.
+
 ## How to Start All Systems
 
 1. **Prerequisites:**
@@ -85,6 +89,8 @@ Run frontend tests with `npm --prefix frontend test`. Run the account service an
 ```bash
 mvn -pl banking -Dtest=AccountsServiceTest,AccountActivityIntegrationTest test
 ```
+
+Run budget unit and integration tests with `mvn -pl budget test`. The PostgreSQL integration tests use Testcontainers and are skipped when Docker is unavailable.
 
 ## Production HTTPS Deployment (Recommended)
 

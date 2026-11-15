@@ -1,5 +1,6 @@
 package es.triana.company.budget.model.db;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +9,8 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -17,6 +20,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import es.triana.company.budget.model.BudgetPeriod;
 
 @Entity
 @Table(name = "budget_plans", schema = "budget")
@@ -44,6 +48,21 @@ public class BudgetPlan {
 
     @Column(nullable = false)
     private Boolean active;
+
+    @Column(name = "is_primary", nullable = false)
+    @Builder.Default
+    private Boolean primary = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    @Builder.Default
+    private BudgetPeriod period = BudgetPeriod.MONTHLY;
+
+    @Column(name = "plan_start_date")
+    private LocalDate startDate;
+
+    @Column(name = "plan_end_date")
+    private LocalDate endDate;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

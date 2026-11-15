@@ -53,7 +53,7 @@ public class BudgetSnapshotCalculator {
     /**
      * Builds expense snapshot lines and calculates expense totals.
      */
-    public SnapshotCalculationResult calculateExpenseLines(List<BudgetPlanLine> expenseLines, Map<Long, Accumulator> expenseByLineId, BudgetSnapshot snapshot, LocalDateTime now) {
+    public SnapshotCalculationResult calculateExpenseLines(List<BudgetPlanLine> expenseLines, Map<Long, Accumulator> expenseByLineId, BudgetSnapshot snapshot, LocalDateTime now, Map<Long, BigDecimal> budgets) {
 
         List<BudgetSnapshotLine> lines = new ArrayList<>();
         BigDecimal totalBudget = BigDecimal.ZERO;
@@ -62,7 +62,7 @@ public class BudgetSnapshotCalculator {
         for (BudgetPlanLine planLine : expenseLines) {
             Accumulator acc = expenseByLineId.getOrDefault(planLine.getId(), new Accumulator());
             BigDecimal spentAmount = acc.spent;
-            BigDecimal budgetAmount = planLine.getBudgetAmount();
+            BigDecimal budgetAmount = budgets.getOrDefault(planLine.getId(), BigDecimal.ZERO);
             BigDecimal variance = budgetAmount.subtract(spentAmount);
             boolean compliant = spentAmount.compareTo(budgetAmount) <= 0;
 
@@ -79,7 +79,7 @@ public class BudgetSnapshotCalculator {
      * Builds income snapshot lines and calculates income totals.
      * For income, compliant means received is greater than or equal to expected.
      */
-    public SnapshotCalculationResult calculateIncomeLines(List<BudgetPlanLine> incomeLines, Map<Long, Accumulator> incomeByLineId, BudgetSnapshot snapshot, LocalDateTime now) {
+    public SnapshotCalculationResult calculateIncomeLines(List<BudgetPlanLine> incomeLines, Map<Long, Accumulator> incomeByLineId, BudgetSnapshot snapshot, LocalDateTime now, Map<Long, BigDecimal> budgets) {
 
         List<BudgetSnapshotLine> lines = new ArrayList<>();
         BigDecimal totalExpectedIncome = BigDecimal.ZERO;
@@ -88,7 +88,7 @@ public class BudgetSnapshotCalculator {
         for (BudgetPlanLine planLine : incomeLines) {
             Accumulator acc = incomeByLineId.getOrDefault(planLine.getId(), new Accumulator());
             BigDecimal actualIncome = acc.spent;
-            BigDecimal expectedIncome = planLine.getBudgetAmount();
+            BigDecimal expectedIncome = budgets.getOrDefault(planLine.getId(), BigDecimal.ZERO);
             BigDecimal variance = actualIncome.subtract(expectedIncome);
             boolean compliant = actualIncome.compareTo(expectedIncome) >= 0; // income compliant = received >= expected
 

@@ -34,6 +34,11 @@ export async function deleteBudgetPlan(token: string, planId: number): Promise<v
   await axios.delete(`${BASE}/plans/${planId}`, { headers: hdrs(token) });
 }
 
+export async function setPrimaryBudgetPlan(token: string, planId: number): Promise<BudgetPlanDTO> {
+  const res = await axios.put<ApiResponse<BudgetPlanDTO>>(`${BASE}/plans/${planId}/primary`, null, { headers: hdrs(token) });
+  return res.data.data;
+}
+
 export async function refreshBudgetSnapshot(
   token: string,
   planId: number,

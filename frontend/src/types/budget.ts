@@ -23,7 +23,6 @@ export type BudgetPlanRequest = {
 
 export type BudgetPlanLineDTO = {
   id: number;
-  planId: number;
   categoryId?: number;
   categoryCode: string;
   categoryName: string;
@@ -33,20 +32,19 @@ export type BudgetPlanLineDTO = {
 
 export type BudgetPlanDTO = {
   id: number;
-  tenantId: number;
   name: string;
   description?: string;
   period: BudgetPeriod;
   startDate?: string;
   endDate?: string;
   currency: string;
-  isActive: boolean;
+  active: boolean;
+  primary: boolean;
   lines: BudgetPlanLineDTO[];
 };
 
 export type BudgetSnapshotLineDTO = {
   id: number;
-  snapshotId: number;
   categoryId?: number;
   categoryCode: string;
   categoryName: string;
@@ -55,21 +53,34 @@ export type BudgetSnapshotLineDTO = {
   variance: number;
   compliant: boolean;
   lineType: BudgetLineType;
+  transactionCount: number;
 };
 
-export type BudgetSnapshotDTO = {
-  id: number;
-  planId: number;
-  startDate: string;
-  endDate: string;
+export type BudgetMonthDTO = {
+  monthStart: string;
   totalBudget: number;
   totalSpent: number;
   variance: number;
   compliant: boolean;
-  computedAt: string;
+  totalExpectedIncome: number;
+  totalIncome: number;
+  lines: BudgetSnapshotLineDTO[];
+};
+
+export type BudgetSnapshotDTO = {
+  id: number;
+  budgetPlanId: number;
+  periodStart: string;
+  periodEnd: string;
+  totalBudget: number;
+  totalSpent: number;
+  variance: number;
+  compliant: boolean;
+  generatedAt: string;
   totalExpectedIncome: number;
   totalIncome: number;
   incomeVariance: number;
   netBalance: number;
   lines: BudgetSnapshotLineDTO[];
+  months: BudgetMonthDTO[];
 };
