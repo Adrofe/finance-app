@@ -105,4 +105,10 @@ public class BudgetController {
         }
         throw new IllegalStateException("No JWT token found in security context");
     }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<Void>> handleStatusException(ResponseStatusException error) {
+        return ResponseEntity.status(error.getStatusCode())
+                .body(new ApiResponse<>(error.getStatusCode().value(), error.getReason(), null));
+    }
 }

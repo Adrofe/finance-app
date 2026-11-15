@@ -277,7 +277,7 @@ public class BudgetService {
                 .toList();
     }
 
-    private void processTransactions(List<BankingTransactionDTO> transactions, Map<Long, BankingCategoryDTO> categoriesById, List<BudgetPlanLine> expenseLines, List<BudgetPlanLine> incomeLines,TransactionAccumulators accumulators) {
+    private void processTransactions(List<BankingTransactionDTO> transactions, Map<Long, BankingCategoryDTO> categoriesById, List<BudgetPlanLine> expenseLines, List<BudgetPlanLine> incomeLines, TransactionAccumulators accumulators, String currency) {
         for (BankingTransactionDTO transaction : transactions) {
             if (transaction.getAmount() == null || transaction.getCategoryId() == null) {
                 continue;
@@ -289,26 +289,34 @@ public class BudgetService {
             }
 
             if (transaction.getAmount() < 0) {
-                accumulateExpense(transaction, expenseLines, accumulators.expenseByLineId, txCategory);
+                accumulateExpense(transaction, expenseLines, accumulators.expenseByLineId, txCategory, currency);
             } else if (transaction.getAmount() > 0) {
-                accumulateIncome(transaction, incomeLines, accumulators.incomeByLineId, txCategory);
+                accumulateIncome(transaction, incomeLines, accumulators.incomeByLineId, txCategory, currency);
             }
         }
     }
 
-    private void accumulateExpense(BankingTransactionDTO transaction, List<BudgetPlanLine> expenseLines,Map<Long, Accumulator> expenseByLineId, BankingCategoryDTO txCategory) {
+    private void accumulateExpense(BankingTransactionDTO transaction, List<BudgetPlanLine> expenseLines,Map<Long, Accumulator> expenseByLineId, BankingCategoryDTO txCategory, String currency) {
         BudgetPlanLine matched = transactionMatcher.findMatchingLine(expenseLines, txCategory);
         if (matched != null) {
+            validateTransactionCurrency(transaction, currency);
             expenseByLineId.computeIfAbsent(matched.getId(), k -> new Accumulator())
                     .add(BigDecimal.valueOf(transaction.getAmount()).abs());
         }
     }
 
-    private void accumulateIncome(BankingTransactionDTO transaction, List<BudgetPlanLine> incomeLines, Map<Long, Accumulator> incomeByLineId, BankingCategoryDTO txCategory) {
+    private void accumulateIncome(BankingTransactionDTO transaction, List<BudgetPlanLine> incomeLines, Map<Long, Accumulator> incomeByLineId, BankingCategoryDTO txCategory, String currency) {
         BudgetPlanLine matched = transactionMatcher.findMatchingLine(incomeLines, txCategory);
         if (matched != null) {
+            validateTransactionCurrency(transaction, currency);
             incomeByLineId.computeIfAbsent(matched.getId(), k -> new Accumulator())
                     .add(BigDecimal.valueOf(transaction.getAmount()));
+        }
+    }
+
+    private void validateTransactionCurrency(BankingTransactionDTO transaction, String currency) {
+        if (transaction.getCurrency() == null || !transaction.getCurrency().equalsIgnoreCase(currency)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Budget transactions must use the plan currency; automatic conversion is not available");
         }
     }
 
