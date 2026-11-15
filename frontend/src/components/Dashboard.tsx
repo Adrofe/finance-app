@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -11,6 +11,8 @@ import type { DashboardSummary, SpendingByCategory, TimeSeriesPoint, DashboardPr
 import { fetchDashboardSummary, fetchSpendingByCategory, fetchTimeSeries } from '../services/dashboardService';
 import { getCategoryVisual } from '../constants/visualConfig';
 import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
+import { fetchBudgetPlans, refreshBudgetSnapshot } from '../services/budgetService';
+import type { BudgetPlanDTO, BudgetSnapshotDTO } from '../types/budget';
 import './Dashboard.css';
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -167,6 +169,7 @@ type DashboardProps = {
   token: string;
   transactions: Transaction[];
   onUnauthorized: (msg: string) => void;
+  onOpenBudget?: (planId: number) => void;
 };
 
 type CategoryViewMode = 'parent' | 'child';
@@ -192,7 +195,7 @@ type DetailsFilter =
   | { mode: 'category'; categoryId: number; name: string }
   | { mode: 'parentCategory'; parentCode: string; name: string };
 
-export function Dashboard({ token, transactions, onUnauthorized }: DashboardProps) {
+export function Dashboard({ token, transactions, onUnauthorized, onOpenBudget }: DashboardProps) {
   const [preset, setPreset]           = useState<DashboardPreset>('this-month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd]     = useState('');
@@ -211,8 +214,47 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
   const [timeSeries, setTimeSeries] = useState<TimeSeriesPoint[]>([]);
   const [loading,    setLoading]    = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [primaryBudget, setPrimaryBudget] = useState<BudgetPlanDTO | null>(null);
+  const [budgetSnapshot, setBudgetSnapshot] = useState<BudgetSnapshotDTO | null>(null);
+  const [budgetError, setBudgetError] = useState<string | null>(null);
+  const budgetRequest = useRef(0);
 
   const { categoryCodeMap, typeMap, categories: catalogCategories } = useTransactionCatalogs(token);
+
+  const loadPrimaryBudget = useCallback(async () => {
+    const request = ++budgetRequest.current;
+    try {
+      setBudgetError(null);
+      const plans = await fetchBudgetPlans(token);
+      const primary = plans.find(plan => plan.primary && plan.active) ?? null;
+      if (request !== budgetRequest.current) return;
+      setPrimaryBudget(primary);
+      setBudgetSnapshot(null);
+      if (!primary) return;
+      const range = getPresetRange('this-month');
+      const snapshot = await refreshBudgetSnapshot(token, primary.id, range.start, range.end);
+      if (request === budgetRequest.current) setBudgetSnapshot(snapshot);
+    } catch (error) {
+      if (request !== budgetRequest.current) return;
+      if (axios.isAxiosError(error) && error.response?.status === 401) onUnauthorized('Sesión expirada. Por favor vuelve a iniciar sesión.');
+      else setBudgetError(axios.isAxiosError(error) && error.response?.status === 422
+        ? 'El presupuesto principal contiene transacciones en otra divisa; la conversión automática aún no está disponible.'
+        : 'No se pudo cargar el presupuesto principal.');
+    }
+  }, [token, onUnauthorized]);
+
+  useEffect(() => {
+    if (!token) return;
+    void loadPrimaryBudget();
+    const refresh = () => { void loadPrimaryBudget(); };
+    window.addEventListener(FINANCE_EVENTS.BUDGET_UPDATED, refresh);
+    window.addEventListener(FINANCE_EVENTS.TRANSACTIONS_UPDATED, refresh);
+    return () => {
+      budgetRequest.current += 1;
+      window.removeEventListener(FINANCE_EVENTS.BUDGET_UPDATED, refresh);
+      window.removeEventListener(FINANCE_EVENTS.TRANSACTIONS_UPDATED, refresh);
+    };
+  }, [token, loadPrimaryBudget]);
 
   const isInternalTransfer = useCallback((tx: Transaction): boolean => {
     const typeName = tx.typeId != null ? (typeMap[tx.typeId] || '').toUpperCase() : '';
@@ -464,6 +506,25 @@ export function Dashboard({ token, transactions, onUnauthorized }: DashboardProp
           {loading ? '⏳' : '↻'} Actualizar
         </button>
       </div>
+
+      {budgetError && <p className="state error">{budgetError}</p>}
+      {primaryBudget && budgetSnapshot && (
+        <section className="db-budget" aria-label="Presupuesto principal">
+          <div className="db-budget-header">
+            <div><h3>Presupuesto principal</h3><span>{primaryBudget.name} · {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span></div>
+            {onOpenBudget && <button type="button" className="db-budget-open" onClick={() => onOpenBudget(primaryBudget.id)}>Ver presupuesto</button>}
+          </div>
+          <div className="db-budget-values">
+            <div><span>Presupuesto</span><strong>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.totalBudget)}</strong></div>
+            <div><span>Gastado</span><strong>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.totalSpent)}</strong></div>
+            <div><span>Restante</span><strong className={budgetSnapshot.variance < 0 ? 'negative' : 'positive'}>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.variance)}</strong></div>
+            <div><span>Estado</span><strong className={budgetSnapshot.compliant ? 'positive' : 'negative'}>{budgetSnapshot.compliant ? 'Dentro del presupuesto' : 'Presupuesto superado'}</strong></div>
+          </div>
+          <div className="db-budget-progress" role="progressbar" aria-label="Presupuesto utilizado" aria-valuemin={0} aria-valuemax={100} aria-valuenow={budgetSnapshot.totalBudget > 0 ? Math.min(100, Math.round(budgetSnapshot.totalSpent / budgetSnapshot.totalBudget * 100)) : budgetSnapshot.totalSpent > 0 ? 100 : 0}>
+            <span className={budgetSnapshot.compliant ? '' : 'over'} style={{ width: `${budgetSnapshot.totalBudget > 0 ? Math.min(100, Math.max(0, budgetSnapshot.totalSpent / budgetSnapshot.totalBudget * 100)) : budgetSnapshot.totalSpent > 0 ? 100 : 0}%` }} />
+          </div>
+        </section>
+      )}
 
       {/* ── Loading / error ──────────────────────────────────────────────── */}
       {loading && <p className="state">Cargando dashboard...</p>}

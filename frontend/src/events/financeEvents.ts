@@ -1,6 +1,7 @@
 export const FINANCE_EVENTS = {
   TRANSACTIONS_UPDATED: 'finance:transactions-updated',
   INVESTMENTS_UPDATED: 'finance:investments-updated',
+  BUDGET_UPDATED: 'finance:budget-updated',
   NAVIGATE_TO_TRANSACTION: 'finance:navigate-to-transaction',
 } as const;
 

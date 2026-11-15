@@ -37,6 +37,7 @@ function App() {
   const [investmentsSubTab, setInvestmentsSubTab] = useState<InvestmentsSubTab>('dashboard');
   const [highlightTransactionId, setHighlightTransactionId] = useState<number | undefined>(undefined);
   const [transactionAccountId, setTransactionAccountId] = useState<number | undefined>(undefined);
+  const [budgetPlanToOpen, setBudgetPlanToOpen] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     return addFinanceEventListener(FINANCE_EVENTS.NAVIGATE_TO_TRANSACTION, (e) => {
@@ -79,13 +80,14 @@ function App() {
             <p>Review balance, accounts and transactions in one place.</p>
           </div>
 
-          <BankingSubTabs activeTab={bankingSubTab} onSelectTab={(tab) => { setBankingSubTab(tab); if (tab !== 'transactions') setTransactionAccountId(undefined); }} />
+          <BankingSubTabs activeTab={bankingSubTab} onSelectTab={(tab) => { setBankingSubTab(tab); setBudgetPlanToOpen(undefined); if (tab !== 'transactions') setTransactionAccountId(undefined); }} />
 
           {bankingSubTab === 'dashboard' && (
             <Dashboard
               token={accessToken}
               transactions={items}
               onUnauthorized={handleUnauthorized}
+              onOpenBudget={(planId) => { setBudgetPlanToOpen(planId); setBankingSubTab('budget'); }}
             />
           )}
 
@@ -113,7 +115,7 @@ function App() {
           )}
 
           {bankingSubTab === 'budget' && (
-            <BudgetPanel token={accessToken} onUnauthorized={handleUnauthorized} />
+            <BudgetPanel token={accessToken} onUnauthorized={handleUnauthorized} initialPlanId={budgetPlanToOpen} />
           )}
 
           {bankingSubTab === 'import' && (

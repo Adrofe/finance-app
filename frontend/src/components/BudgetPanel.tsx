@@ -960,11 +960,13 @@ type PlansGridProps = {
   onSelect: (plan: BudgetPlanDTO) => void;
   onEdit: (plan: BudgetPlanDTO) => void;
   onDelete: (planId: number) => Promise<void>;
+  onSetPrimary: (planId: number) => Promise<void>;
   onNew: () => void;
 };
 
-function PlansGrid({ plans, onSelect, onEdit, onDelete, onNew }: PlansGridProps) {
+function PlansGrid({ plans, onSelect, onEdit, onDelete, onSetPrimary, onNew }: PlansGridProps) {
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [settingPrimaryId, setSettingPrimaryId] = useState<number | null>(null);
 
   const handleDelete = async (e: React.MouseEvent, planId: number) => {
     e.stopPropagation();
@@ -976,6 +978,12 @@ function PlansGrid({ plans, onSelect, onEdit, onDelete, onNew }: PlansGridProps)
   const handleEdit = (e: React.MouseEvent, plan: BudgetPlanDTO) => {
     e.stopPropagation();
     onEdit(plan);
+  };
+
+  const handleSetPrimary = async (event: React.MouseEvent, planId: number) => {
+    event.stopPropagation();
+    setSettingPrimaryId(planId);
+    try { await onSetPrimary(planId); } finally { setSettingPrimaryId(null); }
   };
 
   return (
@@ -1004,12 +1012,17 @@ function PlansGrid({ plans, onSelect, onEdit, onDelete, onNew }: PlansGridProps)
               role="button"
               tabIndex={0}
               onClick={() => onSelect(plan)}
-              onKeyDown={e => e.key === 'Enter' && onSelect(plan)}
+              onKeyDown={event => {
+                if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                  event.preventDefault();
+                  onSelect(plan);
+                }
+              }}
             >
               <div className="bdg-card-top">
                 <span className="bdg-card-icon">📋</span>
-                <span className={`bdg-badge ${plan.isActive ? 'ok' : ''}`}>
-                  {plan.isActive ? 'Activo' : 'Inactivo'}
+                <span className={`bdg-badge ${plan.active ? 'ok' : ''}`}>
+                  {plan.active ? 'Activo' : 'Inactivo'}
                 </span>
               </div>
               <div className="bdg-card-name">{plan.name}</div>
@@ -1029,7 +1042,8 @@ function PlansGrid({ plans, onSelect, onEdit, onDelete, onNew }: PlansGridProps)
                 )}
               </div>
               <div className="bdg-card-footer">
-                <span className="bdg-card-hint">Clic para analizar →</span>
+                <span className="bdg-card-hint">{plan.primary ? 'Principal' : 'Clic para analizar →'}</span>
+                <button type="button" className="btn icon-btn small" aria-label={plan.primary ? 'Presupuesto principal' : 'Marcar como principal'} title={plan.primary ? 'Presupuesto principal' : 'Marcar como principal'} aria-pressed={plan.primary} disabled={plan.primary || settingPrimaryId !== null} onClick={event => { void handleSetPrimary(event, plan.id); }}>{plan.primary ? '★' : '☆'}</button>
                 <button
                   type="button"
                   className="btn icon-btn small"
@@ -1056,9 +1070,10 @@ function PlansGrid({ plans, onSelect, onEdit, onDelete, onNew }: PlansGridProps)
 type Props = {
   token: string;
   onUnauthorized?: (msg: string) => void;
+  initialPlanId?: number;
 };
 
-export function BudgetPanel({ token, onUnauthorized }: Props) {
+export function BudgetPanel({ token, onUnauthorized, initialPlanId }: Props) {
   const [plans, setPlans] = useState<BudgetPlanDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1073,6 +1088,7 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
       setError(null);
       const data = await fetchBudgetPlans(token);
       setPlans(data);
+      if (initialPlanId != null) setSelectedPlan(current => current ?? data.find(plan => plan.id === initialPlanId) ?? null);
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         onUnauthorized?.('Sesión expirada');
@@ -1082,7 +1098,7 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [token, onUnauthorized]);
+  }, [token, onUnauthorized, initialPlanId]);
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
 
@@ -1096,6 +1112,7 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
         setSelectedPlan(saved);
       }
       await loadPlans();
+      dispatchFinanceEvent(FINANCE_EVENTS.BUDGET_UPDATED);
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         onUnauthorized?.('Sesión expirada');
@@ -1110,6 +1127,7 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
       await deleteBudgetPlan(token, planId);
       setPlans(prev => prev.filter(p => p.id !== planId));
       if (selectedPlan?.id === planId) setSelectedPlan(null);
+      dispatchFinanceEvent(FINANCE_EVENTS.BUDGET_UPDATED);
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         onUnauthorized?.('Sesión expirada');
@@ -1120,6 +1138,17 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
   const handleEditPlan = (plan: BudgetPlanDTO) => {
     setEditingPlan(plan);
     setShowCreate(true);
+  };
+
+  const handleSetPrimary = async (planId: number) => {
+    try {
+      await setPrimaryBudgetPlan(token, planId);
+      setPlans(current => current.map(plan => ({ ...plan, primary: plan.id === planId })));
+      dispatchFinanceEvent(FINANCE_EVENTS.BUDGET_UPDATED);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 401) onUnauthorized?.('Sesión expirada');
+      else setError('No se pudo seleccionar el presupuesto principal');
+    }
   };
 
   return (
@@ -1147,6 +1176,7 @@ export function BudgetPanel({ token, onUnauthorized }: Props) {
             onSelect={setSelectedPlan}
             onEdit={handleEditPlan}
             onDelete={handleDelete}
+            onSetPrimary={handleSetPrimary}
             onNew={() => { setEditingPlan(null); setShowCreate(true); }}
           />
         )
