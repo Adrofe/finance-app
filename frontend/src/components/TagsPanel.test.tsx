@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { CatalogService } from '../services/catalogService';
 import { fetchTransactions } from '../services/transactionsService';
 import { FINANCE_EVENTS } from '../events/financeEvents';
+import { getCategoryVisual } from '../constants/visualConfig';
 import { TagsPanel } from './TagsPanel';
 
 vi.mock('../services/transactionsService', () => ({ fetchTransactions: vi.fn() }));
@@ -47,7 +48,26 @@ async function openTag(name = 'Vacaciones') {
   return within(section);
 }
 
+function selectCategory(section: ReturnType<typeof within>, name: string) {
+  fireEvent.click(section.getByRole('button', { name: /Filtrar transacciones por categoría:/ }));
+  const menu = within(section.getByRole('group', { name: 'Categorías de transacciones' }));
+  fireEvent.click(menu.getByRole('button', { name }));
+}
+
 describe('tag transactions', () => {
+  it('orders year-prefixed tags newest first and names alphabetically within each year', async () => {
+    vi.mocked(CatalogService.fetchTags).mockResolvedValue([
+      { id: 1, name: '2025_Zaragoza' }, { id: 2, name: '2026_Zaragoza' },
+      { id: 3, name: '2026_Ávila' }, { id: 4, name: 'Familia' }, { id: 5, name: 'Amigos' },
+      { id: 6, name: '2024_Lisboa' },
+    ]);
+    const { container } = render(<TagsPanel token="test" />);
+    await screen.findByText('# 2026_Ávila');
+    expect([...container.querySelectorAll('.tp-tag-list .tp-tag-pill')].map(element => element.textContent?.trim())).toEqual([
+      '# 2026_Ávila', '# 2026_Zaragoza', '# 2025_Zaragoza', '# 2024_Lisboa', '# Amigos', '# Familia',
+    ]);
+  });
+
   it('lists all tagged transactions with account, currency and newest first', async () => {
     const section = await openTag();
     const rows = section.getAllByRole('row').slice(1);
@@ -109,7 +129,7 @@ describe('tag transactions', () => {
     expect(section.getByText('Transferencia')).toBeTruthy();
     expect((section.getByRole('searchbox', { name: 'Buscar transacciones de la tag' }) as HTMLInputElement).value).toBe('');
     expect(section.queryByRole('button', { name: 'Todas las categorías' })).toBeNull();
-    fireEvent.change(section.getByRole('combobox', { name: 'Filtrar transacciones por categoría' }), { target: { value: '10' } });
+    selectCategory(section, 'Viajes');
     expect(section.getByText('Transferencia')).toBeTruthy();
     expect(section.getByRole('button', { name: 'Todas las categorías' })).toBeTruthy();
   });
@@ -118,9 +138,44 @@ describe('tag transactions', () => {
     vi.mocked(CatalogService.fetchCategories).mockResolvedValue([{ id: 30, name: 'Nómina', code: 'INC' }]);
     vi.mocked(fetchTransactions).mockResolvedValue([{ id: 108, tagIds: [1], categoryId: 30, sourceAccountId: 1, bookingDate: '2025-01-01', description: 'Ingreso', amount: 100, currency: 'EUR' }]);
     const section = await openTag();
-    fireEvent.change(section.getByRole('combobox', { name: 'Filtrar transacciones por categoría' }), { target: { value: '30' } });
+    selectCategory(section, 'Nómina');
     expect(section.getByText('Ingreso')).toBeTruthy();
     expect(section.getByText('Categoría: Nómina')).toBeTruthy();
+  });
+
+  it('shows matching category colors and icons and supports keyboard navigation', async () => {
+    const section = await openTag();
+    const trigger = section.getByRole('button', { name: /Filtrar transacciones por categoría:/ });
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    const menu = section.getByRole('group', { name: 'Categorías de transacciones' });
+    expect(document.activeElement).toBe(within(menu).getByRole('button', { name: 'Todas las categorías' }));
+    const travel = within(menu).getByRole('button', { name: 'Viajes' });
+    const icon = travel.querySelector<HTMLElement>('.tp-category-icon')!;
+    const breakdownSection = screen.getByRole('heading', { name: 'Desglose por categoría' }).closest('.tp-breakdown-card')!;
+    const breakdown = within(breakdownSection as HTMLElement).getByRole('button', { name: 'Viajes' });
+    expect(icon.textContent).toBe(getCategoryVisual('TRAVEL').emoji);
+    expect(icon.style.color).toBe((breakdown as HTMLElement).style.color);
+    fireEvent.click(travel);
+    expect(trigger.getAttribute('aria-label')).toContain('Viajes');
+    expect(trigger.querySelector('.tp-category-icon')?.textContent).toBe(getCategoryVisual('TRAVEL').emoji);
+    expect(document.activeElement).toBe(trigger);
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    expect((trigger.closest('details') as HTMLDetailsElement).open).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('orders category options alphabetically and closes the menu on outside click', async () => {
+    const section = await openTag();
+    const trigger = section.getByRole('button', { name: /Filtrar transacciones por categoría:/ });
+    fireEvent.click(trigger);
+    const menu = section.getByRole('group', { name: 'Categorías de transacciones' });
+    expect(within(menu).getAllByRole('button').map(button => button.textContent?.trim().replace(/^[^\p{L}]+/u, ''))).toEqual([
+      'Todas las categorías', 'Hogar', 'Sin categoría', 'Viajes',
+    ]);
+    fireEvent.mouseDown(document.body);
+    expect(section.queryByRole('group', { name: 'Categorías de transacciones' })).toBeNull();
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('paginates transactions and returns to the first page when searching', async () => {

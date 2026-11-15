@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -41,6 +41,15 @@ const fmtTransactionDate = (value?: string) => {
 };
 
 const normalizeSearch = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
+
+const compareTagNames = (left: Tag, right: Tag) => {
+  const leftYear = left.name.match(/^(\d{4})(?=[_\s-]|$)/)?.[1];
+  const rightYear = right.name.match(/^(\d{4})(?=[_\s-]|$)/)?.[1];
+  if (leftYear && rightYear && leftYear !== rightYear) return Number(rightYear) - Number(leftYear);
+  if (leftYear && !rightYear) return -1;
+  if (!leftYear && rightYear) return 1;
+  return left.name.localeCompare(right.name, 'es', { sensitivity: 'base', numeric: true });
+};
 
 function monthLabel(ym: string) {
   const [year, month] = ym.split('-');
@@ -106,6 +115,9 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null | undefined>(undefined);
   const [transactionSearch, setTransactionSearch] = useState('');
   const [transactionPage, setTransactionPage] = useState(0);
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const categoryDropdownRef = useRef<HTMLDetailsElement>(null);
+  const categoryFocusRef = useRef<'first' | 'last' | null>(null);
 
   // ── Data loading ─────────────────────────────────────────────────────────
 
@@ -138,10 +150,28 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  useEffect(() => {
+    const closeOutside = (event: MouseEvent) => {
+      const dropdown = categoryDropdownRef.current;
+      if (dropdown && !dropdown.contains(event.target as Node)) setCategoryDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', closeOutside);
+    return () => document.removeEventListener('mousedown', closeOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!categoryDropdownOpen) return;
+    categoryDropdownRef.current?.querySelector<HTMLElement>('.tp-category-menu')?.scrollIntoView?.({ block: 'nearest' });
+    if (!categoryFocusRef.current) return;
+    const options = categoryDropdownRef.current?.querySelectorAll<HTMLButtonElement>('.tp-category-option');
+    if (options?.length) options[categoryFocusRef.current === 'first' ? 0 : options.length - 1].focus();
+    categoryFocusRef.current = null;
+  }, [categoryDropdownOpen]);
+
   // ── Derived data ─────────────────────────────────────────────────────────
 
   const sortedTags = useMemo(
-    () => [...tags].sort((a, b) => a.name.localeCompare(b.name, 'es')),
+    () => [...tags].sort(compareTagNames),
     [tags],
   );
 
@@ -262,6 +292,39 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
     });
     return [...options].map(([id, name]) => ({ id, name })).sort((left, right) => left.name.localeCompare(right.name, 'es'));
   }, [tagTx, categories, pieMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedCategory = transactionCategoryOptions.find(option => option.id === selectedCategoryId);
+  const categoryVisual = (id: number | null) => getCategoryVisual(id != null ? catById[id]?.code ?? 'OTH' : 'OTH');
+
+  const selectTransactionCategory = (id: number | null | undefined) => {
+    setSelectedCategoryId(id);
+    if (categoryDropdownRef.current) {
+      setCategoryDropdownOpen(false);
+      categoryDropdownRef.current.querySelector('summary')?.focus();
+    }
+  };
+
+  const handleCategoryDropdownKey = (event: React.KeyboardEvent<HTMLDetailsElement>) => {
+    const dropdown = categoryDropdownRef.current;
+    if (!dropdown) return;
+    if (event.key === 'Escape' && categoryDropdownOpen) {
+      event.preventDefault();
+      setCategoryDropdownOpen(false);
+      dropdown.querySelector('summary')?.focus();
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!categoryDropdownOpen) {
+        categoryFocusRef.current = event.key === 'ArrowDown' ? 'first' : 'last';
+        setCategoryDropdownOpen(true);
+        return;
+      }
+      const options = [...dropdown.querySelectorAll<HTMLButtonElement>('.tp-category-option')];
+      const current = options.indexOf(document.activeElement as HTMLButtonElement);
+      const next = current === -1 ? (event.key === 'ArrowDown' ? 0 : options.length - 1)
+        : (current + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
+      options[next]?.focus();
+    }
+  };
 
   const visibleTransactions = useMemo(() => {
     const query = normalizeSearch(transactionSearch.trim());
@@ -686,10 +749,28 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
                   </div>
                   <div className="tp-transactions-controls">
                     <input type="search" value={transactionSearch} onChange={event => setTransactionSearch(event.target.value)} placeholder="Buscar transacciones..." aria-label="Buscar transacciones de la tag" />
-                    <select aria-label="Filtrar transacciones por categoría" value={selectedCategoryId === undefined ? 'all' : selectedCategoryId === null ? 'none' : String(selectedCategoryId)} onChange={event => setSelectedCategoryId(event.target.value === 'all' ? undefined : event.target.value === 'none' ? null : Number(event.target.value))}>
-                      <option value="all">Todas las categorías</option>
-                      {transactionCategoryOptions.map(option => <option key={option.id ?? 'none'} value={option.id ?? 'none'}>{option.name}</option>)}
-                    </select>
+                    <details className="tp-category-dropdown" ref={categoryDropdownRef} open={categoryDropdownOpen} onKeyDown={handleCategoryDropdownKey}>
+                      <summary role="button" aria-expanded={categoryDropdownOpen} aria-label={`Filtrar transacciones por categoría: ${selectedCategory?.name ?? 'Todas las categorías'}`} title={selectedCategory?.name ?? 'Todas las categorías'} onClick={event => { event.preventDefault(); setCategoryDropdownOpen(current => !current); }}>
+                        {selectedCategory && (() => {
+                          const visual = categoryVisual(selectedCategory.id);
+                          return <span className="tp-category-icon" style={{ color: visual.color, background: `${visual.color}22` }} aria-hidden="true">{visual.emoji}</span>;
+                        })()}
+                        <span className="tp-category-selected" style={selectedCategory ? { color: categoryVisual(selectedCategory.id).color } : undefined}>{selectedCategory?.name ?? 'Todas las categorías'}</span>
+                        <span className="tp-category-arrow" aria-hidden="true">▾</span>
+                      </summary>
+                      {categoryDropdownOpen && <div className="tp-category-menu" role="group" aria-label="Categorías de transacciones">
+                        <button type="button" className="tp-category-option" aria-pressed={selectedCategoryId === undefined} onClick={() => selectTransactionCategory(undefined)}>Todas las categorías</button>
+                        {transactionCategoryOptions.map(option => {
+                          const visual = categoryVisual(option.id);
+                          return (
+                            <button key={option.id ?? 'none'} type="button" className="tp-category-option" aria-pressed={selectedCategoryId === option.id} onClick={() => selectTransactionCategory(option.id)}>
+                              <span className="tp-category-icon" style={{ color: visual.color, background: `${visual.color}22` }} aria-hidden="true">{visual.emoji}</span>
+                              <span style={{ color: visual.color }}>{option.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>}
+                    </details>
                     {selectedCategoryId !== undefined && <button type="button" className="tp-clear-category" onClick={() => setSelectedCategoryId(undefined)}>Todas las categorías</button>}
                   </div>
                 </div>
