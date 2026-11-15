@@ -216,6 +216,7 @@ export function Dashboard({ token, transactions, onUnauthorized, onOpenBudget }:
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [primaryBudget, setPrimaryBudget] = useState<BudgetPlanDTO | null>(null);
   const [budgetSnapshot, setBudgetSnapshot] = useState<BudgetSnapshotDTO | null>(null);
+  const [budgetYearSnapshot, setBudgetYearSnapshot] = useState<BudgetSnapshotDTO | null>(null);
   const [budgetError, setBudgetError] = useState<string | null>(null);
   const budgetRequest = useRef(0);
 
@@ -230,10 +231,18 @@ export function Dashboard({ token, transactions, onUnauthorized, onOpenBudget }:
       if (request !== budgetRequest.current) return;
       setPrimaryBudget(primary);
       setBudgetSnapshot(null);
+      setBudgetYearSnapshot(null);
       if (!primary) return;
       const range = getPresetRange('this-month');
-      const snapshot = await refreshBudgetSnapshot(token, primary.id, range.start, range.end);
-      if (request === budgetRequest.current) setBudgetSnapshot(snapshot);
+      const yearRange = getPresetRange('this-year');
+      const [snapshot, yearSnapshot] = await Promise.all([
+        refreshBudgetSnapshot(token, primary.id, range.start, range.end),
+        primary.period === 'CUSTOM' ? Promise.resolve(null) : refreshBudgetSnapshot(token, primary.id, yearRange.start, yearRange.end),
+      ]);
+      if (request === budgetRequest.current) {
+        setBudgetSnapshot(snapshot);
+        setBudgetYearSnapshot(yearSnapshot);
+      }
     } catch (error) {
       if (request !== budgetRequest.current) return;
       if (axios.isAxiosError(error) && error.response?.status === 401) onUnauthorized('Sesión expirada. Por favor vuelve a iniciar sesión.');
@@ -741,18 +750,40 @@ export function Dashboard({ token, transactions, onUnauthorized, onOpenBudget }:
       {primaryBudget && budgetSnapshot && (
         <section className="db-budget" aria-label="Presupuesto principal">
           <div className="db-budget-header">
-            <div><h3>Presupuesto principal</h3><span>{primaryBudget.name} · {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span></div>
+            <div><h3>Presupuesto principal</h3><span>{primaryBudget.name} · {budgetSnapshot.periodStart} — {budgetSnapshot.periodEnd}</span></div>
             {onOpenBudget && <button type="button" className="db-budget-open" onClick={() => onOpenBudget(primaryBudget.id)}>Ver presupuesto</button>}
           </div>
-          <div className="db-budget-values">
-            <div><span>Presupuesto</span><strong>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.totalBudget)}</strong></div>
-            <div><span>Gastado</span><strong>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.totalSpent)}</strong></div>
+          {budgetSnapshot.lines.some(line => line.lineType !== 'INCOME') && <><div className="db-budget-values">
+            <div><span>Presupuesto mensual</span><strong>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.totalBudget)}</strong></div>
+            <div><span>Gastado en partidas mensuales</span><strong>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.totalSpent)}</strong></div>
             <div><span>Restante</span><strong className={budgetSnapshot.variance < 0 ? 'negative' : 'positive'}>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(budgetSnapshot.variance)}</strong></div>
             <div><span>Estado</span><strong className={budgetSnapshot.compliant ? 'positive' : 'negative'}>{budgetSnapshot.compliant ? 'Dentro del presupuesto' : 'Presupuesto superado'}</strong></div>
           </div>
           <div className="db-budget-progress" role="progressbar" aria-label="Presupuesto utilizado" aria-valuemin={0} aria-valuemax={100} aria-valuenow={budgetSnapshot.totalBudget > 0 ? Math.min(100, Math.round(budgetSnapshot.totalSpent / budgetSnapshot.totalBudget * 100)) : budgetSnapshot.totalSpent > 0 ? 100 : 0}>
             <span className={budgetSnapshot.compliant ? '' : 'over'} style={{ width: `${budgetSnapshot.totalBudget > 0 ? Math.min(100, Math.max(0, budgetSnapshot.totalSpent / budgetSnapshot.totalBudget * 100)) : budgetSnapshot.totalSpent > 0 ? 100 : 0}%` }} />
-          </div>
+          </div></>}
+          {(budgetSnapshot.periodicLines ?? []).length > 0 && <div className="db-budget-periodic" aria-label="Partidas por periodo">
+            {budgetSnapshot.periodicLines?.map(line => <div className="db-budget-periodic-line" key={line.id ?? `${line.lineType}-${line.categoryId}-${line.linePeriodStart}`}>
+              <span>{line.categoryName} · {line.linePeriodStart} — {line.linePeriodEnd} · Hasta {line.lineObservedUntil}</span>
+              <strong className={line.lineType !== 'INCOME' && !line.compliant ? 'negative' : ''}>{new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(line.spentAmount)} / {new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(line.budgetAmount)}</strong>
+            </div>)}
+          </div>}
+          {budgetYearSnapshot && (() => {
+            const factors: Record<string, number> = { MONTHLY: 12, QUARTERLY: 4, SEMIANNUAL: 2, ANNUAL: 1 };
+            const annualBudget = primaryBudget.lines.filter(line => line.lineType !== 'INCOME')
+              .reduce((sum, line) => sum + Number(line.budgetAmount) * factors[line.linePeriod ?? primaryBudget.period], 0);
+            const annualSpent = Number(budgetYearSnapshot.totalSpent) + (budgetYearSnapshot.periodicLines ?? [])
+              .filter(line => line.lineType !== 'INCOME').reduce((sum, line) => sum + Number(line.spentAmount), 0);
+            const format = (amount: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: primaryBudget.currency }).format(amount);
+            return <div className="db-budget-annual" aria-label="Resumen anual">
+              <h4>Resumen anual · {budgetYearSnapshot.periodEnd.slice(0, 4)}</h4>
+              <div className="db-budget-values">
+                <div><span>Previsión anual</span><strong>{format(annualBudget)}</strong></div>
+                <div><span>Gastado este año</span><strong>{format(annualSpent)}</strong></div>
+                <div><span>Margen anual</span><strong className={annualBudget - annualSpent < 0 ? 'negative' : 'positive'}>{format(annualBudget - annualSpent)}</strong></div>
+              </div>
+            </div>;
+          })()}
         </section>
       )}
 
