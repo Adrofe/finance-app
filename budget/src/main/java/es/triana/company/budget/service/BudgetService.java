@@ -22,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import es.triana.company.budget.mapper.BudgetMapper;
 import es.triana.company.budget.model.BudgetLineType;
+import es.triana.company.budget.model.BudgetLinePeriod;
 import es.triana.company.budget.model.BudgetPeriod;
 import es.triana.company.budget.service.BudgetSnapshotCalculator.Accumulator;
 import es.triana.company.budget.service.BudgetSnapshotCalculator.TransactionAccumulators;
@@ -153,14 +154,25 @@ public class BudgetService {
         LocalDateTime now = LocalDateTime.now();
 
         Map<Long, BankingCategoryDTO> categoriesById = loadCategoriesMap(bearerToken);
-        List<BankingTransactionDTO> transactions = bankingApiClient.getTransactions(bearerToken, periodStart, periodEnd).stream()
+        LocalDate lookbackStart = plan.getLines().stream().filter(this::isLongPeriod)
+            .map(line -> linePeriodStart(line.getLinePeriod(), periodStart))
+            .min(LocalDate::compareTo).orElse(periodStart);
+        if (plan.getPeriod() == BudgetPeriod.CUSTOM && lookbackStart.isBefore(plan.getStartDate())) {
+            lookbackStart = plan.getStartDate();
+        }
+        LocalDate transactionStart = lookbackStart;
+        List<BankingTransactionDTO> allTransactions = bankingApiClient.getTransactions(bearerToken, transactionStart, periodEnd).stream()
             .filter(transaction -> transaction.getBookingDate() != null
-                && !transaction.getBookingDate().toLocalDate().isBefore(periodStart)
+            && !transaction.getBookingDate().toLocalDate().isBefore(transactionStart)
                 && !transaction.getBookingDate().toLocalDate().isAfter(periodEnd))
             .toList();
+        List<BankingTransactionDTO> transactions = allTransactions.stream()
+            .filter(transaction -> !transaction.getBookingDate().toLocalDate().isBefore(periodStart)).toList();
 
         List<BudgetPlanLine> expenseLines = filterExpenseLines(plan.getLines());
         List<BudgetPlanLine> incomeLines = filterIncomeLines(plan.getLines());
+        List<BudgetPlanLine> monthlyExpenseLines = expenseLines.stream().filter(line -> !isLongPeriod(line)).toList();
+        List<BudgetPlanLine> monthlyIncomeLines = incomeLines.stream().filter(line -> !isLongPeriod(line)).toList();
 
         TransactionAccumulators accumulators = snapshotCalculator.initializeAccumulators(plan.getLines());
         processTransactions(transactions, categoriesById, expenseLines, incomeLines, accumulators, plan.getCurrency());
@@ -185,7 +197,8 @@ public class BudgetService {
             YearMonth currentMonth = month;
             Map<Long, BigDecimal> monthBudgets = new HashMap<>();
             for (BudgetPlanLine line : plan.getLines()) {
-                BigDecimal amount = monthlyBudget(plan, line.getBudgetAmount(), month);
+                BigDecimal amount = isLongPeriod(line) ? BigDecimal.ZERO : line.getLinePeriod() == BudgetLinePeriod.MONTHLY
+                    ? line.getBudgetAmount() : monthlyBudget(plan, line.getBudgetAmount(), month);
                 monthBudgets.put(line.getId(), amount);
                 totalBudgets.merge(line.getId(), amount, BigDecimal::add);
             }
@@ -200,13 +213,14 @@ public class BudgetService {
             monthlyIncome.lines.forEach(line -> line.setMonthStart(currentMonth.atDay(1)));
         }
 
-        var expenseResult = snapshotCalculator.calculateExpenseLines(expenseLines, accumulators.expenseByLineId, snapshot, now, totalBudgets);
-        var incomeResult = snapshotCalculator.calculateIncomeLines(incomeLines, accumulators.incomeByLineId, snapshot, now, totalBudgets);
+        var expenseResult = snapshotCalculator.calculateExpenseLines(monthlyExpenseLines, accumulators.expenseByLineId, snapshot, now, totalBudgets);
+        var incomeResult = snapshotCalculator.calculateIncomeLines(monthlyIncomeLines, accumulators.incomeByLineId, snapshot, now, totalBudgets);
 
         List<BudgetSnapshotLine> allLines = new ArrayList<>();
         allLines.addAll(expenseResult.lines);
         allLines.addAll(incomeResult.lines);
         allLines.addAll(monthlyLines);
+        allLines.addAll(calculatePeriodicLines(plan, snapshot, allTransactions, categoriesById, expenseLines, incomeLines, periodStart, periodEnd, now));
 
         // Update snapshot totals
         updateSnapshotTotals(snapshot, expenseResult, incomeResult);
@@ -215,6 +229,63 @@ public class BudgetService {
 
         BudgetSnapshot saved = snapshotRepository.save(snapshot);
         return budgetMapper.toSnapshotDto(saved);
+    }
+
+    private boolean isLongPeriod(BudgetPlanLine line) {
+        return line.getLinePeriod() != null && line.getLinePeriod() != BudgetLinePeriod.MONTHLY;
+    }
+
+    private int periodMonths(BudgetLinePeriod period) {
+        return switch (period) {
+            case MONTHLY -> 1;
+            case QUARTERLY -> 3;
+            case SEMIANNUAL -> 6;
+            case ANNUAL -> 12;
+        };
+    }
+
+    private LocalDate linePeriodStart(BudgetLinePeriod period, LocalDate date) {
+        int months = periodMonths(period);
+        return LocalDate.of(date.getYear(), ((date.getMonthValue() - 1) / months) * months + 1, 1);
+    }
+
+    private List<BudgetSnapshotLine> calculatePeriodicLines(BudgetPlan plan, BudgetSnapshot snapshot,
+            List<BankingTransactionDTO> transactions, Map<Long, BankingCategoryDTO> categories,
+            List<BudgetPlanLine> expenseLines, List<BudgetPlanLine> incomeLines,
+            LocalDate start, LocalDate end, LocalDateTime now) {
+        List<BudgetSnapshotLine> results = new ArrayList<>();
+        for (BudgetPlanLine line : plan.getLines()) {
+            if (!isLongPeriod(line)) continue;
+            int months = periodMonths(line.getLinePeriod());
+            for (LocalDate boundary = linePeriodStart(line.getLinePeriod(), start); !boundary.isAfter(end); boundary = boundary.plusMonths(months)) {
+                LocalDate naturalEnd = boundary.plusMonths(months).minusDays(1);
+                LocalDate observedStart = plan.getPeriod() == BudgetPeriod.CUSTOM && boundary.isBefore(plan.getStartDate()) ? plan.getStartDate() : boundary;
+                LocalDate observedEnd = naturalEnd.isAfter(end) ? end : naturalEnd;
+                List<BudgetPlanLine> candidates = line.getLineType() == BudgetLineType.INCOME ? incomeLines : expenseLines;
+                List<BankingTransactionDTO> matching = transactions.stream().filter(transaction -> {
+                    LocalDate date = transaction.getBookingDate().toLocalDate();
+                    if (date.isBefore(observedStart) || date.isAfter(observedEnd) || transaction.getAmount() == null
+                            || (line.getLineType() == BudgetLineType.INCOME ? transaction.getAmount() <= 0 : transaction.getAmount() >= 0)) return false;
+                    BankingCategoryDTO category = categories.get(transaction.getCategoryId());
+                    if (category == null) return false;
+                    BudgetPlanLine matched = transactionMatcher.findMatchingLine(candidates, category);
+                    return matched != null && matched.getId().equals(line.getId());
+                }).toList();
+                TransactionAccumulators periodAccumulators = snapshotCalculator.initializeAccumulators(List.of(line));
+                processTransactions(matching, categories, line.getLineType() == BudgetLineType.INCOME ? List.of() : List.of(line),
+                        line.getLineType() == BudgetLineType.INCOME ? List.of(line) : List.of(), periodAccumulators, plan.getCurrency());
+                Map<Long, BigDecimal> budgets = Map.of(line.getId(), line.getBudgetAmount());
+                var calculation = line.getLineType() == BudgetLineType.INCOME
+                        ? snapshotCalculator.calculateIncomeLines(List.of(line), periodAccumulators.incomeByLineId, snapshot, now, budgets)
+                        : snapshotCalculator.calculateExpenseLines(List.of(line), periodAccumulators.expenseByLineId, snapshot, now, budgets);
+                BudgetSnapshotLine result = calculation.lines.get(0);
+                result.setLinePeriodStart(observedStart);
+                result.setLinePeriodEnd(naturalEnd);
+                result.setLineObservedUntil(observedEnd);
+                results.add(result);
+            }
+        }
+        return results;
     }
 
     BigDecimal monthlyBudget(BudgetPlan plan, BigDecimal amount, YearMonth month) {
@@ -358,6 +429,7 @@ public class BudgetService {
                 .categoryCode(category.getCode())
                 .categoryName(category.getName())
                 .budgetAmount(normalizeAmount(lineRequest.getBudgetAmount()))
+                .linePeriod(lineRequest.getLinePeriod())
                 .lineType(lineType)
                 .createdAt(now)
                 .updatedAt(now)

@@ -39,6 +39,7 @@ import org.testcontainers.DockerClientFactory;
 import tools.jackson.databind.json.JsonMapper;
 
 import es.triana.company.budget.model.BudgetLineType;
+import es.triana.company.budget.model.BudgetLinePeriod;
 import es.triana.company.budget.model.BudgetPeriod;
 import es.triana.company.budget.model.api.BankingCategoryDTO;
 import es.triana.company.budget.model.api.BankingTransactionDTO;
@@ -117,6 +118,33 @@ class BudgetPersistenceIntegrationTest {
         entityManager.flush();
         entityManager.clear();
         assertEquals(2, service.getLatestSnapshot(1L, second.getId()).getMonths().size());
+    }
+
+    @Test
+    void persistsAndReloadsPerLinePeriodsAndTheirSnapshots() {
+        BudgetPlan plan = createPlan(40L, "Periodic");
+        plan.getLines().get(0).setLinePeriod(BudgetLinePeriod.ANNUAL);
+        plan.getLines().get(0).setBudgetAmount(new BigDecimal("1800.00"));
+        plans.saveAndFlush(plan);
+        LocalDate start = LocalDate.of(2026, 6, 1);
+        LocalDate end = LocalDate.of(2026, 6, 15);
+        when(banking.getCategories("token")).thenReturn(List.of(BankingCategoryDTO.builder().id(10L).name("Food").code("FOOD").build()));
+        when(banking.getTransactions("token", LocalDate.of(2026, 1, 1), end)).thenReturn(List.of(
+                BankingTransactionDTO.builder().categoryId(10L).bookingDate(LocalDate.of(2026, 3, 10).atStartOfDay()).amount(-1200.0).currency("EUR").build()));
+        service.refreshSnapshot(40L, "token", plan.getId(), start, end);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertEquals(BudgetLinePeriod.ANNUAL, service.getPlan(40L, plan.getId()).getLines().get(0).getLinePeriod());
+        var stored = service.getLatestSnapshot(40L, plan.getId());
+        assertTrue(stored.getLines().isEmpty());
+        assertEquals(1, stored.getPeriodicLines().size());
+        assertEquals(LocalDate.of(2026, 1, 1), stored.getPeriodicLines().get(0).getLinePeriodStart());
+        assertEquals(0, stored.getPeriodicLines().get(0).getVariance().compareTo(new BigDecimal("600.00")));
+        service.refreshSnapshot(40L, "token", plan.getId(), start, end);
+        entityManager.flush();
+        entityManager.clear();
+        assertEquals(1, service.getLatestSnapshot(40L, plan.getId()).getPeriodicLines().size());
     }
 
     @Test
@@ -215,6 +243,27 @@ class BudgetPersistenceIntegrationTest {
         assertEquals("CUSTOM", customData.get("period").asString());
         assertEquals("2026-01-15", customData.get("startDate").asString());
         assertEquals("2026-03-02", customData.get("endDate").asString());
+
+        String annualBody = """
+            {"name":"Annual line","currency":"EUR","period":"MONTHLY","lines":[{"categoryId":10,"budgetAmount":1800,"lineType":"EXPENSE","linePeriod":"ANNUAL"}]}
+            """;
+        HttpRequest annual = HttpRequest.newBuilder(URI.create(base)).header("Authorization", "Bearer tenant-token")
+            .header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(annualBody)).build();
+        HttpResponse<String> annualResponse = client.send(annual, HttpResponse.BodyHandlers.ofString());
+        assertEquals(201, annualResponse.statusCode(), annualResponse.body());
+        var annualData = new JsonMapper().readTree(annualResponse.body()).get("data");
+        assertEquals("ANNUAL", annualData.get("lines").get(0).get("linePeriod").asString());
+        long annualId = annualData.get("id").asLong();
+        LocalDate june = LocalDate.of(2026, 6, 15);
+        when(banking.getTransactions("tenant-token", start, june)).thenReturn(List.of(
+            BankingTransactionDTO.builder().categoryId(10L).bookingDate(LocalDate.of(2026, 3, 10).atStartOfDay()).amount(-1200.0).currency("EUR").build()));
+        HttpRequest annualRefresh = HttpRequest.newBuilder(URI.create(base + "/" + annualId + "/snapshots/refresh?startDate=2026-06-01&endDate=2026-06-15"))
+            .header("Authorization", "Bearer tenant-token").POST(HttpRequest.BodyPublishers.noBody()).build();
+        HttpResponse<String> annualRefreshed = client.send(annualRefresh, HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, annualRefreshed.statusCode(), annualRefreshed.body());
+        var annualResult = new JsonMapper().readTree(annualRefreshed.body()).get("data").get("periodicLines").get(0);
+        assertEquals("2026-01-01", annualResult.get("linePeriodStart").asString());
+        assertEquals(600.0, annualResult.get("variance").asDouble());
         }
 
     private BudgetPlan createPlan(Long tenantId, String name) {
