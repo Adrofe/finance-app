@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -21,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import es.triana.company.budget.mapper.BudgetMapper;
 import es.triana.company.budget.model.BudgetLineType;
+import es.triana.company.budget.model.BudgetPeriod;
 import es.triana.company.budget.service.BudgetSnapshotCalculator.Accumulator;
 import es.triana.company.budget.service.BudgetSnapshotCalculator.TransactionAccumulators;
 import es.triana.company.budget.model.api.BankingCategoryDTO;
@@ -72,7 +74,16 @@ public class BudgetService {
         plan.setName(request.getName().trim());
         plan.setDescription(request.getDescription());
         plan.setCurrency(normalizeCurrency(request.getCurrency()));
-        plan.setActive(request.getActive() == null || request.getActive());
+        if (request.getActive() != null || plan.getActive() == null) {
+            plan.setActive(request.getActive() == null || request.getActive());
+        }
+        BudgetPeriod period = request.getPeriod() != null ? request.getPeriod() : (plan.getPeriod() != null ? plan.getPeriod() : BudgetPeriod.MONTHLY);
+        if (period == BudgetPeriod.CUSTOM && (request.getStartDate() == null || request.getEndDate() == null || request.getEndDate().isBefore(request.getStartDate()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A valid start and end date are required for a custom budget");
+        }
+        plan.setPeriod(period);
+        plan.setStartDate(period == BudgetPeriod.CUSTOM ? request.getStartDate() : null);
+        plan.setEndDate(period == BudgetPeriod.CUSTOM ? request.getEndDate() : null);
 
         plan.getLines().clear();
         Set<String> seenKeys = new HashSet<>();
@@ -123,21 +134,36 @@ public class BudgetService {
     @Transactional
     public BudgetSnapshotDTO refreshSnapshot(Long tenantId, String bearerToken, Long planId, LocalDate startDate, LocalDate endDate) {
         validateTenantId(tenantId);
-        BudgetPlan plan = planRepository.findByIdAndTenantId(planId, tenantId)
+        BudgetPlan plan = planRepository.findByIdAndTenantIdForUpdate(planId, tenantId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Budget plan not found"));
 
-        LocalDate periodStart = startDate != null ? startDate : YearMonth.now().atDay(1);
-        LocalDate periodEnd = endDate != null ? endDate : LocalDate.now();
+        LocalDate requestedStart = startDate != null ? startDate : YearMonth.now().atDay(1);
+        LocalDate requestedEnd = endDate != null ? endDate : LocalDate.now();
+        if (requestedEnd.isBefore(requestedStart)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date must not be before start date");
+        }
+        if (plan.getPeriod() == BudgetPeriod.CUSTOM && (plan.getStartDate() == null || plan.getEndDate() == null)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Custom budget dates are missing");
+        }
+        LocalDate periodStart = plan.getPeriod() == BudgetPeriod.CUSTOM && requestedStart.isBefore(plan.getStartDate()) ? plan.getStartDate() : requestedStart;
+        LocalDate periodEnd = plan.getPeriod() == BudgetPeriod.CUSTOM && requestedEnd.isAfter(plan.getEndDate()) ? plan.getEndDate() : requestedEnd;
+        if (periodEnd.isBefore(periodStart)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The selected dates do not overlap the budget period");
+        }
         LocalDateTime now = LocalDateTime.now();
 
         Map<Long, BankingCategoryDTO> categoriesById = loadCategoriesMap(bearerToken);
-        List<BankingTransactionDTO> transactions = bankingApiClient.getTransactions(bearerToken, periodStart, periodEnd);
+        List<BankingTransactionDTO> transactions = bankingApiClient.getTransactions(bearerToken, periodStart, periodEnd).stream()
+            .filter(transaction -> transaction.getBookingDate() != null
+                && !transaction.getBookingDate().toLocalDate().isBefore(periodStart)
+                && !transaction.getBookingDate().toLocalDate().isAfter(periodEnd))
+            .toList();
 
         List<BudgetPlanLine> expenseLines = filterExpenseLines(plan.getLines());
         List<BudgetPlanLine> incomeLines = filterIncomeLines(plan.getLines());
 
         TransactionAccumulators accumulators = snapshotCalculator.initializeAccumulators(plan.getLines());
-        processTransactions(transactions, categoriesById, expenseLines, incomeLines, accumulators);
+        processTransactions(transactions, categoriesById, expenseLines, incomeLines, accumulators, plan.getCurrency());
 
         BudgetSnapshot snapshot = snapshotRepository
                 .findByTenantIdAndPlanIdAndPeriodStartAndPeriodEnd(tenantId, planId, periodStart, periodEnd)
@@ -153,13 +179,34 @@ public class BudgetService {
         snapshot.setUpdatedAt(now);
         snapshot.setGeneratedAt(now);
 
-        // Calculate lines and totals
-        var expenseResult = snapshotCalculator.calculateExpenseLines(expenseLines, accumulators.expenseByLineId, snapshot, now);
-        var incomeResult = snapshotCalculator.calculateIncomeLines(incomeLines, accumulators.incomeByLineId, snapshot, now);
+        Map<Long, BigDecimal> totalBudgets = new HashMap<>();
+        List<BudgetSnapshotLine> monthlyLines = new ArrayList<>();
+        for (YearMonth month = YearMonth.from(periodStart); !month.isAfter(YearMonth.from(periodEnd)); month = month.plusMonths(1)) {
+            YearMonth currentMonth = month;
+            Map<Long, BigDecimal> monthBudgets = new HashMap<>();
+            for (BudgetPlanLine line : plan.getLines()) {
+                BigDecimal amount = monthlyBudget(plan, line.getBudgetAmount(), month);
+                monthBudgets.put(line.getId(), amount);
+                totalBudgets.merge(line.getId(), amount, BigDecimal::add);
+            }
+            TransactionAccumulators monthAccumulators = snapshotCalculator.initializeAccumulators(plan.getLines());
+            processTransactions(transactions.stream().filter(transaction -> YearMonth.from(transaction.getBookingDate()).equals(currentMonth)).toList(),
+                    categoriesById, expenseLines, incomeLines, monthAccumulators, plan.getCurrency());
+            var monthlyExpenses = snapshotCalculator.calculateExpenseLines(expenseLines, monthAccumulators.expenseByLineId, snapshot, now, monthBudgets);
+            var monthlyIncome = snapshotCalculator.calculateIncomeLines(incomeLines, monthAccumulators.incomeByLineId, snapshot, now, monthBudgets);
+            monthlyLines.addAll(monthlyExpenses.lines);
+            monthlyLines.addAll(monthlyIncome.lines);
+            monthlyExpenses.lines.forEach(line -> line.setMonthStart(currentMonth.atDay(1)));
+            monthlyIncome.lines.forEach(line -> line.setMonthStart(currentMonth.atDay(1)));
+        }
+
+        var expenseResult = snapshotCalculator.calculateExpenseLines(expenseLines, accumulators.expenseByLineId, snapshot, now, totalBudgets);
+        var incomeResult = snapshotCalculator.calculateIncomeLines(incomeLines, accumulators.incomeByLineId, snapshot, now, totalBudgets);
 
         List<BudgetSnapshotLine> allLines = new ArrayList<>();
         allLines.addAll(expenseResult.lines);
         allLines.addAll(incomeResult.lines);
+        allLines.addAll(monthlyLines);
 
         // Update snapshot totals
         updateSnapshotTotals(snapshot, expenseResult, incomeResult);
@@ -168,6 +215,28 @@ public class BudgetService {
 
         BudgetSnapshot saved = snapshotRepository.save(snapshot);
         return budgetMapper.toSnapshotDto(saved);
+    }
+
+    BigDecimal monthlyBudget(BudgetPlan plan, BigDecimal amount, YearMonth month) {
+        BudgetPeriod period = plan.getPeriod() != null ? plan.getPeriod() : BudgetPeriod.MONTHLY;
+        if (period == BudgetPeriod.MONTHLY) return amount;
+        long months;
+        long index;
+        if (period == BudgetPeriod.QUARTERLY) {
+            months = 3;
+            index = (month.getMonthValue() - 1) % 3;
+        } else if (period == BudgetPeriod.ANNUAL) {
+            months = 12;
+            index = month.getMonthValue() - 1;
+        } else {
+            YearMonth first = YearMonth.from(plan.getStartDate());
+            YearMonth last = YearMonth.from(plan.getEndDate());
+            if (month.isBefore(first) || month.isAfter(last)) return BigDecimal.ZERO;
+            months = ChronoUnit.MONTHS.between(first, last) + 1;
+            index = ChronoUnit.MONTHS.between(first, month);
+        }
+        BigDecimal base = amount.divide(BigDecimal.valueOf(months), 2, RoundingMode.DOWN);
+        return index == months - 1 ? amount.subtract(base.multiply(BigDecimal.valueOf(months - 1))) : base;
     }
 
     @Transactional(readOnly = true)
