@@ -18,6 +18,7 @@ import es.triana.company.budget.model.db.BudgetPlanLine;
 import es.triana.company.budget.model.db.BudgetSnapshot;
 import es.triana.company.budget.model.db.BudgetSnapshotLine;
 import es.triana.company.budget.model.BudgetLineType;
+import es.triana.company.budget.model.BudgetLinePeriod;
 
 @Component
 public class BudgetMapper {
@@ -46,6 +47,7 @@ public class BudgetMapper {
                 .categoryCode(line.getCategoryCode())
                 .categoryName(line.getCategoryName())
                 .budgetAmount(line.getBudgetAmount())
+                .linePeriod(line.getLinePeriod())
                 .lineType(line.getLineType())
                 .build();
     }
@@ -65,10 +67,12 @@ public class BudgetMapper {
                 .totalIncome(snapshot.getTotalIncome())
                 .incomeVariance(snapshot.getIncomeVariance())
                 .netBalance(snapshot.getNetBalance())
-                .lines(snapshot.getLines().stream().filter(line -> line.getMonthStart() == null)
+                .lines(snapshot.getLines().stream().filter(line -> line.getMonthStart() == null && line.getLinePeriodStart() == null)
                         .map(this::toSnapshotLineDto)
                         .toList())
                 .months(toMonths(snapshot.getLines()))
+                .periodicLines(snapshot.getLines().stream().filter(line -> line.getLinePeriodStart() != null)
+                        .map(this::toSnapshotLineDto).toList())
                 .build();
     }
 
@@ -91,6 +95,7 @@ public class BudgetMapper {
 
     private BigDecimal sum(List<BudgetSnapshotLine> lines, BudgetLineType type, boolean budget) {
         return lines.stream().filter(line -> line.getLineType() == type)
+                .filter(line -> line.getLinePeriod() == null || line.getLinePeriod() == BudgetLinePeriod.MONTHLY)
                 .map(line -> budget ? line.getBudgetAmount() : line.getSpentAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
@@ -102,6 +107,10 @@ public class BudgetMapper {
                 .categoryCode(line.getCategoryCode())
                 .categoryName(line.getCategoryName())
                 .budgetAmount(line.getBudgetAmount())
+                .linePeriod(line.getLinePeriod())
+                .linePeriodStart(line.getLinePeriodStart())
+                .linePeriodEnd(line.getLinePeriodEnd())
+                .lineObservedUntil(line.getLineObservedUntil())
                 .spentAmount(line.getSpentAmount())
                 .variance(line.getVariance())
                 .transactionCount(line.getTransactionCount())
