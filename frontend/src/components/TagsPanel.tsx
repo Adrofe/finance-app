@@ -5,9 +5,10 @@ import {
 } from 'recharts';
 import { CatalogService } from '../services/catalogService';
 import { fetchTransactions } from '../services/transactionsService';
-import type { Tag, TransactionCategory } from '../services/catalogService';
+import type { Account, Tag, TransactionCategory } from '../services/catalogService';
 import type { Transaction } from '../types/banking';
 import { getCategoryVisual } from '../constants/visualConfig';
+import { dispatchNavigateToTransaction } from '../events/financeEvents';
 import './TagsPanel.css';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -24,6 +25,22 @@ const fmt = (n: number) =>
 
 const fmtFull = (n: number) =>
   n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
+
+const fmtTransactionAmount = (amount?: number, currency?: string) => {
+  if (amount == null) return '—';
+  return currency && /^[A-Z]{3}$/.test(currency)
+    ? amount.toLocaleString('es-ES', { style: 'currency', currency })
+    : amount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const fmtTransactionDate = (value?: string) => {
+  if (!value) return '—';
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return '—';
+  return new Date(year, month - 1, day).toLocaleDateString('es-ES');
+};
+
+const normalizeSearch = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
 
 function monthLabel(ym: string) {
   const [year, month] = ym.split('-');
@@ -68,6 +85,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
   const [tags, setTags] = useState<Tag[]>([]);
   const [categories, setCategories] = useState<TransactionCategory[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +103,9 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
 
   // Chart state
   const [pieMode, setPieMode] = useState<'parent' | 'child'>('parent');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null | undefined>(undefined);
+  const [transactionSearch, setTransactionSearch] = useState('');
+  const [transactionPage, setTransactionPage] = useState(0);
 
   // ── Data loading ─────────────────────────────────────────────────────────
 
@@ -93,14 +114,16 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
     try {
       setLoading(true);
       setError(null);
-      const [fetchedTags, fetchedCats, fetchedTx] = await Promise.all([
+      const [fetchedTags, fetchedCats, fetchedTx, fetchedAccounts] = await Promise.all([
         CatalogService.fetchTags(token),
         CatalogService.fetchCategories(token),
         fetchTransactions(token),
+        CatalogService.fetchAccounts(token),
       ]);
       setTags(fetchedTags);
       setCategories(fetchedCats);
       setTransactions(fetchedTx);
+      setAccounts(fetchedAccounts);
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
       if (e?.response?.status === 401) {
@@ -174,6 +197,14 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
 
   // Category map: id → parent category
   const catById = useMemo(() => Object.fromEntries(categories.map(c => [c.id, c])), [categories]);
+  const accountById = useMemo(() => Object.fromEntries(accounts.map(account => [account.id, account])), [accounts]);
+
+  const getCategoryGroupId = (categoryId?: number): number | null => {
+    const category = categoryId != null ? catById[categoryId] : undefined;
+    if (!category) return null;
+    return pieMode === 'parent' && category.parentId && catById[category.parentId]
+      ? category.parentId : category.id;
+  };
 
   const getParentName = (catId?: number) => {
     if (!catId) return 'Sin categoría';
@@ -193,7 +224,10 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
 
   const getChildName = (catId?: number) => {
     if (!catId) return 'Sin categoría';
-    return catById[catId]?.name ?? 'Sin categoría';
+    const category = catById[catId];
+    if (!category) return 'Sin categoría';
+    const parent = category.parentId ? catById[category.parentId] : undefined;
+    return parent ? `${parent.name} › ${category.name}` : category.name;
   };
 
   const getChildCode = (catId?: number) => {
@@ -201,34 +235,54 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
     return catById[catId]?.code ?? 'OTH';
   };
 
-  // Pie chart: spending by parent or child category (transfers excluded)
-  const categoryPieData = useMemo(() => {
-    const map: Record<string, number> = {};
-    tagTxFiltered
-      .filter(tx => (tx.amount ?? 0) < 0)
-      .forEach(tx => {
-        const label = pieMode === 'parent' ? getParentName(tx.categoryId) : getChildName(tx.categoryId);
-        map[label] = (map[label] ?? 0) + Math.abs(tx.amount ?? 0);
-      });
-    return Object.entries(map)
-      .sort(([, a], [, b]) => b - a)
-      .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }));
-  }, [tagTxFiltered, categories, pieMode]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Category breakdown table (transfers excluded, adapts to pieMode)
   const categoryBreakdown = useMemo(() => {
-    const map: Record<string, { parentName: string; parentCode: string; amount: number; count: number }> = {};
+    const map = new Map<number | null, { id: number | null; parentName: string; parentCode: string; amount: number; count: number }>();
     tagTxFiltered
       .filter(tx => (tx.amount ?? 0) < 0)
       .forEach(tx => {
-        const key  = pieMode === 'parent' ? getParentName(tx.categoryId) : getChildName(tx.categoryId);
+        const key = getCategoryGroupId(tx.categoryId);
+        const name = pieMode === 'parent' ? getParentName(tx.categoryId) : getChildName(tx.categoryId);
         const code = pieMode === 'parent' ? getParentCode(tx.categoryId)  : getChildCode(tx.categoryId);
-        if (!map[key]) map[key] = { parentName: key, parentCode: code, amount: 0, count: 0 };
-        map[key].amount += Math.abs(tx.amount ?? 0);
-        map[key].count++;
+        const row = map.get(key) ?? { id: key, parentName: name, parentCode: code, amount: 0, count: 0 };
+        row.amount += Math.abs(tx.amount ?? 0);
+        row.count++;
+        map.set(key, row);
       });
-    return Object.values(map).sort((a, b) => b.amount - a.amount);
+    return [...map.values()].sort((a, b) => b.amount - a.amount);
   }, [tagTxFiltered, categories, pieMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const categoryPieData = useMemo(() => categoryBreakdown.map(row => ({ name: row.parentName, value: Math.round(row.amount * 100) / 100 })), [categoryBreakdown]);
+
+  const transactionCategoryOptions = useMemo(() => {
+    const options = new Map<number | null, string>();
+    tagTx.forEach(transaction => {
+      const id = getCategoryGroupId(transaction.categoryId);
+      options.set(id, pieMode === 'parent' ? getParentName(transaction.categoryId) : getChildName(transaction.categoryId));
+    });
+    return [...options].map(([id, name]) => ({ id, name })).sort((left, right) => left.name.localeCompare(right.name, 'es'));
+  }, [tagTx, categories, pieMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const visibleTransactions = useMemo(() => {
+    const query = normalizeSearch(transactionSearch.trim());
+    return tagTx.filter(tx => {
+      if (selectedCategoryId !== undefined && getCategoryGroupId(tx.categoryId) !== selectedCategoryId) return false;
+      const account = tx.sourceAccountId != null ? accountById[tx.sourceAccountId] : undefined;
+      const destination = tx.destinationAccountId != null ? accountById[tx.destinationAccountId] : undefined;
+      const category = tx.categoryId != null ? catById[tx.categoryId] : undefined;
+      return !query || [tx.description, tx.merchantName, account?.name, destination?.name, category?.name, tx.currency]
+        .some(value => value && normalizeSearch(value).includes(query));
+    }).sort((left, right) => (right.bookingDate ?? '').localeCompare(left.bookingDate ?? '') || (right.id ?? 0) - (left.id ?? 0));
+  }, [tagTx, selectedCategoryId, transactionSearch, accountById, catById, pieMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setTransactionPage(0);
+  }, [selectedTagId, selectedCategoryId, transactionSearch, pieMode]);
+
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(visibleTransactions.length / pageSize));
+  const currentPage = Math.min(transactionPage, totalPages - 1);
+  const pagedTransactions = visibleTransactions.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
 
@@ -242,6 +296,8 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
       setTags(prev => [...prev, created]);
       setNewTagName('');
       setSelectedTagId(created.id);
+      setSelectedCategoryId(undefined);
+      setTransactionSearch('');
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { message?: string } }; message?: string };
       if (e?.response?.status === 401) onUnauthorized?.('Sesión expirada');
@@ -371,7 +427,13 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
               <li
                 key={tag.id}
                 className={`tp-tag-item${isActive ? ' tp-tag-item--active' : ''}`}
-                onClick={() => !isEditing && setSelectedTagId(tag.id)}
+                onClick={() => {
+                  if (!isEditing && selectedTagId !== tag.id) {
+                    setSelectedTagId(tag.id);
+                    setSelectedCategoryId(undefined);
+                    setTransactionSearch('');
+                  }
+                }}
               >
                 {isEditing ? (
                   <div className="tp-tag-edit-row" onClick={e => e.stopPropagation()}>
@@ -454,7 +516,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
 
             {tagTxFiltered.length === 0 ? (
               <div className="tp-no-tx">
-                <span>Esta tag no tiene transacciones aún.</span>
+                <span>{tagTx.length ? 'No hay ingresos ni gastos para el análisis.' : 'Esta tag no tiene transacciones aún.'}</span>
               </div>
             ) : (
               <>
@@ -518,13 +580,13 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
                         <div className="tp-pie-toggle">
                           <button
                             className={`tp-pie-toggle__btn${pieMode === 'parent' ? ' tp-pie-toggle__btn--active' : ''}`}
-                            onClick={() => setPieMode('parent')}
+                            onClick={() => { setPieMode('parent'); setSelectedCategoryId(undefined); }}
                           >
                             Padre
                           </button>
                           <button
                             className={`tp-pie-toggle__btn${pieMode === 'child' ? ' tp-pie-toggle__btn--active' : ''}`}
-                            onClick={() => setPieMode('child')}
+                            onClick={() => { setPieMode('child'); setSelectedCategoryId(undefined); }}
                           >
                             Hijos
                           </button>
@@ -561,12 +623,13 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
                 {categoryBreakdown.length > 0 && (
                   <div className="tp-breakdown-card">
                     <h3 className="tp-breakdown-card__title">Desglose por categoría</h3>
+                    <div className="tp-breakdown-table-wrap">
                     <table className="tp-breakdown-table">
                       <thead>
                         <tr>
                           <th>Categoría</th>
-                          <th>Transacciones</th>
-                          <th>Importe</th>
+                          <th>Gastos</th>
+                          <th>Importe gastado</th>
                           <th>% del total</th>
                         </tr>
                       </thead>
@@ -577,16 +640,19 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
                             ? (row.amount / Math.abs(stats.spent)) * 100
                             : 0;
                           return (
-                            <tr key={i} className="tp-breakdown-row">
+                            <tr key={row.id ?? 'uncategorized'} className={`tp-breakdown-row${selectedCategoryId === row.id ? ' tp-breakdown-row--selected' : ''}`}>
                               <td>
                                 <div className="tp-breakdown-cat">
-                                  <span
-                                    className="tp-breakdown-cat__badge"
+                                  <button
+                                    type="button"
+                                    className="tp-breakdown-cat__badge tp-breakdown-cat__button"
                                     style={{ background: `${visual.color}22`, color: visual.color }}
+                                    aria-pressed={selectedCategoryId === row.id}
+                                    onClick={() => setSelectedCategoryId(current => current === row.id ? undefined : row.id)}
                                   >
-                                    <span>{visual.emoji}</span>
+                                    <span aria-hidden="true">{visual.emoji}</span>
                                     <span>{row.parentName}</span>
-                                  </span>
+                                  </button>
                                 </div>
                               </td>
                               <td className="tp-breakdown-num">{row.count}</td>
@@ -605,9 +671,60 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ token, onUnauthorized }) =
                         })}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 )}
               </>
+            )}
+
+            {tagTx.length > 0 && (
+              <section className="tp-transactions" aria-labelledby="tp-transactions-title">
+                <div className="tp-transactions-header">
+                  <div>
+                    <h3 id="tp-transactions-title">Transacciones</h3>
+                    <span>{visibleTransactions.length} de {tagTx.length}</span>
+                  </div>
+                  <div className="tp-transactions-controls">
+                    <input type="search" value={transactionSearch} onChange={event => setTransactionSearch(event.target.value)} placeholder="Buscar transacciones..." aria-label="Buscar transacciones de la tag" />
+                    <select aria-label="Filtrar transacciones por categoría" value={selectedCategoryId === undefined ? 'all' : selectedCategoryId === null ? 'none' : String(selectedCategoryId)} onChange={event => setSelectedCategoryId(event.target.value === 'all' ? undefined : event.target.value === 'none' ? null : Number(event.target.value))}>
+                      <option value="all">Todas las categorías</option>
+                      {transactionCategoryOptions.map(option => <option key={option.id ?? 'none'} value={option.id ?? 'none'}>{option.name}</option>)}
+                    </select>
+                    {selectedCategoryId !== undefined && <button type="button" className="tp-clear-category" onClick={() => setSelectedCategoryId(undefined)}>Todas las categorías</button>}
+                  </div>
+                </div>
+                {selectedCategoryId !== undefined && <p className="tp-transactions-filter">Categoría: {transactionCategoryOptions.find(option => option.id === selectedCategoryId)?.name ?? 'Sin categoría'}</p>}
+                <div className="tp-transactions-table-wrap">
+                  <table className="tp-transactions-table">
+                    <thead><tr><th>Fecha</th><th>Descripción / comercio</th><th>Cuenta</th><th>Categoría</th><th>Importe</th><th><span className="tp-visually-hidden">Acciones</span></th></tr></thead>
+                    <tbody>
+                      {visibleTransactions.length === 0 && <tr><td colSpan={6} className="tp-transactions-empty">No hay transacciones para estos filtros.</td></tr>}
+                      {pagedTransactions.map((transaction, index) => {
+                        const account = transaction.sourceAccountId != null ? accountById[transaction.sourceAccountId] : undefined;
+                        const destination = transaction.destinationAccountId != null ? accountById[transaction.destinationAccountId] : undefined;
+                        const category = transaction.categoryId != null ? catById[transaction.categoryId] : undefined;
+                        return (
+                          <tr key={transaction.id ?? `${transaction.externalId ?? 'transaction'}-${index}`}>
+                            <td className="tp-transaction-date">{fmtTransactionDate(transaction.bookingDate)}</td>
+                            <td><div className="tp-transaction-description"><strong>{transaction.description || transaction.merchantName || '—'}</strong>{transaction.description && transaction.merchantName && <span>{transaction.merchantName}</span>}</div></td>
+                            <td>{account?.name ?? (transaction.sourceAccountId != null ? `#${transaction.sourceAccountId}` : '—')}{destination && <span className="tp-transaction-destination"> → {destination.name}</span>}</td>
+                            <td>{category?.name ?? 'Sin categoría'}</td>
+                            <td className={`tp-transaction-amount ${(transaction.amount ?? 0) < 0 ? 'negative' : 'positive'}`}>{fmtTransactionAmount(transaction.amount, transaction.currency)}</td>
+                            <td>{transaction.id != null && <button type="button" className="tp-transaction-link" title="Ver transacción" aria-label={`Ver transacción ${transaction.description || transaction.id}`} onClick={() => dispatchNavigateToTransaction(transaction.id!)}>↗</button>}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {totalPages > 1 && (
+                  <div className="tp-pagination">
+                    <span>{currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, visibleTransactions.length)} de {visibleTransactions.length}</span>
+                    <button type="button" aria-label="Página anterior" title="Página anterior" disabled={currentPage === 0} onClick={() => setTransactionPage(currentPage - 1)}>‹</button>
+                    <button type="button" aria-label="Página siguiente" title="Página siguiente" disabled={currentPage >= totalPages - 1} onClick={() => setTransactionPage(currentPage + 1)}>›</button>
+                  </div>
+                )}
+              </section>
             )}
           </>
         )}
