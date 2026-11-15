@@ -1,6 +1,8 @@
 package es.triana.company.budget.model.api;
 
 import java.util.List;
+import java.time.LocalDate;
+import es.triana.company.budget.model.BudgetPeriod;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,5 +20,9 @@ public class BudgetPlanDTO {
     private String description;
     private String currency;
     private Boolean active;
+    private Boolean primary;
+    private BudgetPeriod period;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private List<BudgetPlanLineDTO> lines;
 }

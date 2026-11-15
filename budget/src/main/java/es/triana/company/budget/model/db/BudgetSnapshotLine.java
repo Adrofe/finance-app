@@ -1,6 +1,7 @@
 package es.triana.company.budget.model.db;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import es.triana.company.budget.model.BudgetLineType;
@@ -35,6 +36,9 @@ public class BudgetSnapshotLine {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "budget_snapshot_id", nullable = false)
     private BudgetSnapshot snapshot;
+
+    @Column(name = "month_start")
+    private LocalDate monthStart;
 
     @Column(name = "category_id", nullable = false)
     private Long categoryId;

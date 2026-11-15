@@ -1,6 +1,8 @@
 package es.triana.company.budget.model.api;
 
 import java.util.List;
+import java.time.LocalDate;
+import es.triana.company.budget.model.BudgetPeriod;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -31,6 +33,9 @@ public class BudgetPlanRequestDTO {
     private String currency;
 
     private Boolean active;
+    private BudgetPeriod period;
+    private LocalDate startDate;
+    private LocalDate endDate;
 
     @NotEmpty
     @Valid
