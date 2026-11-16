@@ -13,6 +13,7 @@ import { getCategoryVisual } from '../constants/visualConfig';
 import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
 import { fetchBudgetPlans, refreshBudgetSnapshot } from '../services/budgetService';
 import type { BudgetPlanDTO, BudgetSnapshotDTO } from '../types/budget';
+import { getPresetRange, PRESETS, PRESET_LABELS } from '../utils/dashboardPresets';
 import './Dashboard.css';
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -21,45 +22,6 @@ const fmt = (n: number) =>
   new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(n);
 
 const fmtPct = (n: number | null) => (n != null ? `${n.toFixed(1)}%` : '—');
-
-// Uses local date parts (not toISOString) to avoid UTC timezone shifting the day.
-function toISO(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-// ─── Preset helpers ───────────────────────────────────────────────────────────
-
-const PRESET_LABELS: Record<DashboardPreset, string> = {
-  'this-month': 'Este mes',
-  'last-month': 'Mes anterior',
-  '3-months':   'Últimos 3m',
-  '6-months':   'Últimos 6m',
-  'this-year':  'Este año',
-  'last-year':  'Año pasado',
-  'custom':     'Personalizado',
-};
-
-const PRESETS: DashboardPreset[] = [
-  'this-month', 'last-month', '3-months', '6-months', 'this-year', 'last-year', 'custom',
-];
-
-function getPresetRange(preset: DashboardPreset): { start: string; end: string } {
-  const t = new Date();
-  const y = t.getFullYear();
-  const m = t.getMonth();
-  switch (preset) {
-    case 'this-month': return { start: toISO(new Date(y, m, 1)),     end: toISO(t) };
-    case 'last-month': return { start: toISO(new Date(y, m - 1, 1)), end: toISO(new Date(y, m, 0)) };
-    case '3-months':   return { start: toISO(new Date(y, m - 2, 1)), end: toISO(t) };
-    case '6-months':   return { start: toISO(new Date(y, m - 5, 1)), end: toISO(t) };
-    case 'this-year':  return { start: toISO(new Date(y, 0, 1)),     end: toISO(t) };
-    case 'last-year':  return { start: toISO(new Date(y - 1, 0, 1)), end: toISO(new Date(y - 1, 11, 31)) };
-    default:           return { start: '', end: '' };
-  }
-}
 
 // ─── KPI card ─────────────────────────────────────────────────────────────────
 

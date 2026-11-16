@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
-import { EMPTY_FILTERS, TransactionsFiltersPanel, type TransactionFilters } from './TransactionsFiltersPanel';
+import { EMPTY_FILTERS, TransactionsFiltersPanel, applyFilters, type TransactionFilters } from './TransactionsFiltersPanel';
 import { getCategoryVisual } from '../constants/visualConfig';
 import { TransactionsTable } from './TransactionsTable';
 import { useTransactionCatalogs } from '../hooks/useTransactionCatalogs';
 import { searchTransactions } from '../services/transactionsService';
+import { getPresetRange } from '../utils/dashboardPresets';
 
 vi.mock('../hooks/useTransactionCatalogs', () => ({ useTransactionCatalogs: vi.fn() }));
 vi.mock('../services/transactionsService', async importOriginal => ({
@@ -15,6 +16,85 @@ vi.mock('../services/transactionsService', async importOriginal => ({
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe('transaction filter controls', () => {
+  it('uses dashboard calendar ranges, including year boundaries', () => {
+    const today = new Date(2026, 0, 15, 12);
+    expect(getPresetRange('this-month', today)).toEqual({ start: '2026-01-01', end: '2026-01-15' });
+    expect(getPresetRange('last-month', today)).toEqual({ start: '2025-12-01', end: '2025-12-31' });
+    expect(getPresetRange('3-months', today)).toEqual({ start: '2025-11-01', end: '2026-01-15' });
+    expect(getPresetRange('6-months', today)).toEqual({ start: '2025-08-01', end: '2026-01-15' });
+    expect(getPresetRange('this-year', today)).toEqual({ start: '2026-01-01', end: '2026-01-15' });
+    expect(getPresetRange('last-year', today)).toEqual({ start: '2025-01-01', end: '2025-12-31' });
+  });
+
+  it('applies date presets, custom dates and clears the selected period', async () => {
+    vi.mocked(useTransactionCatalogs).mockReturnValue({
+      statusMap: {}, typeMap: {}, categoryMap: {}, categoryCodeMap: {}, accountDetailMap: {}, tagMap: {}, categories: [], merchants: [], tags: [], accounts: [], types: [], statuses: [],
+    } as unknown as ReturnType<typeof useTransactionCatalogs>);
+    vi.mocked(searchTransactions).mockResolvedValue({ content: [], page: 0, size: 25, totalElements: 0, totalPages: 0 });
+    render(<TransactionsTable items={[]} accessToken="test" />);
+    fireEvent.click(screen.getByRole('button', { name: /Filtros/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Año pasado' }));
+    const range = getPresetRange('last-year');
+    await waitFor(() => expect(searchTransactions).toHaveBeenLastCalledWith('test', expect.objectContaining({ startDate: range.start, endDate: range.end })));
+    expect(screen.getByRole('button', { name: 'Año pasado' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Personalizado' }));
+    fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2025-02-01' } });
+    fireEvent.change(screen.getByLabelText('Hasta'), { target: { value: '2025-02-28' } });
+    await waitFor(() => expect(searchTransactions).toHaveBeenLastCalledWith('test', expect.objectContaining({ startDate: '2025-02-01', endDate: '2025-02-28' })));
+    fireEvent.click(screen.getByRole('button', { name: /Limpiar filtros/ }));
+    expect(screen.queryByLabelText('Desde')).toBeNull();
+    await waitFor(() => expect(searchTransactions).toHaveBeenLastCalledWith('test', expect.objectContaining({ startDate: undefined, endDate: undefined })));
+  });
+
+  it('selects and searches multiple tags and clears them without closing the picker', () => {
+    function Panel() {
+      const [filters, setFilters] = useState<TransactionFilters>(EMPTY_FILTERS);
+      return <TransactionsFiltersPanel filters={filters} onChange={setFilters} categories={[]} accounts={[]} statuses={[]} types={[]} tags={[{ id: 1, name: 'Viajes' }, { id: 2, name: 'Trabajo' }, { id: 3, name: 'Casa' }]} />;
+    }
+    render(<Panel />);
+    expect(screen.queryByRole('checkbox', { name: '#Viajes' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Etiquetas' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '#Viajes' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '#Trabajo' }));
+    expect(screen.getByRole('button', { name: 'Etiquetas' }).textContent).toContain('#Viajes, #Trabajo');
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar etiquetas' }), { target: { value: 'casa' } });
+    expect(screen.getByRole('checkbox', { name: '#Casa' })).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: '#Viajes' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar selección' }));
+    expect(screen.getByRole('button', { name: 'Etiquetas' }).textContent).toContain('Todas las etiquetas');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Etiquetas' }).getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Etiquetas' }));
+  });
+
+  it('retains parent transactions when a selected child is excluded', () => {
+    const categories = [{ id: 1, name: 'Food', code: 'FOOD' }, { id: 2, name: 'Supermarket', code: 'FOOD.SUP', parentId: 1 }, { id: 3, name: 'Restaurant', code: 'FOOD.REST', parentId: 1 }];
+    const transactions = [{ id: 1, categoryId: 1 }, { id: 2, categoryId: 2 }, { id: 3, categoryId: 3 }];
+    const onChange = vi.fn();
+    render(<TransactionsFiltersPanel filters={{ ...EMPTY_FILTERS, parentCategoryIds: [1] }} onChange={onChange} categories={categories} accounts={[]} statuses={[]} types={[]} tags={[]} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Supermarket' }));
+    const selected = onChange.mock.calls[0][0] as TransactionFilters;
+    expect(selected.parentCategoryIds).toEqual([]);
+    expect(selected.categoryIds).toEqual([1, 3]);
+    expect(applyFilters(transactions, selected, categories).map(transaction => transaction.id)).toEqual([1, 3]);
+  });
+
+  it('sends the selected parent, remaining child and multiple tags to the server', async () => {
+    vi.mocked(useTransactionCatalogs).mockReturnValue({
+      statusMap: {}, typeMap: {}, categoryMap: {}, categoryCodeMap: {}, accountDetailMap: {}, tagMap: {}, merchants: [], accounts: [], types: [], statuses: [],
+      categories: [{ id: 1, name: 'Food', code: 'FOOD' }, { id: 2, name: 'Supermarket', code: 'FOOD.SUP', parentId: 1 }, { id: 3, name: 'Restaurant', code: 'FOOD.REST', parentId: 1 }],
+      tags: [{ id: 10, name: 'Travel' }, { id: 11, name: 'Work' }],
+    } as unknown as ReturnType<typeof useTransactionCatalogs>);
+    vi.mocked(searchTransactions).mockResolvedValue({ content: [], page: 0, size: 25, totalElements: 0, totalPages: 0 });
+    render(<TransactionsTable items={[]} accessToken="test" />);
+    fireEvent.click(screen.getByRole('button', { name: /Filtros/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Food/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Supermarket' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Etiquetas' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '#Travel' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '#Work' }));
+    await waitFor(() => expect(searchTransactions).toHaveBeenLastCalledWith('test', expect.objectContaining({ categoryIds: [1, 3], tagIds: [10, 11] })));
+  });
   it('does not replace filtered results with a late response from an earlier search', async () => {
     vi.mocked(useTransactionCatalogs).mockReturnValue({
       statusMap: {}, typeMap: {}, categoryMap: {}, categoryCodeMap: {}, accountDetailMap: {}, tagMap: {}, categories: [], merchants: [], tags: [], accounts: [], types: [],
@@ -68,15 +148,18 @@ describe('transaction filter controls', () => {
     }
     render(<Panel />);
     const parent = screen.getByRole('checkbox', { name: /Food/ }) as HTMLInputElement;
+    expect(screen.queryByRole('checkbox', { name: 'Supermarket' })).toBeNull();
+    fireEvent.click(parent);
     const child = screen.getByRole('checkbox', { name: 'Supermarket' }) as HTMLInputElement;
-    fireEvent.click(child);
     expect(child.checked).toBe(true);
-    expect(child.closest('label')?.classList.contains('ttf-cat--selected')).toBe(true);
+    fireEvent.click(child);
+    expect(child.checked).toBe(false);
+    expect(child.closest('label')?.classList.contains('ttf-cat--selected')).toBe(false);
     expect(parent.indeterminate).toBe(true);
-    expect(parent.closest('label')?.classList.contains('ttf-cat--partial')).toBe(true);
+    expect(parent.closest('.ttf-cat-parent-row')?.classList.contains('ttf-cat--partial')).toBe(true);
     fireEvent.click(parent);
     expect(parent.checked).toBe(true);
-    expect(parent.closest('label')?.classList.contains('ttf-cat--selected')).toBe(true);
+    expect(parent.closest('.ttf-cat-parent-row')?.classList.contains('ttf-cat--selected')).toBe(true);
     expect((screen.getByRole('checkbox', { name: 'Restaurant' }) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(parent);
     expect(parent.checked).toBe(false);
@@ -98,7 +181,8 @@ describe('transaction filter controls', () => {
     render(<TransactionsFiltersPanel filters={{ ...EMPTY_FILTERS, sourceAccountIds: [1], statusIds: [2], typeIds: [3, 5], tagIds: [4] }} onChange={vi.fn()} categories={[]}
       accounts={[{ id: 1, name: 'Main account' }]} statuses={[{ id: 2, code: 'PENDING', description: '' }]}
       types={[{ id: 3, name: 'TRANSFER', description: '' }, { id: 5, name: 'OTHER', description: '' }]} tags={[{ id: 4, name: 'Travel' }]} />);
-    for (const [name, selectedClass] of [['Main account', 'ttf-chip--on'], ['PENDING', 'ttf-status-chip--on'], ['TRANSFER', 'ttf-type-chip--on'], ['OTHER', 'ttf-type-chip--on'], ['#Travel', 'ttf-chip--on']]) {
+    fireEvent.click(screen.getByRole('button', { name: 'Etiquetas' }));
+    for (const [name, selectedClass] of [['Main account', 'ttf-chip--on'], ['PENDING', 'ttf-status-chip--on'], ['TRANSFER', 'ttf-type-chip--on'], ['OTHER', 'ttf-type-chip--on'], ['#Travel', 'selected']]) {
       const control = screen.getByRole('checkbox', { name }) as HTMLInputElement;
       expect(control.checked).toBe(true);
       expect(control.closest('label')?.classList.contains(selectedClass)).toBe(true);
@@ -107,18 +191,17 @@ describe('transaction filter controls', () => {
     expect(screen.getByRole('checkbox', { name: 'TRANSFER' }).closest('label')?.style.color).toBe('rgb(30, 64, 175)');
   });
 
-  it('exposes the selected date mode and selected month', () => {
-    render(<TransactionsFiltersPanel filters={{ ...EMPTY_FILTERS, dateMode: 'month', dateMonth: `${new Date().getFullYear()}-02` }} onChange={vi.fn()} accounts={[]} statuses={[]} types={[]} tags={[]} categories={[]} />);
-    expect(screen.getByRole('button', { name: 'Mes' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Intervalo' }).getAttribute('aria-pressed')).toBe('false');
-    expect(screen.getByRole('button', { name: 'Feb' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Ene' }).getAttribute('aria-pressed')).toBe('false');
+  it('exposes the selected dashboard date preset', () => {
+    render(<TransactionsFiltersPanel filters={{ ...EMPTY_FILTERS, datePreset: 'this-month' }} onChange={vi.fn()} accounts={[]} statuses={[]} types={[]} tags={[]} categories={[]} />);
+    expect(screen.getByRole('button', { name: 'Este mes' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Mes anterior' }).getAttribute('aria-pressed')).toBe('false');
   });
   it('shows the corresponding visuals for parent and child categories', () => {
     render(<TransactionsFiltersPanel filters={EMPTY_FILTERS} onChange={vi.fn()} accounts={[]} statuses={[]} types={[]} tags={[]} categories={[
       { id: 1, name: 'Food', code: 'FOOD' },
       { id: 2, name: 'Supermarket', code: 'FOOD.SUP', parentId: 1 },
     ]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Desplegar Food' }));
     for (const [name, code] of [['Food', 'FOOD'], ['Supermarket', 'FOOD.SUP']]) {
       const icon = screen.getByRole('checkbox', { name: new RegExp(name) }).closest('label')!.querySelector<HTMLElement>('.ttf-cat-emoji')!;
       const expected = document.createElement('span');
@@ -142,6 +225,7 @@ describe('transaction filter controls', () => {
     const account = screen.getByRole('checkbox', { name: 'Main account' });
     const status = screen.getByRole('checkbox', { name: 'BOOKED' });
     const type = screen.getByRole('checkbox', { name: 'TRANSFER' });
+    fireEvent.click(screen.getByRole('button', { name: 'Etiquetas' }));
     const tag = screen.getByRole('checkbox', { name: '#Travel' });
 
     for (const control of [account, status, type, tag]) {

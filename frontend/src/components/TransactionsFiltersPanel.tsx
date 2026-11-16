@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { TransactionCategory, Account, TransactionStatus, TransactionType, Tag } from '../services/catalogService';
 import { getCategoryVisual, getInstitutionLogo } from '../constants/visualConfig';
+import type { DashboardPreset } from '../types/dashboard';
+import { getPresetRange, PRESETS, PRESET_LABELS } from '../utils/dashboardPresets';
+import './Dashboard.css';
 import './TransactionsFiltersPanel.css';
 
 // ─── Visual style maps (same as TransactionsTable) ─────────────────────────
@@ -24,6 +27,7 @@ const FILTER_TYPE_STYLES: Record<string, { bg: string; color: string }> = {
 export type DateMode = 'range' | 'month' | 'year';
 
 export type TransactionFilters = {
+  datePreset?: DashboardPreset | null;
   dateMode: DateMode;
   dateFrom: string;       // YYYY-MM-DD (range mode)
   dateTo: string;         // YYYY-MM-DD (range mode)
@@ -41,6 +45,7 @@ export type TransactionFilters = {
 };
 
 export const EMPTY_FILTERS: TransactionFilters = {
+  datePreset: null,
   dateMode: 'range',
   dateFrom: '',
   dateTo: '',
@@ -164,112 +169,23 @@ type Props = {
   tags: Tag[];
 };
 
-const MONTHS_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-
 function DateFilter({ filters, onChange }: { filters: TransactionFilters; onChange: (f: TransactionFilters) => void }) {
-  const mode = filters.dateMode;
-
-  const setMode = (m: DateMode) =>
-    onChange({ ...filters, dateMode: m, dateFrom: '', dateTo: '', dateMonth: '', dateYear: '' });
-
-  // Year picker: list of years from 2010 to current+1
-  const currentYear = new Date().getFullYear();
-  const years: number[] = [];
-  for (let y = currentYear + 1; y >= 2010; y--) years.push(y);
-
-  // Month picker: selected year for month grid
-  const [monthPickerYear, setMonthPickerYear] = useState<number>(() => {
-    if (filters.dateMonth) return Number(filters.dateMonth.slice(0, 4));
-    return currentYear;
-  });
-
-  const selectedMonth = filters.dateMonth; // YYYY-MM
-  const selectedYear  = filters.dateYear;  // YYYY
-
   return (
     <div className="ttf-date-filter">
-      {/* Mode tabs */}
-      <div className="ttf-date-tabs">
-        {(['range', 'month', 'year'] as DateMode[]).map(m => (
-          <button
-            key={m}
-            type="button"
-            className={`ttf-date-tab${mode === m ? ' active' : ''}`}
-            aria-pressed={mode === m}
-            onClick={() => setMode(m)}
-          >
-            {{ range: 'Intervalo', month: 'Mes', year: 'Año' }[m]}
-          </button>
-        ))}
+      <div className="db-presets" role="group" aria-label="Periodo de transacciones">
+        {PRESETS.map(preset => {
+          const selected = filters.datePreset === preset;
+          return <button key={preset} type="button" className={`db-preset-btn${selected ? ' active' : ''}`} aria-pressed={selected}
+            onClick={() => {
+              const range = selected ? { start: '', end: '' } : getPresetRange(preset);
+              onChange({ ...filters, datePreset: selected ? null : preset, dateMode: 'range', dateFrom: range.start, dateTo: range.end, dateMonth: '', dateYear: '' });
+            }}>{PRESET_LABELS[preset]}</button>;
+        })}
       </div>
-
-      {/* Range mode */}
-      {mode === 'range' && (
-        <div className="ttf-range">
-          <input
-            type="date"
-            className="ttf-input"
-            value={filters.dateFrom}
-            onChange={e => onChange({ ...filters, dateFrom: e.target.value })}
-            title="Desde"
-          />
-          <span className="ttf-range-sep">–</span>
-          <input
-            type="date"
-            className="ttf-input"
-            value={filters.dateTo}
-            onChange={e => onChange({ ...filters, dateTo: e.target.value })}
-            title="Hasta"
-          />
-        </div>
-      )}
-
-      {/* Month mode: year navigator + 12-month grid */}
-      {mode === 'month' && (
-        <div className="ttf-month-picker">
-          <div className="ttf-month-nav">
-            <button className="ttf-month-nav-btn" onClick={() => setMonthPickerYear(y => y - 1)}>‹</button>
-            <span className="ttf-month-nav-year">{monthPickerYear}</span>
-            <button className="ttf-month-nav-btn" onClick={() => setMonthPickerYear(y => y + 1)}>›</button>
-          </div>
-          <div className="ttf-month-grid">
-            {MONTHS_ES.map((name, i) => {
-              const val = `${monthPickerYear}-${String(i + 1).padStart(2, '0')}`;
-              const isOn = selectedMonth === val;
-              return (
-                <button
-                  key={val}
-                  type="button"
-                  className={`ttf-month-cell${isOn ? ' active' : ''}`}
-                  aria-pressed={isOn}
-                  onClick={() => onChange({ ...filters, dateMonth: isOn ? '' : val })}
-                >
-                  {name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Year mode: scrollable pill list */}
-      {mode === 'year' && (
-        <div className="ttf-year-list">
-          {years.map(y => {
-            const val = String(y);
-            const isOn = selectedYear === val;
-            return (
-              <button
-                key={y}
-                type="button"
-                className={`ttf-year-pill${isOn ? ' active' : ''}`}
-                aria-pressed={isOn}
-                onClick={() => onChange({ ...filters, dateYear: isOn ? '' : val })}
-              >
-                {y}
-              </button>
-            );
-          })}
+      {filters.datePreset === 'custom' && (
+        <div className="db-custom-dates">
+          <label>Desde <input type="date" value={filters.dateFrom} onChange={event => onChange({ ...filters, dateFrom: event.target.value })} /></label>
+          <label>Hasta <input type="date" value={filters.dateTo} onChange={event => onChange({ ...filters, dateTo: event.target.value })} /></label>
         </div>
       )}
     </div>
@@ -277,6 +193,31 @@ function DateFilter({ filters, onChange }: { filters: TransactionFilters; onChan
 }
 
 export function TransactionsFiltersPanel({ filters, onChange, categories, accounts, statuses, types, tags }: Props) {
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [tagSearch, setTagSearch] = useState('');
+  const tagsPickerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!tagsOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!tagsPickerRef.current?.contains(event.target as Node)) setTagsOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setTagsOpen(false);
+        tagsPickerRef.current?.querySelector<HTMLButtonElement>('.ttf-tags-trigger')?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [tagsOpen]);
+  const [expandedParents, setExpandedParents] = useState<Set<number>>(() => new Set([
+    ...filters.parentCategoryIds,
+    ...categories.filter(category => category.parentId != null && filters.categoryIds.includes(category.id)).map(category => category.parentId!),
+  ]));
   // Build category tree
   const parentCategories = categories.filter(c => c.parentId == null);
   const childrenByParent: Record<number, TransactionCategory[]> = {};
@@ -297,14 +238,15 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
       onChange({
         ...filters,
         parentCategoryIds: filters.parentCategoryIds.filter(id => id !== parentId),
-        categoryIds: filters.categoryIds.filter(id => !childIds.includes(id)),
+        categoryIds: filters.categoryIds.filter(id => id !== parentId && !childIds.includes(id)),
       });
     } else {
+      setExpandedParents(current => new Set(current).add(parentId));
       // Select parent; remove individual child selections (parent covers them all)
       onChange({
         ...filters,
         parentCategoryIds: [...filters.parentCategoryIds, parentId],
-        categoryIds: filters.categoryIds.filter(id => !childIds.includes(id)),
+        categoryIds: filters.categoryIds.filter(id => id !== parentId && !childIds.includes(id)),
       });
     }
   };
@@ -320,6 +262,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
         parentCategoryIds: filters.parentCategoryIds.filter(id => id !== parentId),
         categoryIds: [...new Set([
           ...filters.categoryIds.filter(id => !(childrenByParent[parentId]?.map(c => c.id) ?? []).includes(id)),
+          parentId,
           ...siblings,
         ])],
       });
@@ -334,7 +277,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
       {/* ── Row 1: Date · Description · Amount ── */}
       <div className="ttf-row">
 
-        <div className="ttf-group">
+        <div className="ttf-group ttf-group--dates">
           <span className="ttf-label">Fecha</span>
           <DateFilter filters={filters} onChange={onChange} />
         </div>
@@ -387,12 +330,14 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
               const children = childrenByParent[parent.id] ?? [];
               const isParentSel = filters.parentCategoryIds.includes(parent.id);
               const selectedChildCount = children.filter(c => filters.categoryIds.includes(c.id)).length;
-              const isIndeterminate = !isParentSel && selectedChildCount > 0;
+              const isIndeterminate = !isParentSel && (selectedChildCount > 0 || filters.categoryIds.includes(parent.id));
+              const expanded = expandedParents.has(parent.id);
               const parentVisual = getCategoryVisual(parent.code || parent.name);
 
               return (
                 <div key={parent.id} className="ttf-cat-group">
-                  <label className={`ttf-cat-parent${isParentSel ? ' ttf-cat--selected' : isIndeterminate ? ' ttf-cat--partial' : ''}`}>
+                  <div className={`ttf-cat-parent-row${isParentSel ? ' ttf-cat--selected' : isIndeterminate ? ' ttf-cat--partial' : ''}`}>
+                  <label className="ttf-cat-parent">
                     <input
                       type="checkbox"
                       className="ttf-checkbox"
@@ -404,7 +349,14 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                     <span className="ttf-cat-parent-name">{parent.name}</span>
                     <span className="ttf-cat-count">({children.length})</span>
                   </label>
-                  <div className="ttf-cat-children">
+                  <button type="button" className="ttf-cat-expand" aria-label={`${expanded ? 'Contraer' : 'Desplegar'} ${parent.name}`} aria-expanded={expanded}
+                    onClick={() => setExpandedParents(current => {
+                      const next = new Set(current);
+                      if (next.has(parent.id)) next.delete(parent.id); else next.add(parent.id);
+                      return next;
+                    })}>{expanded ? '▾' : '▸'}</button>
+                  </div>
+                  {expanded && <div className="ttf-cat-children">
                     {children.map(child => {
                       const childVisual = getCategoryVisual(child.code || child.name);
                       return (
@@ -420,7 +372,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                         </label>
                       );
                     })}
-                  </div>
+                  </div>}
                 </div>
               );
             })}
@@ -535,27 +487,30 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
 
       </div>
 
-      {/* ── Row 3: Tags ── */}
       {tags.length > 0 && (
         <div className="ttf-row">
           <div className="ttf-group ttf-group--tags">
-            <span className="ttf-label">Tags</span>
-            <div className="ttf-chip-list ttf-chip-list--wrap">
-              {tags.map(tag => (
-                <label
-                  key={tag.id}
-                  className={`ttf-chip ttf-chip--tag ${filters.tagIds.includes(tag.id) ? 'ttf-chip--on' : ''}`}
-                >
-                  <input
-                    type="checkbox"
-                    className="ttf-visually-hidden"
-                    checked={filters.tagIds.includes(tag.id)}
-                    onChange={() => onChange({ ...filters, tagIds: toggle(filters.tagIds, tag.id) })}
-                  />
-                  #{tag.name}
-                  {filters.tagIds.includes(tag.id) && <span className="ttf-selection-check" aria-hidden="true">&#10003;</span>}
-                </label>
-              ))}
+            <span className="ttf-label">Etiquetas</span>
+            <div className="ttf-tags-picker" ref={tagsPickerRef}>
+              <button type="button" className={`ttf-tags-trigger${filters.tagIds.length ? ' active' : ''}`} aria-label="Etiquetas" aria-expanded={tagsOpen} aria-controls="transaction-tag-options"
+                onClick={() => { setTagsOpen(open => !open); setTagSearch(''); }}>
+                <span>{filters.tagIds.length ? tags.filter(tag => filters.tagIds.includes(tag.id)).map(tag => `#${tag.name}`).join(', ') : 'Todas las etiquetas'}</span>
+                {filters.tagIds.length > 0 && <span className="ttf-tags-count">{filters.tagIds.length}</span>}
+                <span aria-hidden="true">{tagsOpen ? '▴' : '▾'}</span>
+              </button>
+              {tagsOpen && <div id="transaction-tag-options" className="ttf-tags-dropdown" role="group" aria-label="Seleccionar etiquetas">
+                <input type="search" className="ttf-input ttf-tags-search" placeholder="Buscar etiquetas" aria-label="Buscar etiquetas" value={tagSearch} onChange={event => setTagSearch(event.target.value)} />
+                <div className="ttf-tags-options">
+                  {tags.filter(tag => tag.name.toLocaleLowerCase().includes(tagSearch.trim().toLocaleLowerCase())).map(tag => (
+                    <label key={tag.id} className={`ttf-tag-option${filters.tagIds.includes(tag.id) ? ' selected' : ''}`}>
+                      <input type="checkbox" className="ttf-checkbox" checked={filters.tagIds.includes(tag.id)} onChange={() => onChange({ ...filters, tagIds: toggle(filters.tagIds, tag.id) })} />
+                      <span>#{tag.name}</span>
+                    </label>
+                  ))}
+                  {!tags.some(tag => tag.name.toLocaleLowerCase().includes(tagSearch.trim().toLocaleLowerCase())) && <span className="ttf-tags-empty">Sin resultados</span>}
+                </div>
+                {filters.tagIds.length > 0 && <button type="button" className="ttf-tags-clear" onClick={() => onChange({ ...filters, tagIds: [] })}>Limpiar selección</button>}
+              </div>}
             </div>
           </div>
         </div>
