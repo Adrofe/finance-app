@@ -74,6 +74,34 @@ class InstrumentHistoryServiceTest {
         verify(operationRepository).findByInstrumentAndTenantOrderByOperationDateAscIdAsc(instrumentId, tenantId);
     }
 
+    @Test
+    void showsBackdatedSaleOnItsDateUsingTheLatestKnownPrice() {
+        Long instrumentId = 3L;
+        Long tenantId = 12L;
+        LocalDate start = LocalDate.of(2026, 1, 5);
+        LocalDate saleDate = start.plusDays(2);
+        LocalDate end = start.plusDays(5);
+        when(instrumentRepository.findById(instrumentId)).thenReturn(Optional.of(InvestmentInstrument.builder()
+                .id(instrumentId).symbol("BTC").name("Bitcoin").currency("EUR").build()));
+        when(operationRepository.findByInstrumentAndTenantOrderByOperationDateAscIdAsc(instrumentId, tenantId))
+                .thenReturn(List.of(operation(1L, start.minusDays(2), OperationType.BUY, "10", "100"),
+                        operation(2L, saleDate, OperationType.SELL, "4", "60")));
+        when(priceRepository.findFirstByInstrumentIdAndAsOfBeforeOrderByAsOfDescIdDesc(instrumentId, start.atStartOfDay()))
+                .thenReturn(Optional.of(price(1L, start.minusDays(1).atTime(10, 0), "12", "EUR")));
+        when(priceRepository.findByInstrumentIdAndAsOfBetweenOrderByAsOfAscIdAsc(instrumentId, start.atStartOfDay(), end.plusDays(1).atStartOfDay().minusNanos(1)))
+                .thenReturn(List.of(price(2L, end.atTime(10, 0), "15", "EUR")));
+
+        var points = new InstrumentHistoryService(instrumentRepository, priceRepository, operationRepository, exchangeRateRepository)
+                .getHistory(tenantId, instrumentId, start, end).points();
+        assertThat(points).hasSize(3);
+        assertThat(points.get(0).date()).isEqualTo(start);
+        assertThat(points.get(0).valueEur()).isEqualByComparingTo("120.00");
+        assertThat(points.get(1).date()).isEqualTo(saleDate);
+        assertThat(points.get(1).quantity()).isEqualByComparingTo("6");
+        assertThat(points.get(1).valueEur()).isEqualByComparingTo("72.00");
+        assertThat(points.get(2).valueEur()).isEqualByComparingTo("90.00");
+    }
+
     private InvestmentOperation operation(Long id, LocalDate date, OperationType type, String quantity, String totalEur) {
         return InvestmentOperation.builder()
                 .id(id).operationDate(date).type(type)

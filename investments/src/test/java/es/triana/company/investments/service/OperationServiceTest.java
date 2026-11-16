@@ -34,6 +34,7 @@ import es.triana.company.investments.model.api.OperationDTO;
 import es.triana.company.investments.model.api.TaxSummaryDTO;
 import es.triana.company.investments.model.db.ExchangeRate;
 import es.triana.company.investments.model.db.Investment;
+import es.triana.company.investments.model.db.InvestmentInstrument;
 import es.triana.company.investments.model.db.InvestmentOperation;
 import es.triana.company.investments.model.db.OperationFifoLot;
 import es.triana.company.investments.model.db.OperationType;
@@ -573,6 +574,88 @@ class OperationServiceTest {
     @Nested
     @DisplayName("FIFO rebuild")
     class FifoRebuild {
+
+        @Test
+        void backdatedSaleRebuildsLaterLotsAndPositionCost() {
+            LocalDate saleDate = LocalDate.of(2024, 2, 1);
+            InvestmentOperation firstBuy = savedOp(101L, OperationType.BUY, DATE_BUY1,
+                    bd("10"), bd("100"), bd("0"), bd("1000"), "USD", bd("1"), bd("1000"));
+            InvestmentOperation laterBuy = savedOp(102L, OperationType.BUY, DATE_BUY2,
+                    bd("10"), bd("200"), bd("0"), bd("2000"), "USD", bd("1"), bd("2000"));
+            InvestmentOperation laterSale = savedOp(103L, OperationType.SELL, DATE_SELL,
+                    bd("10"), bd("300"), bd("0"), bd("3000"), "USD", bd("1"), bd("3000"));
+            InvestmentOperation insertedSale = savedOp(104L, OperationType.SELL, saleDate,
+                    bd("5"), bd("150"), bd("0"), bd("750"), "USD", bd("1"), bd("750"));
+            investment.setQuantity(bd("10"));
+            investment.setInvestedAmount(bd("1500"));
+            investment.setCurrentValueCalculated(bd("3000"));
+            when(investmentInstrumentRepository.findById(INSTRUMENT_ID)).thenReturn(Optional.of(InvestmentInstrument.builder()
+                    .id(INSTRUMENT_ID).currency("EUR").lastPrice(bd("300")).build()));
+            stubEurRate("USD", saleDate, "1");
+            stubSellOperation(insertedSale);
+            when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID)).thenReturn(List.of(firstBuy, laterBuy));
+            when(fifoLotRepository.findByBuyOperationIdIn(any())).thenReturn(List.of(OperationFifoLot.builder().buyOperationId(101L).quantity(bd("10")).build()));
+            when(operationRepository.findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(INSTRUMENT_ID, TENANT_ID))
+                    .thenReturn(List.of(firstBuy, laterBuy, laterSale), List.of(firstBuy, insertedSale, laterBuy, laterSale));
+            when(operationRepository.findByInvestmentIdOrderByOperationDateAscIdAsc(INVESTMENT_ID))
+                    .thenReturn(List.of(firstBuy, insertedSale, laterBuy, laterSale));
+            when(fifoLotRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+            when(fifoLotRepository.findBySellOperationId(104L)).thenReturn(List.of(OperationFifoLot.builder()
+                    .sellOperationId(104L).buyOperationId(101L).quantity(bd("5")).buyUnitPriceEur(bd("100")).sellUnitPriceEur(bd("150")).gainLossEur(bd("250")).build()));
+
+            OperationDTO result = operationService.registerOperation(sell(saleDate, "5", "150", "0"));
+
+            verify(fifoLotRepository).deleteBySellOperationIdIn(List.of(104L, 103L));
+            ArgumentCaptor<OperationFifoLot> lots = ArgumentCaptor.forClass(OperationFifoLot.class);
+            verify(fifoLotRepository, times(3)).save(lots.capture());
+            assertThat(lots.getAllValues()).extracting(OperationFifoLot::getBuyOperationId).containsExactly(101L, 101L, 102L);
+            assertThat(lots.getAllValues()).extracting(OperationFifoLot::getSellOperationId).containsExactly(104L, 103L, 103L);
+            assertThat(result.fifoLots()).hasSize(1);
+            assertThat(investment.getQuantity()).isEqualByComparingTo("5");
+            assertThat(investment.getInvestedAmount()).isEqualByComparingTo("833.33");
+                        assertThat(investment.getCurrentValueCalculated()).isEqualByComparingTo("1500.00");
+        }
+
+                @Test
+                void manualRecalculationRebuildsTenantFifoAndPreservesPositionsWithoutOperations() {
+                        Investment untouched = Investment.builder().id(2L).tenantId(TENANT_ID).instrumentId(20L).quantity(bd("8")).build();
+                        InvestmentOperation firstBuy = savedOp(101L, OperationType.BUY, DATE_BUY1,
+                                        bd("10"), bd("100"), bd("0"), bd("1000"), "USD", bd("1"), bd("1000"));
+                        InvestmentOperation sale = savedOp(102L, OperationType.SELL, DATE_SELL,
+                                        bd("4"), bd("150"), bd("0"), bd("600"), "USD", bd("1"), bd("600"));
+                        when(investmentRepository.findByTenantIdOrderByUpdatedAtDescIdDesc(TENANT_ID)).thenReturn(List.of(untouched, investment));
+                        when(investmentRepository.findByIdAndTenantIdForUpdate(2L, TENANT_ID)).thenReturn(Optional.of(untouched));
+                        when(operationRepository.findByInvestmentIdOrderByOperationDateAscIdAsc(INVESTMENT_ID)).thenReturn(List.of(firstBuy, sale));
+                        when(operationRepository.findByInvestmentIdOrderByOperationDateAscIdAsc(2L)).thenReturn(List.of());
+                        when(operationRepository.findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(INSTRUMENT_ID, TENANT_ID)).thenReturn(List.of(firstBuy, sale));
+                        when(fifoLotRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+                        assertThat(operationService.recalculateTenantPositionsAndFifo(TENANT_ID)).isEqualTo(1);
+                        verify(fifoLotRepository).deleteBySellOperationIdIn(List.of(102L));
+                        assertThat(investment.getQuantity()).isEqualByComparingTo("6");
+                        assertThat(investment.getInvestedAmount()).isEqualByComparingTo("600.00");
+                        assertThat(untouched.getQuantity()).isEqualByComparingTo("8");
+                }
+
+        @Test
+        void backdatedSaleCannotUseAFuturePurchase() {
+            LocalDate saleDate = LocalDate.of(2024, 1, 1);
+            InvestmentOperation futureBuy = savedOp(101L, OperationType.BUY, DATE_BUY1,
+                    bd("10"), bd("100"), bd("0"), bd("1000"), "USD", bd("1"), bd("1000"));
+            InvestmentOperation insertedSale = savedOp(104L, OperationType.SELL, saleDate,
+                    bd("5"), bd("150"), bd("0"), bd("750"), "USD", bd("1"), bd("750"));
+            investment.setQuantity(bd("10"));
+            stubEurRate("USD", saleDate, "1");
+            stubSellOperation(insertedSale);
+            when(operationRepository.findBuysByInstrumentAndTenantFifo(INSTRUMENT_ID, TENANT_ID)).thenReturn(List.of(futureBuy));
+            when(fifoLotRepository.findByBuyOperationIdIn(any())).thenReturn(List.of());
+            when(operationRepository.findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(INSTRUMENT_ID, TENANT_ID))
+                    .thenReturn(List.of(futureBuy), List.of(insertedSale, futureBuy));
+            when(operationRepository.findByInvestmentIdOrderByOperationDateAscIdAsc(INVESTMENT_ID)).thenReturn(List.of(insertedSale, futureBuy));
+
+            assertThatThrownBy(() -> operationService.registerOperation(sell(saleDate, "5", "150", "0")))
+                    .isInstanceOf(InvestmentValidationException.class).hasMessageContaining("Insufficient stock in position on 2024-01-01");
+        }
 
         @Test
         @DisplayName("Rebuild FIFO from scratch for instrument+tenant in temporal order")

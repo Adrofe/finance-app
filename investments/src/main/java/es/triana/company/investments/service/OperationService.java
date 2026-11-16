@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +83,10 @@ public class OperationService {
     Investment investment = resolveOrCreateInvestment(req);
     req.setInvestmentId(investment.getId());
 
+        boolean hasLaterOperations = operationRepository
+            .findByInstrumentAndTenantOrderByOperationDateAscIdAscForUpdate(investment.getInstrumentId(), req.getTenantId())
+            .stream().anyMatch(operation -> operation.getOperationDate().isAfter(req.getOperationDate()));
+
         // For SELL: validate FIFO coverage BEFORE any other work so nothing is
         // persisted and no external calls are made if stock is insufficient.
         if (OperationType.SELL.equals(req.getType())) {
@@ -102,12 +107,16 @@ public class OperationService {
         LOG.info("Registered {} operation id={} investment={} quantity={} totalEur={}",
                 op.getType(), op.getId(), op.getInvestmentId(), op.getQuantity(), op.getTotalAmountEur());
 
-        List<OperationFifoLot> lots = new ArrayList<>();
-        if (OperationType.SELL.equals(req.getType())) {
-            lots = applyFifo(op, investment);
+        List<OperationFifoLot> lots;
+        if (hasLaterOperations) {
+            validatePositionHistory(investment.getId());
+            rebuildInstrumentState(investment.getInstrumentId(), req.getTenantId());
+            recalculateInvestmentPosition(investment.getId(), req.getTenantId());
+            lots = fifoLotRepository.findBySellOperationId(op.getId());
+        } else {
+            lots = OperationType.SELL.equals(req.getType()) ? applyFifo(op, investment) : new ArrayList<>();
+            updateInvestmentPosition(investment, req.getType(), req.getQuantity(), totalAmountEur);
         }
-
-        updateInvestmentPosition(investment, req.getType(), req.getQuantity(), totalAmountEur);
 
         return operationMapper.toDto(op, lots);
     }
@@ -605,7 +614,20 @@ public class OperationService {
             inv.setQuantity(newQty);
         }
         inv.setUpdatedAt(LocalDateTime.now());
+        updateCalculatedValue(inv, inv.getQuantity());
         investmentRepository.save(inv);
+    }
+
+    private void validatePositionHistory(Long investmentId) {
+        BigDecimal quantity = BigDecimal.ZERO;
+        for (InvestmentOperation operation : operationRepository.findByInvestmentIdOrderByOperationDateAscIdAsc(investmentId)) {
+            if (OperationType.BUY.equals(operation.getType())) quantity = quantity.add(operation.getQuantity());
+            if (OperationType.SELL.equals(operation.getType())) quantity = quantity.subtract(operation.getQuantity());
+            if (quantity.signum() < 0) {
+                throw new InvestmentValidationException("Insufficient stock in position on " + operation.getOperationDate()
+                        + ": short by " + quantity.abs().stripTrailingZeros().toPlainString() + " units.");
+            }
+        }
     }
 
     private void rebuildInstrumentState(Long instrumentId, Long tenantId) {
@@ -615,6 +637,20 @@ public class OperationService {
     private void recalculateInvestmentPosition(Long investmentId, Long tenantId) {
         Investment investment = findAndLockInvestment(investmentId, tenantId);
         recalculatePositionFromHistory(investment);
+    }
+
+    @Transactional
+    public int recalculateTenantPositionsAndFifo(Long tenantId) {
+        List<Investment> positions = investmentRepository.findByTenantIdOrderByUpdatedAtDescIdDesc(tenantId).stream()
+                .sorted(Comparator.comparing(Investment::getId))
+                .map(position -> findAndLockInvestment(position.getId(), tenantId))
+                .filter(position -> !operationRepository.findByInvestmentIdOrderByOperationDateAscIdAsc(position.getId()).isEmpty())
+                .toList();
+        for (Investment position : positions) validatePositionHistory(position.getId());
+        positions.stream().map(Investment::getInstrumentId).distinct().sorted()
+                .forEach(instrumentId -> rebuildInstrumentState(instrumentId, tenantId));
+        positions.forEach(this::recalculatePositionFromHistory);
+        return positions.size();
     }
 
     /**
@@ -659,9 +695,13 @@ public class OperationService {
         investment.setInvestedAmount(investedAmount.setScale(2, RoundingMode.HALF_UP));
         investment.setCurrency(EUR);
 
-        // Also recompute currentValueCalculated so P&L reflects the updated quantity.
-        // Without this, a position that had sells would still show the old calculated
-        // value (oldQuantity * lastPrice) making rentabilidad/P&L incorrect.
+        updateCalculatedValue(investment, quantity);
+
+        investment.setUpdatedAt(LocalDateTime.now());
+        investmentRepository.save(investment);
+    }
+
+    private void updateCalculatedValue(Investment investment, BigDecimal quantity) {
         if (investment.getCurrentValueCalculated() != null) {
             InvestmentInstrument instrument = investmentInstrumentRepository
                     .findById(investment.getInstrumentId()).orElse(null);
@@ -687,8 +727,6 @@ public class OperationService {
             }
         }
 
-        investment.setUpdatedAt(LocalDateTime.now());
-        investmentRepository.save(investment);
     }
 
     // -------------------------------------------------------------------------

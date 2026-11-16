@@ -78,6 +78,14 @@ public class InstrumentHistoryService {
             dailyPrices.merge(price.getAsOf().toLocalDate(), price,
                     (left, right) -> comparePriceTimestamp(left, right) >= 0 ? left : right);
         }
+        Map.Entry<LocalDate, InvestmentPrice> startPrice = dailyPrices.floorEntry(startDate);
+        if (startPrice != null) dailyPrices.putIfAbsent(startDate, startPrice.getValue());
+        for (InvestmentOperation operation : operations) {
+            LocalDate date = operation.getOperationDate();
+            if (date.isBefore(startDate) || date.isAfter(endDate) || dailyPrices.containsKey(date)) continue;
+            Map.Entry<LocalDate, InvestmentPrice> previousPrice = dailyPrices.floorEntry(date);
+            if (previousPrice != null) dailyPrices.put(date, previousPrice.getValue());
+        }
 
         Map<String, TreeMap<LocalDate, BigDecimal>> ratesByCurrency = loadHistoricalRates(
                 dailyPrices.values(), instrument.getCurrency(), startDate, endDate);
