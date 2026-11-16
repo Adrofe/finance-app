@@ -124,12 +124,12 @@ function buildSearchRequest(
   ]));
 
   return {
-    accountId: pickSingle(filters.sourceAccountIds),
+    sourceAccountIds: filters.sourceAccountIds.length > 0 ? filters.sourceAccountIds : undefined,
     categoryId: pickSingle(categoryIds),
     categoryIds: categoryIds.length > 1 ? categoryIds : undefined,
     tagIds: filters.tagIds.length > 0 ? filters.tagIds : undefined,
-    statusId: pickSingle(filters.statusIds),
-    typeId: pickSingle(filters.typeIds),
+    statusIds: filters.statusIds.length > 0 ? filters.statusIds : undefined,
+    typeIds: filters.typeIds.length > 0 ? filters.typeIds : undefined,
     startDate,
     endDate,
     minAmount: parseNumber(filters.amountMin),
@@ -222,23 +222,27 @@ export function TransactionsTable({ items, accessToken, onRefresh, initialAccoun
 
     setLoadingPage(true);
     setPageError('');
+    let active = true;
 
     searchTransactions(accessToken, buildSearchRequest(filters, categories, page, pageSize))
       .then((result) => {
+        if (!active) return;
         setServerItems(result.content || []);
         setTotalElements(result.totalElements ?? 0);
         setTotalPages(Math.max(1, result.totalPages ?? 1));
       })
       .catch(() => {
+        if (!active) return;
         setServerItems([]);
         setTotalElements(0);
         setTotalPages(1);
         setPageError('Could not load paginated transactions.');
       })
       .finally(() => {
-        setLoadingPage(false);
+        if (active) setLoadingPage(false);
       });
-  }, [accessToken, filters, page, pageSize, highlightTransactionId, refreshTick]);
+    return () => { active = false; };
+  }, [accessToken, filters, categories, page, pageSize, highlightTransactionId, refreshTick]);
 
   const handleSuccess = () => {
     if (onRefresh) {
@@ -429,7 +433,9 @@ export function TransactionsTable({ items, accessToken, onRefresh, initialAccoun
             {selectMode ? '✕ Cancelar selección' : '☑ Seleccionar'}
           </button>
           <button
-            className={`btn-filter-toggle ${showFilters ? 'active' : ''}`}
+            className={`btn-filter-toggle${showFilters ? ' active' : ''}${activeFilters > 0 ? ' has-filters' : ''}`}
+            aria-expanded={showFilters}
+            aria-controls="transaction-filters"
             onClick={() => setShowFilters(v => !v)}
           >
             {showFilters ? '▲' : '▼'} Filtros

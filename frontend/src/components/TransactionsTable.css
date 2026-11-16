@@ -486,10 +486,11 @@
   border-color: #9ca3af;
 }
 
-.btn-filter-toggle.active {
-  background: #eef2ff;
-  border-color: #6366f1;
-  color: #4338ca;
+.btn-filter-toggle.active,
+.btn-filter-toggle.has-filters {
+  background: #e8f1ff;
+  border-color: #2563eb;
+  color: #164b9c;
 }
 
 .btn-filter-badge {
@@ -500,16 +501,17 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #6366f1;
+  background: #2563eb;
   color: #fff;
   font-size: 10px;
   font-weight: 700;
   vertical-align: middle;
 }
 
-.btn-filter-toggle.active .btn-filter-badge {
+.btn-filter-toggle.active .btn-filter-badge,
+.btn-filter-toggle.has-filters .btn-filter-badge {
   background: #fff;
-  color: #6366f1;
+  color: #164b9c;
 }
 
 /* Clear filters button */

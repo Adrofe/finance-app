@@ -193,7 +193,9 @@ function DateFilter({ filters, onChange }: { filters: TransactionFilters; onChan
         {(['range', 'month', 'year'] as DateMode[]).map(m => (
           <button
             key={m}
+            type="button"
             className={`ttf-date-tab${mode === m ? ' active' : ''}`}
+            aria-pressed={mode === m}
             onClick={() => setMode(m)}
           >
             {{ range: 'Intervalo', month: 'Mes', year: 'Año' }[m]}
@@ -237,7 +239,9 @@ function DateFilter({ filters, onChange }: { filters: TransactionFilters; onChan
               return (
                 <button
                   key={val}
+                  type="button"
                   className={`ttf-month-cell${isOn ? ' active' : ''}`}
+                  aria-pressed={isOn}
                   onClick={() => onChange({ ...filters, dateMonth: isOn ? '' : val })}
                 >
                   {name}
@@ -257,7 +261,9 @@ function DateFilter({ filters, onChange }: { filters: TransactionFilters; onChan
             return (
               <button
                 key={y}
+                type="button"
                 className={`ttf-year-pill${isOn ? ' active' : ''}`}
+                aria-pressed={isOn}
                 onClick={() => onChange({ ...filters, dateYear: isOn ? '' : val })}
               >
                 {y}
@@ -323,7 +329,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
   };
 
   return (
-    <div className="ttf-panel">
+    <div id="transaction-filters" className="ttf-panel">
 
       {/* ── Row 1: Date · Description · Amount ── */}
       <div className="ttf-row">
@@ -386,7 +392,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
 
               return (
                 <div key={parent.id} className="ttf-cat-group">
-                  <label className="ttf-cat-parent">
+                  <label className={`ttf-cat-parent${isParentSel ? ' ttf-cat--selected' : isIndeterminate ? ' ttf-cat--partial' : ''}`}>
                     <input
                       type="checkbox"
                       className="ttf-checkbox"
@@ -402,7 +408,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                     {children.map(child => {
                       const childVisual = getCategoryVisual(child.code || child.name);
                       return (
-                        <label key={child.id} className="ttf-cat-child">
+                        <label key={child.id} className={`ttf-cat-child${isParentSel || filters.categoryIds.includes(child.id) ? ' ttf-cat--selected' : ''}`}>
                           <input
                             type="checkbox"
                             className="ttf-checkbox"
@@ -422,12 +428,16 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
             {standaloneCategories.map(cat => {
               const visual = getCategoryVisual(cat.code || cat.name);
               return (
-                <label key={cat.id} className="ttf-cat-standalone">
+                <label key={cat.id} className={`ttf-cat-standalone${filters.categoryIds.includes(cat.id) || filters.parentCategoryIds.includes(cat.id) ? ' ttf-cat--selected' : ''}`}>
                   <input
                     type="checkbox"
                     className="ttf-checkbox"
                     checked={filters.categoryIds.includes(cat.id) || filters.parentCategoryIds.includes(cat.id)}
-                    onChange={() => onChange({ ...filters, categoryIds: toggle(filters.categoryIds, cat.id) })}
+                    onChange={() => onChange({
+                      ...filters,
+                      categoryIds: filters.parentCategoryIds.includes(cat.id) ? filters.categoryIds.filter(id => id !== cat.id) : toggle(filters.categoryIds, cat.id),
+                      parentCategoryIds: filters.parentCategoryIds.filter(id => id !== cat.id),
+                    })}
                   />
                   <span className="ttf-cat-emoji" style={{ color: visual.color, background: `${visual.color}22` }} aria-hidden="true">{visual.emoji}</span>
                   <span>{cat.name}</span>
@@ -461,6 +471,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                     : <span className="ttf-acc-emoji" aria-hidden="true">{logoSrc}</span>
                   }
                   {acc.name}
+                  {isOn && <span className="ttf-selection-check" aria-hidden="true">&#10003;</span>}
                 </label>
               );
             })}
@@ -473,7 +484,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
           <div className="ttf-chip-list">
             {statuses.map(s => {
               const isOn = filters.statusIds.includes(s.id);
-              const st = FILTER_STATUS_STYLES[s.code] ?? FILTER_STATUS_STYLES.BOOKED;
+              const st = FILTER_STATUS_STYLES[s.code.toUpperCase()] ?? { bg: '#e8f1ff', color: '#164b9c' };
               return (
                 <label
                   key={s.id}
@@ -488,6 +499,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                   />
                   <span className="ttf-status-dot" style={{ background: isOn ? st.color : '#9ca3af' }} />
                   {s.code}
+                  {isOn && <span className="ttf-selection-check" aria-hidden="true">&#10003;</span>}
                 </label>
               );
             })}
@@ -505,7 +517,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                 <label
                   key={t.id}
                   className={`ttf-type-chip${isOn ? ' ttf-type-chip--on' : ''}`}
-                  style={isOn && ty ? { background: ty.bg, color: ty.color } : {}}
+                  style={isOn && ty ? { background: ty.bg, color: ty.color, borderColor: `${ty.color}66` } : {}}
                 >
                   <input
                     type="checkbox"
@@ -514,6 +526,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                     onChange={() => onChange({ ...filters, typeIds: toggle(filters.typeIds, t.id) })}
                   />
                   {t.name}
+                  {isOn && <span className="ttf-selection-check" aria-hidden="true">&#10003;</span>}
                 </label>
               );
             })}
@@ -540,6 +553,7 @@ export function TransactionsFiltersPanel({ filters, onChange, categories, accoun
                     onChange={() => onChange({ ...filters, tagIds: toggle(filters.tagIds, tag.id) })}
                   />
                   #{tag.name}
+                  {filters.tagIds.includes(tag.id) && <span className="ttf-selection-check" aria-hidden="true">&#10003;</span>}
                 </label>
               ))}
             </div>

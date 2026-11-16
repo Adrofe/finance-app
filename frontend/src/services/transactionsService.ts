@@ -5,12 +5,15 @@ import type { Transaction, CreateTransactionRequest } from '../types/banking';
 
 export type TransactionsSearchRequest = {
   accountId?: number;
+  sourceAccountIds?: number[];
   categoryId?: number;
   categoryIds?: number[];
   tagIds?: number[];
   merchantId?: number;
   statusId?: number;
+  statusIds?: number[];
   typeId?: number;
+  typeIds?: number[];
   currency?: string;
   startDate?: string;
   endDate?: string;

@@ -14,6 +14,8 @@ public class TransactionFilterRequest {
     /** Filter by source OR destination account */
     private Long accountId;
 
+    private List<Long> sourceAccountIds;
+
     private Long categoryId;
 
     /** Transactions assigned to any of these categories. */
@@ -26,7 +28,11 @@ public class TransactionFilterRequest {
 
     private Long statusId;
 
+    private List<Long> statusIds;
+
     private Long typeId;
+
+    private List<Long> typeIds;
 
     /** ISO 4217, e.g. "EUR". Case-insensitive. */
     private String currency;

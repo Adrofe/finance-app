@@ -34,7 +34,9 @@ public class TransactionSpecification implements Specification<Transaction> {
         predicates.add(cb.equal(root.get("tenantId"), tenantId));
 
         // Account (source OR destination)
-        if (filter.getAccountId() != null) {
+        if (filter.getSourceAccountIds() != null && !filter.getSourceAccountIds().isEmpty()) {
+            predicates.add(root.get("sourceAccount").get("id").in(filter.getSourceAccountIds()));
+        } else if (filter.getAccountId() != null) {
             Predicate isSource = cb.equal(root.get("sourceAccount").get("id"), filter.getAccountId());
             Predicate isDestination = cb.equal(root.get("destinationAccount").get("id"), filter.getAccountId());
             predicates.add(cb.or(isSource, isDestination));
@@ -50,11 +52,15 @@ public class TransactionSpecification implements Specification<Transaction> {
             predicates.add(cb.equal(root.get("merchant").get("id"), filter.getMerchantId()));
         }
 
-        if (filter.getStatusId() != null) {
+        if (filter.getStatusIds() != null && !filter.getStatusIds().isEmpty()) {
+            predicates.add(root.get("status").get("id").in(filter.getStatusIds()));
+        } else if (filter.getStatusId() != null) {
             predicates.add(cb.equal(root.get("status").get("id"), filter.getStatusId()));
         }
 
-        if (filter.getTypeId() != null) {
+        if (filter.getTypeIds() != null && !filter.getTypeIds().isEmpty()) {
+            predicates.add(root.get("transactionType").get("id").in(filter.getTypeIds()));
+        } else if (filter.getTypeId() != null) {
             predicates.add(cb.equal(root.get("transactionType").get("id"), filter.getTypeId()));
         }
 

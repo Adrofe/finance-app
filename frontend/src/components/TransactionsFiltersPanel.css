@@ -156,8 +156,8 @@ input[type="number"].ttf-input {
 }
 
 .ttf-date-tab.active {
-  background: #fff;
-  color: #4338ca;
+  background: #e8f1ff;
+  color: #164b9c;
   box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
 
@@ -229,8 +229,8 @@ input[type="number"].ttf-input {
 }
 
 .ttf-month-cell.active {
-  background: #6366f1;
-  border-color: #6366f1;
+  background: #2563eb;
+  border-color: #2563eb;
   color: #fff;
   font-weight: 700;
 }
@@ -263,8 +263,8 @@ input[type="number"].ttf-input {
 }
 
 .ttf-year-pill.active {
-  background: #6366f1;
-  border-color: #6366f1;
+  background: #2563eb;
+  border-color: #2563eb;
   color: #fff;
   font-weight: 700;
 }
@@ -274,7 +274,7 @@ input[type="number"].ttf-input {
 .ttf-checkbox {
   width: 14px;
   height: 14px;
-  accent-color: #6366f1;
+  accent-color: #2563eb;
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -334,7 +334,7 @@ input[type="number"].ttf-input {
 
 .ttf-cat-children {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   padding-left: 16px;
   gap: 0 4px;
 }
@@ -349,6 +349,8 @@ input[type="number"].ttf-input {
   font-size: 12.5px;
   color: #4b5563;
   user-select: none;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .ttf-cat-child:hover {
@@ -369,6 +371,14 @@ input[type="number"].ttf-input {
 
 .ttf-cat-standalone:hover {
   background: #f3f4f6;
+}
+
+.ttf-cat-parent.ttf-cat--selected,
+.ttf-cat-child.ttf-cat--selected,
+.ttf-cat-standalone.ttf-cat--selected,
+.ttf-cat-parent.ttf-cat--partial {
+  background: #e8f1ff;
+  color: #164b9c;
 }
 
 /* ─── Chip list ────────────────────────────────────────────────────────────── */
@@ -411,15 +421,15 @@ input[type="number"].ttf-input {
 }
 
 .ttf-chip--on {
-  background: #6366f1;
-  border-color: #6366f1;
+  background: #2563eb;
+  border-color: #2563eb;
   color: #fff;
   font-weight: 600;
 }
 
 .ttf-chip--on:hover {
-  background: #4f46e5;
-  border-color: #4f46e5;
+  background: #1d4ed8;
+  border-color: #1d4ed8;
   color: #fff;
 }
 
@@ -500,8 +510,17 @@ input[type="number"].ttf-input {
   color: #4338ca;
 }
 
-.ttf-type-chip--on {
-  border-color: transparent;
+.ttf-type-chip.ttf-type-chip--on,
+.ttf-type-chip.ttf-type-chip--on:hover {
+  border-color: #2563eb;
+  background: #e8f1ff;
+  color: #164b9c;
+  font-weight: 700;
+}
+
+.ttf-selection-check {
+  margin-left: auto;
+  padding-left: 8px;
   font-weight: 700;
 }
 
@@ -530,3 +549,14 @@ input[type="number"].ttf-input {
 .ttf-group--scroll::-webkit-scrollbar { width: 4px; }
 .ttf-group--scroll::-webkit-scrollbar-track { background: transparent; }
 .ttf-group--scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+
+@media (max-width: 900px) {
+  .ttf-row--multi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ttf-cat-tree { min-width: 0; }
+}
+
+@media (max-width: 600px) {
+  .ttf-panel { padding: 12px; }
+  .ttf-row--multi { grid-template-columns: minmax(0, 1fr); }
+  .ttf-range input[type="date"].ttf-input { width: min(138px, 42%); }
+}
