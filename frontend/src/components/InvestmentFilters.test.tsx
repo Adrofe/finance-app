@@ -5,7 +5,8 @@ import { useInvestmentsOverview } from '../hooks/useInvestmentsOverview';
 import { useInvestmentOperations } from '../hooks/useInvestmentOperations';
 import { useInvestmentsDashboard } from '../hooks/useInvestmentsDashboard';
 import { fetchInstruments, fetchInvestmentTypes, fetchPlatforms, fetchPortfolioHistory } from '../services/investmentCatalogService';
-import { fetchExposureOverview, fetchInvestmentPositions, fetchInvestmentSummary, fetchOperations, fetchTaxSummary } from '../services/investmentOperationsService';
+import { fetchExposureOverview, fetchInvestmentPositions, fetchInvestmentSummary, fetchOperations, fetchTaxSummary, recalculateAllPositions } from '../services/investmentOperationsService';
+import { FINANCE_EVENTS } from '../events/financeEvents';
 import { CatalogService } from '../services/catalogService';
 import { fetchExchangeRates } from '../services/exchangeRatesService';
 import { InvestmentCatalogTable } from './InvestmentCatalogTable';
@@ -67,6 +68,21 @@ afterEach(() => {
 });
 
 describe('investment type filters', () => {
+  it('refreshes investment views after recalculation and reports failures', async () => {
+    vi.mocked(recalculateAllPositions).mockResolvedValueOnce(1).mockRejectedValueOnce(new Error('failed'));
+    const updated = vi.fn();
+    window.addEventListener(FINANCE_EVENTS.INVESTMENTS_UPDATED, updated);
+    try {
+      render(<InvestmentsOverviewTable token="test" />);
+      fireEvent.click(screen.getByRole('button', { name: /Recalcular/ }));
+      await waitFor(() => expect(updated).toHaveBeenCalledTimes(1));
+      fireEvent.click(screen.getByRole('button', { name: /Recalcular/ }));
+      expect((await screen.findByRole('alert')).textContent).toContain('No se pudieron recalcular las inversiones.');
+      expect(updated).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(FINANCE_EVENTS.INVESTMENTS_UPDATED, updated);
+    }
+  });
   it('filters catalog from the type counters and combines selections with text search', () => {
     render(<InvestmentCatalogTable token="test" />);
     const table = within(screen.getByRole('table'));

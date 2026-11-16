@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+import { dispatchFinanceEvent, FINANCE_EVENTS } from '../events/financeEvents';
 import { useInvestmentsOverview } from '../hooks/useInvestmentsOverview';
 import { recalculateAllPositions } from '../services/investmentOperationsService';
 import { fetchExchangeRates } from '../services/exchangeRatesService';
@@ -38,6 +40,7 @@ const pnlClass = (value: number | null | undefined) => safeNumber(value) >= 0 ? 
 export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorized }) => {
   const { summary, positions, byInstrument, loading, error, clearError, reload } = useInvestmentsOverview(token, onUnauthorized);
   const [recalculating, setRecalculating] = useState(false);
+  const [recalculateError, setRecalculateError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedTypeCodes, setSelectedTypeCodes] = useState<string[]>([]);
   const [countryFilter, setCountryFilter] = useState('');
@@ -140,9 +143,13 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
 
   const handleRecalculate = () => {
     setRecalculating(true);
+    setRecalculateError('');
     recalculateAllPositions(token)
-      .then(() => reload())
-      .catch((err) => console.error('Recalculate failed', err))
+      .then(() => dispatchFinanceEvent(FINANCE_EVENTS.INVESTMENTS_UPDATED))
+      .catch((err: unknown) => {
+        if (axios.isAxiosError(err) && err.response?.status === 401) onUnauthorized?.('Sesión expirada');
+        else setRecalculateError(axios.isAxiosError(err) ? err.response?.data?.message || 'No se pudieron recalcular las inversiones.' : 'No se pudieron recalcular las inversiones.');
+      })
       .finally(() => setRecalculating(false));
   };
 
@@ -214,6 +221,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
 
   return (
     <div className="io-wrapper">
+      {recalculateError && <p className="state error" role="alert">{recalculateError}</p>}
       {historyInstrument && (
         <InstrumentHistoryModal
           instrumentId={historyInstrument.id}
@@ -294,6 +302,7 @@ export const InvestmentsOverviewTable: React.FC<Props> = ({ token, onUnauthorize
           <button
             type="button"
             className="io-btn-recalc"
+            title="Recalcular posiciones y lotes FIFO"
             onClick={handleRecalculate}
             disabled={recalculating}
           >

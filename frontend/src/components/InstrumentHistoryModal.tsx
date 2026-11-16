@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { FINANCE_EVENTS } from '../events/financeEvents';
 import {
   Area,
   CartesianGrid,
@@ -109,6 +110,12 @@ export function InstrumentHistoryModal({ instrumentId, symbol, name, currency, t
   const [dateFilter, setDateFilter] = useState('');
   const [inputCurrency, setInputCurrency] = useState(currency);
   const loadedOnce = useRef(false);
+
+  useEffect(() => {
+    const refresh = () => setReloadKey(key => key + 1);
+    window.addEventListener(FINANCE_EVENTS.INVESTMENTS_UPDATED, refresh);
+    return () => window.removeEventListener(FINANCE_EVENTS.INVESTMENTS_UPDATED, refresh);
+  }, []);
 
   useEffect(() => {
     let active = true;
